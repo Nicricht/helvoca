@@ -6,7 +6,14 @@ on:
       payer_email:
         description: "Mercado Pago TEST payer email (@testuser.com)"
         required: true
-        default: "test@testuser.com"
+        type: string
+      expected_test_seller_id:
+        description: "Test SELLER User ID from Mercado Pago Test Accounts (digits only)"
+        required: true
+        type: string
+      confirm_test_credential_source:
+        description: "Type I_VERIFIED_TEST_CREDENTIALS after checking Test, not Production"
+        required: true
         type: string
       confirm_sandbox:
         description: "I confirm this run uses Mercado Pago TEST credentials only"
@@ -28,6 +35,8 @@ jobs:
     timeout-minutes: 12
     env:
       CONFIRM_SANDBOX: ${{ inputs.confirm_sandbox }}
+      CONFIRM_TEST_CREDENTIAL_SOURCE: ${{ inputs.confirm_test_credential_source }}
+      MERCADOPAGO_EXPECTED_TEST_SELLER_ID: ${{ inputs.expected_test_seller_id }}
       HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
       MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
       MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
@@ -44,26 +53,14 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Fail closed unless this is an explicit TEST run
+      - name: Verify TEST seller provenance before any subscription creation
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$CONFIRM_SANDBOX" != "true" ]]; then
-            echo "confirm_sandbox must be true"
-            exit 1
-          fi
-          if [[ -z "${MERCADOPAGO_TEST_ACCESS_TOKEN:-}" ]]; then
-            echo "Missing repository secret MERCADOPAGO_TEST_ACCESS_TOKEN"
-            exit 1
-          fi
-          if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
-            echo "Refusing to run: TEST token must start with APP_USR"
-            exit 1
-          fi
-          if [[ "$MERCADOPAGO_TEST_PAYER_EMAIL" != *@testuser.com ]]; then
-            echo "Refusing to run: payer must be a Mercado Pago testuser.com account"
-            exit 1
-          fi
+          # APP_USR is used by both TEST and PRODUCTION credentials.
+          # A missing or false test_user identity blocks all provider writes.
+          python3 scripts/ops/c5_mercadopago_sandbox_preflight.py
+          echo "HELVOCA_C5_PROVENANCE_GATE_PASSED=true" >> "$GITHUB_ENV"
 
       - name: Run real Mercado Pago sandbox provider certification
         run: |

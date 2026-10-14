@@ -17,6 +17,8 @@ class MercadoPagoSaasSandboxProviderIT {
                 Boolean.parseBoolean(System.getenv("HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST")),
                 "External Mercado Pago sandbox certification is disabled");
 
+        assertEquals("true", System.getenv("HELVOCA_C5_PROVENANCE_GATE_PASSED"),
+                "C5 read-only authenticated TEST seller identity preflight must pass before provider writes");
         String token = requiredEnv("MERCADOPAGO_TEST_ACCESS_TOKEN");
         assertTrue(token.startsWith("APP_USR"),
                 "Mercado Pago TEST access token must start with APP_USR");
@@ -56,9 +58,8 @@ class MercadoPagoSaasSandboxProviderIT {
         assertNotNull(remote.status());
         assertFalse(remote.status().isBlank());
 
-        System.out.println("MERCADOPAGO_SANDBOX_CERTIFIED subscriptionId=" + remote.id());
-        System.out.println("MERCADOPAGO_SANDBOX_STATUS=" + remote.status());
-        System.out.println("MERCADOPAGO_SANDBOX_CHECKOUT_URL=" + checkout.checkoutUrl());
+        // Avoid putting remotely actionable checkout links or identifiers into CI logs.
+        System.out.println("C5_SANDBOX_SUBSCRIPTION_CREATED_AND_READBACK_VERIFIED");
     }
 
     private static String requiredEnv(String name) {
