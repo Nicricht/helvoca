@@ -1,0 +1,47 @@
+name: Agenda Fixed-Clock E2E
+
+on:
+  pull_request:
+    paths:
+      - e2e/react-agenda.spec.js
+      - .github/workflows/agenda-fixture-clock-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agenda-fixture-clock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build production React assets
+        run: npm run frontend:build
+
+      - name: Verify all Agenda browser scenarios on fixture week
+        run: npx playwright test e2e/react-agenda.spec.js
+
+      - name: Retain failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agenda-fixture-clock-e2e-diagnostics
+          path: |
+            test-results/**
+            playwright-report/**
+          if-no-files-found: warn
+          retention-days: 14
