@@ -8,6 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -65,6 +69,12 @@ class BillingProviderPostgresBridgeIntegrationTest {
 
     @Autowired
     TenantDatabaseContext scope;
+
+    @Autowired
+    WebApplicationContext webContext;
+
+    @Autowired
+    MercadoPagoProperties webhookProperties;
 
     @Autowired
     @Qualifier("migrationDataSource")
@@ -351,6 +361,69 @@ class BillingProviderPostgresBridgeIntegrationTest {
                 null, invoiceId, body)).getStatusCode().value());
         assertEquals(settled, stored(tenantA));
         verify(provider, times(2)).getInvoice(invoiceId);
+    }
+
+    @Test
+    void signedHttpPostTraversesSpringSecurityAndPersistsExactlyOnceInPostgres() throws Exception {
+        String invoiceId = "test-http-invoice-a";
+        String requestId = "test-http-request";
+        String secret = "synthetic-http-test-only-secret";
+        String oldToken = webhookProperties.getAccessToken();
+        String oldSecret = webhookProperties.getWebhookSecret();
+        boolean oldEnabled = webhookProperties.isEnabled();
+        webhookProperties.setEnabled(true);
+        webhookProperties.setAccessToken("TEST-only-http-token");
+        webhookProperties.setWebhookSecret(secret);
+        try {
+            MockMvc mvc = MockMvcBuilders.webAppContextSetup(webContext)
+                    .apply(org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity())
+                    .build();
+            when(provider.getInvoice(invoiceId)).thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                    invoiceId, subscriptionId(tenantA), "processed", "approved", "paid",
+                    OffsetDateTime.parse("2026-10-13T19:00:00Z")));
+            String body = "{\"type\":\"subscription_authorized_payment\","
+                    + "\"data\":{\"id\":\"" + invoiceId + "\"}}";
+            String signature = signTestWebhook(
+                    invoiceId, requestId, Instant.now().getEpochSecond(), secret);
+
+            // Security filters and the actual HTTP parameter binding must allow
+            // only a correctly authenticated provider event through to billing.
+            assertEquals(401, mvc.perform(
+                    org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .post("/webhooks/v1/mercadopago")
+                            .param("type", "subscription_authorized_payment")
+                            .param("data.id", invoiceId)
+                            .header("x-request-id", requestId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body)).andReturn().getResponse().getStatus());
+            assertEquals("TRIALING", stored(tenantA).get("status"));
+            verify(provider, never()).getInvoice(invoiceId);
+
+            var post = org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                    .post("/webhooks/v1/mercadopago")
+                    .param("type", "subscription_authorized_payment")
+                    .param("data.id", invoiceId)
+                    .header("x-request-id", requestId)
+                    .header("x-signature", signature)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body);
+
+            assertEquals(204, mvc.perform(post).andReturn().getResponse().getStatus());
+            Map<String, Object> first = stored(tenantA);
+            assertEquals("ACTIVE", first.get("status"));
+            assertEquals("PRO", first.get("plan_code"));
+            assertEquals(invoiceId, first.get("last_billing_invoice_id"));
+            assertEquals("TRIALING", stored(tenantB).get("status"));
+
+            assertEquals(204, mvc.perform(post).andReturn().getResponse().getStatus());
+            assertEquals(first, stored(tenantA), "Repeated signed POST must be idempotent");
+            assertEquals("TRIALING", stored(tenantB).get("status"));
+            verify(provider, times(2)).getInvoice(invoiceId);
+        } finally {
+            webhookProperties.setWebhookSecret(oldSecret);
+            webhookProperties.setAccessToken(oldToken);
+            webhookProperties.setEnabled(oldEnabled);
+        }
     }
 
     @Test
