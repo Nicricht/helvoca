@@ -43,9 +43,14 @@ public class MercadoPagoWebhookController {
             WebhookSignatureValidator.validate(
                     signature,
                     requestId,
-                    data.id(),
-                    properties.getWebhookSecret(),
-                    Duration.ofSeconds(properties.getWebhookToleranceSeconds()));
+                    data.id().toLowerCase(java.util.Locale.ROOT),
+                    properties.getWebhookSecret());
+            // SDK 3.7.0 only interprets ts as seconds in its tolerance
+            // overload, while Mercado Pago also sends millisecond timestamps.
+            // Check both units with a strict window after cryptographic HMAC.
+            MercadoPagoWebhookTimestampGuard.validate(
+                    signature, Duration.ofSeconds(properties.getWebhookToleranceSeconds()),
+                    java.time.Instant.now());
         } catch (MPInvalidWebhookSignatureException | IllegalArgumentException e) {
             log.warn("Rejected Mercado Pago webhook request={} topic={}", requestId, data.topic());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();

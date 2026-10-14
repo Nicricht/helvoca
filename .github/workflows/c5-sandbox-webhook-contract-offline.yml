@@ -1,0 +1,51 @@
+name: C5 stage 2 signed webhooks and invoice replay (offline)
+
+on:
+  push:
+    branches:
+      - 'test/c5-webhook-signed-sandbox-contract-*'
+  pull_request:
+    branches:
+      - 'fix/c5-sandbox-provenance-preflight-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  signed-webhooks-and-paid-invoice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Real HMAC and invoice approval/idempotency unit contracts (no provider)
+        run: >-
+          mvn -B --no-transfer-progress
+          -Dtest=MercadoPagoWebhookSignatureRoundTripTest,MercadoPagoWebhookTimestampGuardTest,MercadoPagoWebhookControllerTest,BillingSubscriptionServiceTest,BillingSubscriptionServiceEdgeCasesTest
+          test
+      - name: Assert external TEST provider gate stays disabled
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src = Path('src/test/java/cl/helvoca/billing/MercadoPagoWebhookSignatureRoundTripTest.java').read_text()
+          assert 'mockStatic' not in src
+          assert 'HmacSHA256' in src and 'getInstance("HmacSHA256")' in src
+          assert 'reconcileAuthorizedPayment' in src
+          assert 'verifyNoInteractions(billing)' in src
+          assert 'Instant.now().toEpochMilli()' in src
+          assert 'MERCADOPAGO_TEST_ACCESS_TOKEN' not in src
+          guard = Path('src/main/java/cl/helvoca/billing/MercadoPagoWebhookTimestampGuard.java').read_text()
+          controller = Path('src/main/java/cl/helvoca/billing/MercadoPagoWebhookController.java').read_text()
+          assert 'ts.length() == 10' in guard
+          assert 'getInstance("HmacSHA256")' in src
+          assert 'MercadoPagoWebhookTimestampGuard.validate' in controller
+          assert 'properties.getWebhookSecret());' in controller
+          print('C5_WEBHOOK_HMAC_AND_PROVIDER_OFFLINE_CONTRACT=PASS')
+          PY
