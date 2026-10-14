@@ -23,6 +23,14 @@ jobs:
           python-version: '3.11'
       - name: Confirm Python syntax
         run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py scripts/ops/c1_unattended_institutional_backup.py scripts/ops/test_c1_unattended_institutional_backup.py scripts/ops/c1_railway_cron_backup.py scripts/ops/test_c1_railway_cron_backup.py
+      - name: Parse one-time institutional OAuth PowerShell wizard, without executing it
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [void][System.Management.Automation.Language.Parser]::ParseFile("scripts/ops/c1_authorize_institutional_drive.ps1", [ref]$tokens, [ref]$errors)
+          if ($errors.Count -gt 0) { throw "C1_OAUTH_POWERSHELL_SYNTAX_INVALID" }
+          Write-Host "C1_OAUTH_POWERSHELL_SYNTAX_PASS"
       - name: Synthetic offline security and failure regressions
         run: |
           python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
@@ -81,6 +89,17 @@ jobs:
           assert 'CMD ["python3", "-c"' in image
           assert 'postgres:18-' in image
           assert 'age rclone' in image
+          oauth=Path('scripts/ops/c1_authorize_institutional_drive.ps1').read_text()
+          assert 'scope=drive.file' in oauth
+          assert 'Get-FileHash $zip -Algorithm SHA256' in oauth
+          assert 'variable set $Name --stdin' in oauth
+          assert '--skip-deploys' in oauth
+          assert 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' in oauth
+          assert "HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE" in oauth
+          assert 'config create $remote drive' in oauth
+          assert 'HelvocaBackups-Automaticos' in oauth
+          assert 'AGE-SECRET-KEY-' not in oauth
+          assert 'docker' not in oauth.lower()
           assert 'age-test' not in src
           assert 'merge_pull_request' not in src
           print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
