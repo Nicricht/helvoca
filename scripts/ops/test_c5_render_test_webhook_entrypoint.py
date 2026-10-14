@@ -70,7 +70,7 @@ class TestRenderFreeEntrypoint(unittest.TestCase):
         with patch.dict(os.environ, good(), clear=True):
             with patch("scripts.ops.c5_render_test_webhook_entrypoint.Collector", return_value=fake) as factory:
                 self.assertEqual(main(), 0)
-                factory.assert_called_once_with(("0.0.0.0", 10000), SECRET)
+                factory.assert_called_once_with(("0.0.0.0", 10000), SECRET, require_test_mode=True)
                 fake.serve_forever.assert_called_once()
                 fake.server_close.assert_called_once()
 
