@@ -8,7 +8,11 @@ on:
         required: true
         type: string
       expected_test_seller_id:
-        description: "Test SELLER User ID from Mercado Pago Test Accounts (digits only)"
+        description: "Test SELLER User ID from Mercado Pago > Test Accounts (digits only)"
+        required: true
+        type: string
+      expected_test_seller_nickname:
+        description: "Generated Test SELLER username from same Test Accounts row (TEST...)"
         required: true
         type: string
       confirm_test_credential_source:
@@ -37,6 +41,7 @@ jobs:
       CONFIRM_SANDBOX: ${{ inputs.confirm_sandbox }}
       CONFIRM_TEST_CREDENTIAL_SOURCE: ${{ inputs.confirm_test_credential_source }}
       MERCADOPAGO_EXPECTED_TEST_SELLER_ID: ${{ inputs.expected_test_seller_id }}
+      MERCADOPAGO_EXPECTED_TEST_SELLER_NICKNAME: ${{ inputs.expected_test_seller_nickname }}
       HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
       MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
       MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
@@ -58,7 +63,8 @@ jobs:
         run: |
           set -euo pipefail
           # APP_USR is used by both TEST and PRODUCTION credentials.
-          # A missing or false test_user identity blocks all provider writes.
+          # Test account panel ID + generated nickname must match GET /users/me.
+          # A mismatched alias or explicit test_user=false blocks every write.
           python3 scripts/ops/c5_mercadopago_sandbox_preflight.py
           echo "HELVOCA_C5_PROVENANCE_GATE_PASSED=true" >> "$GITHUB_ENV"
 
