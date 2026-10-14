@@ -84,9 +84,14 @@ class MercadoPagoSaasSandboxProviderIT {
         assertEquals("buyer_42@testuser.com", validatedBuyerEmail(" BUYER_42@TESTUSER.COM "));
     }
 
-    // RED: legacy workflow allowed example email; never invoke provider here.
+    // This is a shape/preflight guard, NOT proof the buyer still exists.
     static String validatedBuyerEmail(String value) {
-        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        String normalized = value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+        if ("test@testuser.com".equals(normalized)
+                || !normalized.matches("[a-z0-9][a-z0-9._+-]*@testuser\\.com")) {
+            throw new IllegalArgumentException("A non-example TEST buyer email is required");
+        }
+        return normalized;
     }
 
     @Test
@@ -99,11 +104,8 @@ class MercadoPagoSaasSandboxProviderIT {
         assertTrue(token.startsWith("APP_USR"),
                 "Mercado Pago TEST access token must start with APP_USR");
 
-        String payerEmail = requiredEnv("MERCADOPAGO_TEST_PAYER_EMAIL")
-                .trim()
-                .toLowerCase(Locale.ROOT);
-        assertTrue(payerEmail.endsWith("@testuser.com"),
-                "Sandbox payer must be a Mercado Pago testuser.com account");
+        // Refuse the documented API-example email BEFORE issuing POST /preapproval.
+        String payerEmail = validatedBuyerEmail(requiredEnv("MERCADOPAGO_TEST_PAYER_EMAIL"));
 
         UUID businessId = UUID.randomUUID();
         PaymentPlan plan = new PaymentPlan("BASIC", "Emprende", 24_990, false);
