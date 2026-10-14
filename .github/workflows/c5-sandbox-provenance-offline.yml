@@ -1,0 +1,58 @@
+name: C5 sandbox seller provenance (offline)
+
+on:
+  push:
+    branches:
+      - 'fix/c5-sandbox-provenance-preflight-*'
+  pull_request:
+    branches:
+      - 'feat/c5-offline-plan-intent-handoff-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-python-no-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify fail-closed preflight including mocked read-only identity lookup
+        run: |
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c5_mercadopago_sandbox_preflight.py'
+      - name: Static check manual provider workflow cannot bypass preflight
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/saas-billing-sandbox.yml').read_text()
+          provider_step = workflow.index('Run real Mercado Pago sandbox provider certification')
+          guard = workflow.index('python3 scripts/ops/c5_mercadopago_sandbox_preflight.py')
+          assert guard < provider_step
+          assert 'CONFIRM_TEST_CREDENTIAL_SOURCE' in workflow
+          assert 'MERCADOPAGO_EXPECTED_TEST_SELLER_ID' in workflow
+          assert 'HELVOCA_C5_PROVENANCE_GATE_PASSED=true' in workflow
+          assert 'test@testuser.com' not in workflow
+          provider_test = Path('src/test/java/cl/helvoca/billing/MercadoPagoSaasSandboxProviderIT.java').read_text()
+          assert 'HELVOCA_C5_PROVENANCE_GATE_PASSED' in provider_test
+          assert 'MERCADOPAGO_SANDBOX_CHECKOUT_URL=' not in provider_test
+          print('C5_SANDBOX_PROVENANCE_AND_NO_LEAK_CONTRACT=PASS')
+          PY
+
+  existing-billing-contract-no-provider:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run focused billing tests with external certification disabled
+        env:
+          HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: 'false'
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=MercadoPagoSaasSandboxProviderIT,MercadoPagoSubscriptionGatewayTest,SaasBillingSandboxCertificationStartupRunnerTest
+          test
