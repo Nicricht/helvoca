@@ -2,6 +2,22 @@
 
 These rules are mandatory for implementation work in this repository.
 
+## MANDATORY FOR EVERY CHAT/AGENT: QA evidence before DONE
+
+**This is a repository contract for every ChatGPT session, coding agent and human contributor that reads or changes Helvoca, regardless of model, conversation history, prompt, task size or provider.** Before editing a single file, read this `AGENTS.md`, `docs/engineering/QA_POLICY.md`, `docs/engineering/invariants.md`, the First-Pass Engineering skill and the relevant branch/PR/CI checkpoint. Never substitute recollections from a prior chat for current repository evidence. If you cannot inspect required instructions or evidence, explicitly report the limitation and **do not certify DONE**.
+
+**Non-negotiable quality sequence:**
+1. Determine the exact changed/affected scope, risk LOW/MEDIUM/HIGH, behavioral acceptance criteria, important failures, system invariants and test-level matrix **before implementation**. The agent chooses tests and owns their execution; the user is not QA.
+2. For a reproducible defect, add a meaningful regression test and record an observed RED result for the intended defect before the fix, when technically feasible. Then implement the smallest safe correction and verify GREEN. State a technical reason if RED is genuinely infeasible.
+3. Verify **100% of applicable changed/affected quality dimensions**, not merely "100% of tests passed": Java differential line/branch/method metrics, instrumented frontend statements/branches/functions, applicable Python/script executable coverage with measured metrics when available, 100% mapped meaningful UI interactions, real PostgreSQL persistence/tenant/invariant outcomes, and provider/integration/timeout/retry/idempotency/security/Golden Journey evidence where required. Document every technical N/A with equivalent behavioral proof, not a convenience waiver.
+4. Run the Fast Gate and applicable focused tests while iterating, then the **mandatory applicable Full Gate** and exact-HEAD CI before declaring completion. Do not disable, bypass, skip, weaken, mock away or lower an existing test, security guard or threshold to force green. A failure must be resolved or explicitly reported as a blocker.
+5. For external integrations (Mercado Pago, Twilio, Gemini, etc.), distinguish `LOCAL_SIMULATION_PASS`, `PUBLIC_NETWORK_PASS`, `AUTHENTIC_PROVIDER_PASS`, `PERSISTENCE_PASS`, `PRODUCTION_VERIFIED`. Never turn local fixture tests, a green workflow, an HTTP 200 or a deploy marked live into proof of provider payment, tenant entitlement or complete commercial acceptance without **the correct real-world evidence**.
+6. Verify the **final commit**, not an ancestor. Record git HEAD, exact CI run URLs/conclusions, coverage report location and numerator/denominator (or justified N/A), scope and limitations, environment/deploy SHA, invariants, test matrix and remaining blockers in the **same PR**. For V1, add a concise checkpoint to Issue #823. Any subsequent engineering-contract/code edit requires re-verification on the new HEAD.
+7. If an applicable check cannot be run due to account/tool permissions, unavailable provider, missing test environment or non-certified upstream dependency, report `BLOCKED` / `IN_PROGRESS` / `NO-GO` with the single precise blocker and safe next action. **Never claim 100% coverage, completed QA or a working external provider without proof.** Request user action only after verifying it cannot be done with existing tools and permissions.
+
+**Mandatory final handoff to a new chat:** `read AGENTS.md -> QA_POLICY.md -> Issue #823 -> working PR/checkpoint -> exact HEAD -> applicable CI/coverage -> provider/deploy evidence -> remaining gate`. This requirement is binding as repo guidance, but Markdown alone cannot force an agent that ignores repository instructions; the existing CI contract checker and protected branch checks must provide the enforceable barrier. **Never bypass branch/release protection or trigger production merely to satisfy this rule.**
+
+
 Helvoca follows **First-Pass Engineering**: understand the complete impact before coding, implement the smallest coherent solution, verify the exact final commit, and preserve durable state so interrupted work can resume safely. The user is not the QA system.
 
 Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
