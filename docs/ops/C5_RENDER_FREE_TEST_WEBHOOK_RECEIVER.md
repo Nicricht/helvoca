@@ -90,3 +90,16 @@ El titular aportó una captura del formulario **Configurar notificaciones Webhoo
 
 **Fuentes:** [MP Webhooks y restricciones de Suscripciones](https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod). La captura del usuario **no** está en el repositorio para proteger la URL sensible y la clave.
 
+
+## Corrección de ACK oficial y despliegue comprobado
+
+**2026-10-14:** la [documentación oficial de notificaciones MP](https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod) especifica que para confirmar la entrega un receptor debe devolver **HTTP 200 o 201**. El servidor de test devolvía 204 tras HMAC válida, respuesta que otros sistemas aceptan pero que MP puede interpretar como ausencia de confirmación.
+
+**TDD y resolución:**
+- [CI RED #38549537160](https://github.com/Nicricht/helvoca/actions/runs/38549537160): nuevos asserts 200 reprodujeron el bug: 2 fallos, resultado real 204, sin modificar credenciales ni producción.
+- Se cambió **solo el ACK del POST firmado y aceptado**, de 204 a **200**. `GET /health` continúa 204, el POST sin HMAC sigue 401, y los eventos con `live_mode` incompatible siguen rechazados. Se actualizó el smoke sintético para que exija 200.
+- [CI GREEN #38549622427](https://github.com/Nicricht/helvoca/actions/runs/38549622427) **35/35 pruebas Python PASS** y contrato sin proveedor/efecto de cobro. [CI HTTPS #38549622492](https://github.com/Nicricht/helvoca/actions/runs/38549622492) success.
+- **Render Free real:** deployment manual `dep-db7li1k9v7es73cg70c0` terminó en estado **`live`** sobre SHA ejecutable `12a7e99b27c74771ac307e9155475c2f491a8a61`. Servicio sigue en plan `free` y AutoDeploy desactivado. Ningún despliegue a Railway ni token de MP revelado.
+
+**La siguiente acción requiere al titular:** copiar la `Clave secreta` existente de la pestaña `Modo de prueba` de Mercado Pago, sin restablecerla ni pegarla en chat, directamente sobre la variable existente `C5_EPHEMERAL_HMAC_SECRET` del servicio Render Free `helvoca-c5-test-webhook-ingress`, seleccionando `Save and deploy`. **No actualizar `MERCADOPAGO_TEST_ACCESS_TOKEN`**, no editar el entorno Railway, no exponer secret por screenshot y no editar aún la URL del proveedor. El agente comprobará Render live + HTTPS, y luego guiará el cambio temporal/supervisado de URL y tópico `Planes y suscripciones` en Modo de prueba, preservando la configuración anterior del webhook TEST de pagos de negocio. La documentación oficial contiene una salvedad sobre notificaciones de Suscripciones: una casilla visible no garantiza entrega hasta ver un callback MP verdadero.
+
