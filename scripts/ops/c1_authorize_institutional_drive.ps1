@@ -138,12 +138,10 @@ try {
     Write-Host 'Never share your local rclone.conf or any OAuth token.'
 } catch {
     $code = $_.Exception.Message
-    if ($code -notmatch '^C1_[A-Z0-9_]+
-    Write-Host "C1_OAUTH_BLOCKED: $code"
-    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
-    exit 2
-}
-) { $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage }
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
     Write-Host "C1_OAUTH_BLOCKED: $code"
     Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
     exit 2
