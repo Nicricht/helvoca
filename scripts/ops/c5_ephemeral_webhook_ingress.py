@@ -104,11 +104,22 @@ def verify(body, query, headers, secret, now_ms=None):
         raise InvalidWebhook("HMAC mismatch")
     return topic, event_id
 
+def require_sandbox_event(payload):
+    # An authentic HMAC is necessary but not sufficient to mark a test event.
+    # Production-labeled or unspecified events must not be acknowledged by
+    # Render's permanently public test-only receiver.
+    data = strict_json(payload)
+    if data.get("live_mode") is not False:
+        raise InvalidWebhook("non-test provider event")
+    return True
+
+
 class Collector(ThreadingHTTPServer):
     daemon_threads = True
-    def __init__(self, address, secret):
+    def __init__(self, address, secret, require_test_mode=False):
         super().__init__(address, Handler)
         self.secret = secret
+        self.require_test_mode = require_test_mode
         self.received = 0
         self.unique = set()
 
@@ -145,6 +156,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             content = self.rfile.read(size)
             topic, event_id = verify(content, parts.query, self.headers, self.server.secret)
+            if self.server.require_test_mode:
+                require_sandbox_event(content)
         except InvalidWebhook:
             return self.respond(401)
         except Exception:
@@ -152,6 +165,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(500)
         self.server.received += 1
         self.server.unique.add((topic, event_id))
+        if self.server.require_test_mode:
+            # Topic belongs to a fixed allowlist; do not log raw event IDs,
+            # headers, signature, request body, payer, buyer or token.
+            print("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=" + topic, flush=True)
         self.respond(204)
 
 def main():
