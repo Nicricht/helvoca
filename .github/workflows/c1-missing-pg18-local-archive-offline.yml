@@ -48,7 +48,9 @@ jobs:
           assert 'REMOTE_ENCRYPTED_SHA256' in restored
           assert 'sha256_file(path)' in restored
           assert 'restore_to_disposable_docker' in restored
-          assert 'LOCAL_PRIVATE' not in restored or 'LOCAL_PRIVATE' in restored
+          assert 'dump_from_railway' not in restored
+          assert 'REMOTE_DOWNLOAD_SHA256_MISMATCH' in restored
+          assert 'complete_production_rto_verified": False' in restored
           assert 'railway ssh' not in restored.lower()
           assert 'production_modified": False' in restored
           assert 'age-test' not in src
