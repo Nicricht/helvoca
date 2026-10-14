@@ -8,6 +8,19 @@ Cada funcionalidad, corrección, prueba, integración, auditoría u operación c
 
 La documentación es una **parte del entregable**, no una tarea opcional posterior. El agente la escribe y actualiza; el usuario no debe recordar en qué archivo quedó algo ni reconstruir conversaciones previas.
 
+## Condición QA de cierre aplicable a todos los agentes
+
+**Ningún chat, agente o implementación puede declarar DONE, 100% QA o integración certificada** solo porque pasó una suite de tests. Antes de cada modificación debe leer `AGENTS.md` y `docs/engineering/QA_POLICY.md`, comprobar el estado real del PR, definir una matriz de pruebas y después documentar en el **mismo PR**:
+
+- Comportamiento/invariante modificado, clasificación de riesgo, casos positivos, negativos y adversariales, y nivel de prueba correcto.
+- Evidencia RED -> GREEN para defectos reproducibles cuando sea técnicamente posible, sin alterar pruebas para esconder el fallo.
+- Cobertura cuantificada al 100% en **todas las dimensiones aplicables** (Java, frontend, scripts Python, interacciones y contratos de datos); métricas no instrumentadas requieren N/A técnico y matriz de comportamiento completo, nunca valores supuestos.
+- Enlaces a ejecuciones CI del commit **HEAD final**, Fast Gate y Full Gate aplicable; número de tests aprobados **no equivale** a 100% de cobertura.
+- Separación explícita de mock/local, HTTP público, proveedor real autenticado, base de datos real, evento terminal de negocio y producción; el 200 de un simulador **no prueba** una factura approved.
+- Identificación del código exactamente desplegado, estado `IN_PROGRESS`/`BLOCKED`/`NO-GO` cuando falta evidencia, y un único siguiente paso seguro.
+
+Para trabajos solo documentales, no inventar porcentajes de cobertura del código: registrar **N/A técnico** y certificar integridad del contrato documental mediante comprobador CI, enlaces válidos y ausencia de cambios productivos. Todas estas verificaciones corresponden al implementador, **no al usuario**.
+
 ## Dónde registrar la información (sin crear planes paralelos)
 
 1. **Código/contrato/procedimiento:** actualizar, dentro del mismo PR, la documentación técnica o runbook que corresponda, solo cuando exista un cambio significativo de comportamiento, configuración, arquitectura o procedimiento. Reutilizar la página existente antes de crear una.
