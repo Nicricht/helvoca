@@ -169,7 +169,9 @@ class Handler(BaseHTTPRequestHandler):
             # Topic belongs to a fixed allowlist; do not log raw event IDs,
             # headers, signature, request body, payer, buyer or token.
             print("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=" + topic, flush=True)
-        self.respond(204)
+        # Mercado Pago documents HTTP 200/201 as successful webhook ACK.
+        # 204 was accepted by our generic HTTP smoke, but can trigger provider retries.
+        self.respond(200)
 
 def main():
     if os.getenv("C5_EPHEMERAL_MODE") != "test-only":
