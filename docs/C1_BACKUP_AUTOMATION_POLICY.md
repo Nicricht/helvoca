@@ -72,6 +72,16 @@ Fuentes: [Railway Cron Jobs](https://docs.railway.com/cron-jobs) y [Railway pric
 - Un cron nativo en Railway trabaja en UTC. Antes de activar, revisar el horario, coste/consumo de ejecución y prueba de alertas; Railway puede omitir intervalos si un job anterior continúa ejecutándose.
 - Validación de código: GitHub Actions `#38515642709`, pruebas **56/56** sintéticas offline (17+9+10+9+11), sintaxis y guardas de seguridad. CI no ejecuta ni construye el contenedor contra Railway, no lee datos productivos y no certifica backups automáticos reales.
 
+## Autorización OAuth institucional asistida, sin instalar rclone en Windows
+
+- Script de un solo uso: `scripts/ops/c1_authorize_institutional_drive.ps1`. Este script **NO** autoriza Google por sí solo: necesita que el operador abra el navegador y conceda el acceso con su cuenta institucional. No recibe OAuth por el conector de ChatGPT.
+- Si el PC no tiene rclone, descarga una versión **portátil** desde los releases oficiales, contrasta su SHA-256 con SHA256SUMS, la ejecuta desde directorio temporal y no la instala en PATH. Las credenciales se guardan en `%USERPROFILE%\HelvocaPrivate\oauth\rclone.conf` con ACL de Windows restrictivas.
+- Solicita scope de Google **`drive.file`**, no acceso completo a todo Drive. Por ese motivo crea la nueva carpeta `HelvocaBackups-Automaticos` en **la misma cuenta institucional**; el respaldo manual en `HelvocaBackups` permanece intacto y ajeno al token.
+- Comprueba la escritura y lectura remota de un archivo pequeño de prueba sin datos de producción y localiza el ID de la carpeta propia de la app. Transmite token OAuth con `railway variable set ... --stdin --skip-deploys` y actualiza únicamente las variables `RCLONE_CONFIG_INSTITUTIONAL_TOKEN`, `...ROOT_FOLDER_ID` y `...SCOPE` del servicio cron vacío. **Nunca pega token por chat ni lanza backup/deploy**.
+- Importante: el cliente OAuth compartido de rclone está siendo retirado durante 2026. Si Google lo bloquea o el refresh token deja de ser válido, la configuración debe rehacerse con un **OAuth client propio de Google Cloud** autorizado por el titular institucional. No declarar operación 24/7 durable con el OAuth compartido sin comprobar que renovación de token funciona.
+- El asistente es una ayuda para el operador; el proyecto no puede ejecutar un consentimiento OAuth en su nombre ni exportar credenciales desde el plugin de Google Drive. Usar solo desde una copia local de `Nicricht/helvoca` actualizada. Guardar el archivo `rclone.conf` con el mismo cuidado que cualquier contraseña y **nunca** compartirlo.
+- **Comando local (Windows, no requiere instalar rclone):** abrir PowerShell en la copia existente del repo, actualizar rama del PR #828 y ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\ops\c1_authorize_institutional_drive.ps1`. Solo compartir el código de éxito o bloqueo `C1_*`, sin capturas con OAuth.
+
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
