@@ -18,7 +18,7 @@ IDENTITY_URL = "https://api.mercadopago.com/users/me"
 class ProbeBlocked(Exception):
     pass
 
-def verify_public_identity(payload, expected_digest):
+def verify_public_identity(payload, expected_digest, seller_id_digest="", buyer_id_digest=""):
     if not isinstance(payload, dict):
         raise ProbeBlocked("C5_READONLY_RESPONSE_INVALID")
     user_id = str(payload.get("id") or "")
@@ -41,10 +41,15 @@ def verify_public_identity(payload, expected_digest):
         f"{user_id}|{nickname.upper()}|{site}".encode("utf-8")
     ).hexdigest()
     if not hmac.compare_digest(candidate, expected_digest):
-        raise ProbeBlocked("C5_EXISTING_SECRET_SELLER_IDENTITY_MISMATCH")
+        identity_digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
+        if seller_id_digest and hmac.compare_digest(identity_digest, seller_id_digest):
+            raise ProbeBlocked("C5_EXISTING_SECRET_SELLER_ID_MATCH_BUT_ALIAS_MISMATCH")
+        if buyer_id_digest and hmac.compare_digest(identity_digest, buyer_id_digest):
+            raise ProbeBlocked("C5_EXISTING_SECRET_IS_SCREENSHOT_BUYER_NOT_SELLER")
+        raise ProbeBlocked("C5_EXISTING_SECRET_IS_DIFFERENT_TEST_ACCOUNT")
     return True
 
-def probe(token, expected_digest, opener=request.urlopen):
+def probe(token, expected_digest, opener=request.urlopen, seller_id_digest="", buyer_id_digest=""):
     if not token:
         raise ProbeBlocked("C5_EXISTING_REPOSITORY_SECRET_UNAVAILABLE_TO_ACTIONS")
     if not re.fullmatch(r"[a-f0-9]{64}", expected_digest):
@@ -70,12 +75,16 @@ def probe(token, expected_digest, opener=request.urlopen):
         payload = json.loads(body)
     except (ValueError, UnicodeDecodeError):
         raise ProbeBlocked("C5_READONLY_RESPONSE_INVALID") from None
-    return verify_public_identity(payload, expected_digest)
+    return verify_public_identity(payload, expected_digest, seller_id_digest, buyer_id_digest)
 
 def main():
     try:
-        probe(os.environ.get("MERCADOPAGO_TEST_ACCESS_TOKEN", ""),
-              os.environ.get("C5_EXPECTED_TEST_SELLER_FINGERPRINT", ""))
+        probe(
+            os.environ.get("MERCADOPAGO_TEST_ACCESS_TOKEN", ""),
+            os.environ.get("C5_EXPECTED_TEST_SELLER_FINGERPRINT", ""),
+            seller_id_digest=os.environ.get("C5_SELLER_ID_HASH", ""),
+            buyer_id_digest=os.environ.get("C5_BUYER_ID_HASH", ""),
+        )
     except ProbeBlocked as exc:
         # Only return safe categorical outcomes. Never log credential or payload.
         print(str(exc))
