@@ -95,6 +95,26 @@ An inapplicable metric requires a technical N/A plus equivalent behavior-level p
 - Blockers / rulings:
 - Next step:
 
+## Mandatory documentation / completion record
+
+<!-- Rule: docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md. Document every meaningful finished block in THIS PR; for Helvoca V1 also link the relevant C0–C7 gate in Issue #823. Do not claim DONE with CI still pending or before updated docs/checkpoint. -->
+
+- [ ] Existing docs/runbook updated if actual behavior, architecture, configuration or operation changed (or explain N/A).
+- [ ] The completed work, motivation and affected files/behaviors are described.
+- [ ] Exact branch/PR/final HEAD, CI URL, actual test outcome and verified environment are recorded.
+- [ ] Real external actions **not performed** (deployment, migrations, calls, payments, backups) and remaining gates are explicit.
+- [ ] Decisions, safety boundaries, blockers and next precise action are documented.
+- [ ] For V1: Issue #823 and affected C0–C7 gate have a current checkpoint.
+- [ ] No secrets, private evidence or customer data were exposed; earlier valid evidence is linked, not rerun.
+
+Completion status: DONE_VERIFIED / DONE_OFFLINE_ONLY / IN_PROGRESS / BLOCKED / NO-GO
+
+Canonical documentation / runbook link (or N/A):
+
+Master gate / issue link (or N/A):
+
+Next exact action and owner:
+
 ## Final commit evidence
 
 - [ ] Cited verification belongs to the exact final commit.
