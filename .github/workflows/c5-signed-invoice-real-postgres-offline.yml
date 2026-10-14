@@ -1,0 +1,44 @@
+name: C5 signed invoice real PostgreSQL isolated
+
+on:
+  push:
+    branches:
+      - 'test/c5-isolated-postgres-signed-webhook-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-tenant-invoice-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 23
+    env:
+      HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Real HMAC plus isolated PostgreSQL 16 with Flyway and tenant boundaries
+        run: >-
+          mvn -B --no-transfer-progress
+          -Dtest=MercadoPagoSignedInvoicePostgresIntegrationTest
+          test
+      - name: Check test never calls live provider or production
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          test = Path('src/test/java/cl/helvoca/billing/MercadoPagoSignedInvoicePostgresIntegrationTest.java').read_text()
+          assert '@Testcontainers' in test
+          assert 'PostgreSQLContainer' in test
+          assert '@MockitoBean SubscriptionPaymentGateway remoteProvider' in test
+          assert 'MercadoPagoWebhookSignatureRoundTripTest.sign' in test
+          assert 'verifyNoInteractions(remoteProvider)' in test
+          assert 'verifyNoMoreInteractions(remoteProvider)' in test
+          assert 'tenantB' in test
+          assert 'C5' in test
+          print('C5_SIGNED_INVOICE_ISOLATED_POSTGRES_CONTRACT=PASS')
+          PY

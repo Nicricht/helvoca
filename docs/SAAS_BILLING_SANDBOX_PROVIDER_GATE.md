@@ -101,3 +101,17 @@ El preflight inicial del PR #831 exigía `GET /users/me → test_user=true`, per
 Esta decisión se fundamenta en [Cuentas de prueba de Mercado Pago](https://www.mercadopago.cl/developers/es/docs/automatic-payments-orders/resources/test-accounts?scope=prod) y en el [endpoint de creación de test user](https://www.mercadopago.cl/developers/es/reference/test_user/_users_test/post), que muestran el identificador y nickname generados. Mercado Pago indica asimismo que la prueba de **suscripciones** emplea una aplicación del vendedor TEST, cuya credencial puede tener aspecto de producción; ver [guía oficial de suscripciones](https://www.mercadopago.cl/developers/es/news/2023/11/16/Questions-on-how-to-test-your-integration--). Por ello se requiere **verificación del vendedor real de prueba** y no basta el nombre del secreto o APP_USR.
 
 **Estado:** aún no es certificación auténtica de sandbox. Faltan las cuentas del titular, credencial TEST privada y receptor de webhook aislado. Hasta entonces `BLOCKED_EXTERNAL_PROVIDER`; etapa 3 no iniciada. Evidencia CI exacta y siguiente paso en PR V2 e Issue #823.
+
+## Etapa 2: PostgreSQL temporal, firmas y transacciones sin proveedor real
+
+**Razón:** las pruebas anteriores verificaban HMAC y estados con repositorios simulados; ahora también se exige evidencia de persistencia real en PostgreSQL con Flyway, separación de tenants e idempotencia en transacciones.
+
+**Implementación:** PR #835 (https://github.com/Nicricht/helvoca/pull/835), test Java MercadoPagoSignedInvoicePostgresIntegrationTest y workflow c5-signed-invoice-real-postgres-offline.yml. PostgreSQL 16 Testcontainers y Flyway se ejecutan en runner temporal. El único componente simulado es la API externa SubscriptionPaymentGateway; el HMAC del SDK, el controlador de webhook, el servicio, JPA y PostgreSQL son reales.
+
+**Criterios:** notificación de autorización sin factura NO activa plan; factura aprobada con HMAC válido actualiza negocio A y no B; repetir factura no modifica el período; firma falsa se rechaza sin consulta remota; factura de suscripción no vinculada no modifica otro tenant; factura rechazada no activa plan ni amplía gracia con replay. Hasta CI final verde no declarar estos criterios certificados.
+
+**Diagnóstico inicial:** CI https://github.com/Nicricht/helvoca/actions/runs/38539820855 falló con cinco respuestas 404 porque el workflow imponía la variable de entorno MERCADOPAGO_ENABLED=false, que tiene prioridad sobre la propiedad del test. Eliminamos esa variable del job; el gateway sigue siendo un mock y la credencial del controlador una cadena ficticia sin proveedor real.
+
+**NO-GO externa:** Mercado Pago TEST real no se ha llamado con POST en esta entrega. Railway solo tiene production, por lo que no se montó receptor webhook allí. Una suscripción pending creada en /preapproval NO equivale a pago aprobado; para cerrar C5 etapa 2 faltan checkout con comprador TEST, webhook entregado por proveedor en receptor separado, factura aprobada consultada desde Mercado Pago y repetición real. No confundir tests con mocks o PostgreSQL temporal con certificación productiva.
+
+**Siguiente paso:** verificar CI en el SHA final del PR #835, registrar el resultado exacto, comprobar si ya existe un entorno receptor aislado reutilizable y solo solicitar acción externa al titular si se demuestra indispensable. La etapa 3 queda intacta.
