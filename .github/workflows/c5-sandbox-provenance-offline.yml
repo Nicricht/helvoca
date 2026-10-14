@@ -5,6 +5,7 @@ on:
     branches:
       - 'fix/c5-sandbox-provenance-preflight-*'
       - 'fix/c5-test-seller-identity-v2-*'
+      - 'probe/c5-existing-secret-readonly-20261014'
   pull_request:
     branches:
       - 'feat/c5-offline-plan-intent-handoff-*'

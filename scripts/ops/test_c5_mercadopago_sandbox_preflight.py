@@ -72,8 +72,21 @@ class TestC5SandboxSafety(unittest.TestCase):
     def test_missing_test_user_field_uses_two_independent_panel_identifiers(self):
         self.assertTrue(verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "TEST45I5GYIH"}, "123456789", "TEST45I5GYIH"))
 
+    def test_login_username_and_provider_test_nickname_may_differ_for_same_seller_id(self):
+        # Same authenticated seller ID is authoritative; both aliases are TEST.
+        self.assertTrue(verify_identity(
+            {"id": 123456789, "site_id": "MLC",
+             "nickname": "TESTOTHERALIAS123", "email": "test@testuser.com"},
+            "123456789", "TEST45I5GYIH"))
+
+    def test_same_test_alias_but_another_seller_id_is_rejected(self):
+        with self.assertRaisesRegex(SandboxBlocked, "SELLER_ID_MISMATCH"):
+            verify_identity(
+                {"id": 999999999, "site_id": "MLC",
+                 "nickname": "TEST45I5GYIH"}, "123456789", "TEST45I5GYIH")
+
     def test_mismatched_seller_alias_fails_closed(self):
-        with self.assertRaisesRegex(SandboxBlocked, "NICKNAME_MISMATCH"):
+        with self.assertRaisesRegex(SandboxBlocked, "NICKNAME_INVALID"):
             verify_identity({"id": 123456789, "site_id": "MLC", "nickname": "REALSELLER"}, "123456789", "TEST45I5GYIH")
 
     def test_mismatched_seller_email_fails_closed(self):
