@@ -19,7 +19,7 @@ class ReadOnlyExistingSecretTests(unittest.TestCase):
         self.assertTrue(verify_public_identity(ACCOUNT, EXPECTED))
 
     def test_wrong_test_seller_is_blocked(self):
-        with self.assertRaisesRegex(ProbeBlocked, "SELLER_IDENTITY_MISMATCH"):
+        with self.assertRaisesRegex(ProbeBlocked, "IS_DIFFERENT_TEST_ACCOUNT"):
             verify_public_identity({**ACCOUNT, "id": 654321}, EXPECTED)
 
 
