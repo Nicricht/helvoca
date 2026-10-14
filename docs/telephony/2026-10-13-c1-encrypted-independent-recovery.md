@@ -61,3 +61,21 @@ Workflow: .github/workflows/c1-encrypted-offsite-pg18-restore-contract.yml.
 Sin tráfico de proveedor, sin producción y sin secretos.
 
 **C1 permanece bloqueado hasta una copia externa cifrada restaurable, custodia independiente de contraseña y objetivos RPO/RTO aceptados.** Mantener PROD_DEPLOY=NO-GO, LIVE_CALL_CERTIFIED=false, COMMERCIAL_GO=NO-GO.
+
+## Actualización C1 · 2026-10-14 · recuperación desde descarga nueva de Google Drive
+
+**Esta actualización no certifica C1 ni activa producción.** La exportación fresca ya fue realizada y verificada por el operador; no repetirla. En Google Drive se comprobó de forma autenticada que el archivo cifrado **`helvoca-postgres18-20261013T213529Z-ced3d8.dump.age`** está en el directorio HelvocaOffsite, es privado (`shared=false`), descargable, tiene **673001 bytes** y fue creado 2026-10-13 21:35:55 UTC. El SHA256 del ciphertext remoto observado anteriormente desde una descarga autenticada independiente es `fdf281efa0ff75dac61e00353229d2e8f61f55c8c434a876c75d33d7449a7ce8`. **No es el SHA del dump en claro**. No poner el informe privado ni los bytes del backup en GitHub.
+
+**Brecha real previa:** `c1_replace_missing_offsite_archive.py` ya descifra y restaura una copia local sincronizada, pero no recibe un archivo *descargado de nuevo* de Google Drive. El nuevo comprobador específico `scripts/ops/c1_verify_cloud_download_restore.py` está fijado al nombre, tamaño y SHA256 de **este objeto remoto concreto**. Compara estos valores con el informe **privado existente** de exportación local, solicita al programa `age` el secreto de forma interactiva solo en el PC, comprueba `PGDMP`, tamaño y SHA del dump privado y restaura PostgreSQL 18 en un Docker disposable `--network none` sin puertos. Emite informe nuevo solo en `private-evidence` y siempre conserva `commercial_go=false`, RPO y RTO de producción desconocidos. No vuelve a invocar Railway ni crea recursos.
+
+**Paso de operación privada (solo cuando CI final de este script esté aprobado):** desde la cuenta Drive ya autenticada, descargar el objeto existente mediante el enlace oficial privado [archivo cifrado](https://drive.google.com/file/d/1gJ4yiwYW6Hg3RNKmL3KfcgHBVDMCUgUH/view), en **Descargas**, sin usar ni reutilizar el fichero sincronizado de G:. Mantener Docker Desktop y age disponibles. Desde una copia del repositorio con el PR C1 más reciente, ejecutar lo siguiente en PowerShell:
+
+~~~powershell
+py -3 .\scripts\ops\c1_verify_cloud_download_restore.py --downloaded-ciphertext "$env:USERPROFILE\Downloads\helvoca-postgres18-20261013T213529Z-ced3d8.dump.age" --private-report "$env:USERPROFILE\HelvocaPrivate\private-evidence\helvoca-c1-offsite-20261013T213708Z-90a1e4.private.json" --private-root "$env:USERPROFILE\HelvocaPrivate"
+~~~
+
+Si el nombre de la descarga cambia automáticamente, comprobar cuál fichero descargó realmente el navegador antes de ejecutar. No cambiar los hashes ni copiar el archivo sincronizado de G: fingiendo descarga independiente. La ruta exacta del informe privado consta en el registro del operador, pero **no** es prueba de que esté actualmente accesible. Se exige que el usuario introduzca la contraseña solo en el prompt de age: ningún bot debe pedirla, cambiarla o transferirla.
+
+**Criterios de aceptación todavía pendientes:** ejecución privada real sobre bytes descargados, comparación con SHA original del informe, custodia del secreto fuera de la cuenta institucional, evidencias de respaldo periódico y retención con RPO elegido/aceptado, prueba RTO extremo a extremo desde nube y sin acceso previo al archivo local, verificación operativa y un custodio designado. Una restauración aislada con origen remoto autenticado cierra solo esa parte, no C1 completa. El conector Railway muestra Postgres y su volumen actuales, pero **no expone la lista de snapshots/puntos PITR**; no certificar respaldo nativo vigente por la afirmación histórica de octubre 1.
+
+**Estado:** `C1_IN_PROGRESS`, `PROD_DEPLOY=NO-GO`, `COMMERCIAL_GO=NO-GO`.
