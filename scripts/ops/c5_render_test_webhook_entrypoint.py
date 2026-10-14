@@ -38,7 +38,7 @@ def main():
         return 2
     # Render's public ingress cannot reach 127.0.0.1; bind all interfaces
     # ONLY in the specifically gated TEST-only entrypoint.
-    server = Collector(("0.0.0.0", port), secret)
+    server = Collector(("0.0.0.0", port), secret, require_test_mode=True)
     print("C5_RENDER_TEST_INGRESS_LISTENING_NO_PAYMENT_ACTIONS", flush=True)
     try:
         server.serve_forever(poll_interval=0.2)
