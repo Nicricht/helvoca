@@ -15,6 +15,20 @@ Dos hitos distintos:
 - **HELVOCA_V1_COMERCIAL=TERMINADA:** C0–C7 cerradas con evidencia; flujo real registro→pago SaaS→configuración→recepción voz Twilio→acción de agenda→panel→soporte; primera activación de un negocio bajo condiciones aceptadas; sin P0, costes y protección de datos controlados. No declarar esto solo por CI verde, una demo o una compra simulada.
 - **PRIMER_CLIENTE_PAGADOR=VERIFICADO:** hito de negocio separado y adicional: se ha recibido un pago auténtico y el negocio realmente opera el alcance contratado. Para declarar concluido el **lanzamiento comercial inicial**, también debe estar cerrado; nunca falsificar interés, consentimiento o pago.
 
+## Actualización operativa 2026-10-14: desarrollo primero, C1 antes de producción
+
+**Decisión explícita del titular:** posponer la automatización personalizada de Google Drive/rclone y priorizar cerrar software V1. La vía propuesta para recuperar C1 antes de despliegue será estudiar y, si se autoriza el precio, habilitar **backups nativos de Railway**, probar una restauración aislada y conservar el respaldo externo cifrado ya recuperado. No se ha comprado plan ni activado backup aquí. Nunca asumir que el backup nativo reemplaza automáticamente una copia independiente fuera de Railway.
+
+Esta decisión modifica **el orden de ejecución, no los criterios de GO ni el checklist C0–C7**:
+
+- **AHORA, sin cambios productivos y sin necesidad de nuevos secretos:** C2-A, preparar la convergencia de ramas y CI de integración en una rama no desplegada; C3-A, preparar/verificar estáticamente contratos de Twilio y dos administradores; C4-A, revisar límites y pruebas deterministas Gemini/Twilio sin llamada; C5-A, revisar/pruebas de Mercado Pago TEST y onboarding offline con mocks y sin cobros; C6-A, elaborar privacidad, soporte, costes y checklist de aceptación. Reutilizar evidencia ya aprobada; corregir únicamente brechas reproducibles.
+- **ANTES DE CUALQUIER MERGE A `main`, migración Flyway V100–V103 o despliegue que toque datos:** retomar C1 con backup fresco verificable, restore aislado desde backup, copia/estrategia independiente, RPO/RTO aceptados, plan de rollback y autorización de ventana. Como Railway auto-despliega `main`, no realizar merges solo para terminar código.
+- **DESPUÉS Y CON AUTORIZACIONES REALES:** C2-B desplegar con seguridad; C3-B reconciliación Twilio auténtica de dos operadores; C4-B llamada real consentida con presupuesto; C5-B proveedor TEST auténtico y pago LIVE acotado; C6-B aprobaciones operativas; C7 recorrido completo.
+- **CONGELADO HASTA C1:** trabajo nuevo sobre `rclone` / OAuth Google Drive, archivos de automatización de backup, token Drive, creación de Cron, rutas productivas. Mantener `helvoca-backup-cron` sin source, schedule o despliegue. No borrar respaldo manual ni contraseñas age.
+- **No inferir** que el tiempo comercial está resuelto solo por pagar Railway. El primer negocio pagador se mantiene como evidencia separada.
+
+**Siguiente frente de ejecución:** C2-A, convergencia sin merge y pruebas CI del ensamble ya preparado en PR #826; en paralelo se puede avanzar C5-A/C6-A sin desplegar. Al cerrar cada brecha, documentar commit/CI en Issue #823 y avanzar al siguiente frente sin repetir la tarea.
+
 ## 1. Estado base: reutilizar logros, NO repetir
 
 | Elemento | Última evidencia conocida a fecha de creación | Interpretación correcta |
@@ -44,7 +58,7 @@ Dos hitos distintos:
 
 **Responsable:** asistente. **No requiere** nuevos secretos, capturas o autorizaciones productivas.
 
-### C1 · Respaldo real recuperable, redundancia y RPO/RTO [P0 ANTES DE MIGRAR]
+### C1 · Respaldo real recuperable, redundancia y RPO/RTO [P0 ANTES DE MIGRAR, NO BLOQUEA TRABAJO OFFLINE]
 
 **Ya tenemos:** dump/restauración PG18 local reportada y hash; documentación de rutina Railway. No repasar el simulacro anterior salvo que cambie el archivo o la compatibilidad.
 
@@ -52,7 +66,7 @@ Dos hitos distintos:
 
 **DONE C1:** al menos una copia actual restaurable + segunda copia independiente cifrada también restaurada, SHA/fecha/ubicación privada atestiguados, RPO/RTO medidos y aprobados, destino de recuperación identificado; ni dump ni claves en GitHub/chat/CI público.
 
-**Responsables:** asistente prepara y revisa; titular ejecuta/autoriza en su máquina o conecta almacenamiento privado autorizado. **STOP:** sin backup recuperable no hay C2 productivo.
+**Responsables:** asistente prepara y revisa; titular ejecuta/autoriza en su máquina o conecta almacenamiento privado autorizado. **STOP:** sin backup recuperable no hay C2 productivo. **NO bloquea** C2-A ni otros trabajos en ramas con CI y sin efectos en producción.
 
 ### C2 · Convergencia GitHub, Flyway V100–V103 y despliegue acotado [P0]
 
@@ -130,6 +144,9 @@ C0 Plan único
                                                       C7 Golden Journey real <---+
                                                       + primer negocio pagador
 ```
+
+
+**Lectura vigente tras cambio de prioridades:** en el diagrama siguiente, la flecha C1→C2 se refiere **solo a C2-B (merge y producción)**, no a C2-A (integración y pruebas en GitHub). C3-A/C4-A/C5-A/C6-A se pueden ejecutar en paralelo, sin llamadas reales ni cobros. Ningún nuevo backup automatizado se exige para abrir una rama o correr CI.
 
 C6 soporte, consentimiento y acuerdos aplicables deben estar **aprobados antes de C4 real**, aunque se trabaje en paralelo. C5 LIVE requiere su propia autorización y los controles del entorno real. **No llevar a producción una tarea por el solo hecho de estar delante en el diagrama.**
 
