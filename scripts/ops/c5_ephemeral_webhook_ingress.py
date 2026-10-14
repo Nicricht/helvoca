@@ -26,6 +26,33 @@ PREAPPROVAL = re.compile(r"[0-9a-fA-F-]{1,80}")
 class InvalidWebhook(ValueError):
     pass
 
+# Diagnostics are restricted to fixed categorical labels. Render Logs must
+# NEVER include raw payloads, IDs, timestamps, HMACs, keys, or headers.
+_SAFE_REJECT_CAUSES = {
+    "signature missing or too long": "SIGNATURE_FORMAT",
+    "invalid signature fields": "SIGNATURE_FORMAT",
+    "unexpected signature shape": "SIGNATURE_FORMAT",
+    "signature header ambiguity": "SIGNATURE_HEADER",
+    "request header ambiguity": "REQUEST_HEADER",
+    "request id invalid": "REQUEST_ID_FORMAT",
+    "invalid timestamp": "SIGNATURE_TIMESTAMP",
+    "stale or future timestamp": "SIGNATURE_TIMESTAMP",
+    "HMAC mismatch": "HMAC_MISMATCH",
+    "missing test-only secret": "SERVER_CONFIG",
+    "oversized body": "ENVELOPE",
+    "duplicate JSON field": "ENVELOPE",
+    "invalid JSON": "ENVELOPE",
+    "JSON object required": "ENVELOPE",
+    "duplicate query": "ENVELOPE",
+    "unrecognized or conflicting topic": "EVENT_SHAPE",
+    "event id required": "EVENT_SHAPE",
+    "conflicting event id": "EVENT_SHAPE",
+    "event id invalid": "EVENT_SHAPE",
+    "event id shape invalid": "EVENT_SHAPE",
+}
+def safe_rejection_reason(exception):
+    return _SAFE_REJECT_CAUSES.get(str(exception), "UNKNOWN")
+
 def strict_json(blob):
     def unique_pairs(pairs):
         result = {}
@@ -175,10 +202,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             content = self.rfile.read(size)
             topic, event_id = verify(content, parts.query, self.headers, self.server.secret)
-        except InvalidWebhook:
-            # Safe class-level diagnostic: never log request fields, reason,
-            # IDs, raw signature, tokens, or body content.
+        except InvalidWebhook as exc:
+            # Only a fixed enum is logged; client always receives the same
+            # generic 401. Never log exception text, header, token or body.
             print("C5_TEST_WEBHOOK_REJECT_STAGE=HMAC_OR_ENVELOPE", flush=True)
+            print("C5_TEST_WEBHOOK_REJECT_CAUSE=" + safe_rejection_reason(exc), flush=True)
             return self.respond(401)
         except Exception:
             return self.respond(500)
