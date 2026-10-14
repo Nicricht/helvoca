@@ -124,6 +124,14 @@ Preferred order:
 - [ ] tenant is moved from PAUSED only after the checks above;
 - [ ] global switch is enabled only for an explicitly authorized pilot window.
 
+## C6-A: incidente de privacidad, solicitud de datos y consentimiento
+
+Esta guía no sustituye la evaluación legal. Si existe acceso cruzado entre empresas, exposición de transcripciones o contactos, uso de datos sin fundamento verificado, o una comunicación/llamada no autorizada, tratarlo como **P0 por defecto** hasta que el responsable designado descarte riesgo. Bloquear los efectos externos del tenant y, si el alcance es incierto, el switch global; preservar solo metadatos mínimos y la evidencia privada necesaria, sin difundir contenido personal en GitHub.
+
+Para una solicitud de acceso, rectificación o supresión, **no realizar una eliminación SQL manual** ni asumir que la política `docs/DATA_RETENTION_POLICY.md` es una purga desplegada. Canalizar al responsable de privacidad verificado, comprobar identidad y tenant por procedimiento autorizado, evaluar obligaciones de conservación/documentación y registrar decisión/fecha de cierre de forma segura. La ruta pública `/data-deletion.html` es informativa, no prueba que un ticket esté atendido.
+
+Antes de reactivar el piloto después de un incidente de privacidad, requerir además aprobación registrada del responsable contractual/privacidad y, cuando corresponda, revisión jurídica, notificaciones exigibles y confirmación de que la causa ya no puede reproducirse. Los contactos, plazos de respuesta, escalaciones y avisos exigibles **deben acordarse y verificarse para el negocio y normativa aplicable**, no inventarse en este runbook.
+
 ## Support intake template
 
 Record:

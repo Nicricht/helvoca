@@ -199,6 +199,38 @@ Los valores vigentes deben contrastarse con `/api/v1/public/pricing`. Los límit
 
 Si un punto aplicable falla, registrar **PILOT pendiente**, no **CUSTOMER**.
 
+## 12 bis. Puerta C6-A: privacidad, IA y operación comercial (obligatoria antes de un piloto real)
+
+**Estado de esta sección al 2026-10-14: CHECKLIST PREPARATORIA, NO APROBACIÓN LEGAL.** No llenar datos personales, contratos firmados ni pruebas privadas en GitHub. Custodiar el expediente de aceptación fuera del repositorio y registrar aquí solo una referencia segura. La página pública `/privacy.html`, los `/terms.html` y `/data-deletion.html` **existen en el código**; su existencia no prueba aceptación del cliente, conformidad legal, disponibilidad en producción ni procesamiento efectivo de solicitudes.
+
+**Marco a revisar:** [Ley 19.628 vigente hasta el 30-11-2026](https://www.bcn.cl/leychile/Navegar?dt=open&idLey=19628); [Ley 21.719 con vigencia desde el 01-12-2026](https://www.bcn.cl/leychile/Navegar?i=1209272), según Biblioteca del Congreso Nacional. La aplicabilidad de bases de licitud, información, derechos, transferencias y obligaciones especiales debe determinarse con revisión jurídica del servicio y de cada piloto. No asumir que un check técnico reemplaza asesoría o aceptación formal.
+
+### Identidades y acuerdos verificables
+
+- Responsable contractual por RecepVoz (identidad y contacto **verificados, en expediente privado**):
+- Responsable contractual por el negocio (identidad/contacto **verificados, en expediente privado**):
+- Roles de tratamiento (quién decide finalidades/medios, quién procesa por cuenta ajena): **PENDIENTE DE DEFINICIÓN CONTRACTUAL** hasta evaluación de los flujos concretos.
+- Acuerdo de tratamiento de datos, confidencialidad, subencargados/proveedores y transferencias pertinentes: pendiente / revisado / aprobado (referencia no sensible):
+- Encargado de incidentes y contacto alternativo verificables (referencia privada):
+- Canal de derechos de titulares, verificación de identidad, escalamiento, plazos aplicables y constancia de resolución (referencia privada):
+- Decisor autorizado de PAUSE/STOP/rollback y destinatario humano de derivaciones:
+- Identidad legal del prestador, datos de facturación e impuestos: verificados / pendientes:
+
+### Pruebas de aceptación que NO se presumen
+
+- [ ] Responsable del negocio revisó y aprobó el alcance de los datos que entregará, base jurídica aplicable y destinatarios; se distingue el uso de datos del negocio del uso por RecepVoz.
+- [ ] Aviso al interlocutor de que interactúa con una IA, su finalidad y alternativa de atención humana revisados para el canal y jurisdicción del piloto; texto, momento y evidencia de aceptación o base habilitante autorizados.
+- [ ] Si existieran grabaciones o almacenamiento de audio, se documentó separadamente su fundamento legal, información/consentimiento cuando corresponda y política de retención. **No inferir que el producto actual graba llamadas.**
+- [ ] Procedimiento para ejercer derechos, corregir, suprimir o restringir datos verificado operacionalmente; sin asumir que la política de retención equivale a una eliminación automática ya desplegada. Véase `docs/DATA_RETENTION_POLICY.md`.
+- [ ] Política pública de privacidad, términos y eliminación revisados con responsable jurídico/contractual, accesibles desde el frontend en entorno objetivo y con datos de contacto/identidad válidos.
+- [ ] Proveedores, transferencias, controles de acceso, registros sin PII innecesaria y responsabilidades de incidentes evaluados por canal; cualquier proveedor sin certificación permanece fuera del piloto.
+- [ ] Plan mensual, impuestos/comisiones, minutos, excedentes, límites de concurrencia, suspensión, cancelación, reembolsos o controversias y vía de soporte definidos, publicados/aceptados según corresponda. El catálogo API manda sobre precios.
+- [ ] Contactos y dueños de severidad P0/P1 probados; prueba de PAUSE y rollback en entorno autorizado con evidencias. Véase `docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md`.
+- [ ] Coste unitario/margen medido con tarifas y factura o consumo representativos, con presupuesto y límite/alarma autorizados; **NO se promete rentabilidad**.
+- [ ] Responsable contractual de RecepVoz y, si corresponde, asesor jurídico, autorizaron expresamente el paquete de documentos y el piloto específico.
+
+**Regla de salida:** si cualquiera de las condiciones aplicables está pendiente, el piloto con tráfico o clientes reales sigue `C6=NO-GO`. Es admisible trabajar en demo offline, QA y documentación; **no se habilitan llamadas, mensajes, cobros ni producción** por completar esta ficha.
+
 ## 13. Criterios para activar
 
 No activar hasta cumplir:
