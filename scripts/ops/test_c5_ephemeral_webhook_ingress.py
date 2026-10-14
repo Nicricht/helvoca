@@ -90,6 +90,20 @@ class HmacContract(unittest.TestCase):
         from scripts.ops import c5_ephemeral_webhook_ingress as mod
         self.assertEqual(mod.Handler.log_message(None, "fake email %s", "hello@example.com"), None)
 
+def mp_simulator_fixture():
+    """Fixed synthetic example from MP Developers' webhook simulator."""
+    return {
+        "action": "updated",
+        "application_id": "1234509876",
+        "data": {"id": "123456"},
+        "date": "2021-11-01T02:02:02Z",
+        "entity": "preapproval",
+        "id": "123456",
+        "type": "subscription_preapproval",
+        "version": 8,
+    }
+
+
 class StrictSandboxEventContract(unittest.TestCase):
     def test_only_explicit_sandbox_event_is_eligible(self):
         self.assertTrue(require_sandbox_event(b'{"live_mode":false}'))
@@ -105,6 +119,29 @@ class StrictSandboxEventContract(unittest.TestCase):
     def test_string_false_does_not_count_as_sandbox(self):
         with self.assertRaisesRegex(InvalidWebhook, "non-test"):
             require_sandbox_event(b'{"live_mode":"false"}')
+
+
+    def test_only_exact_mpsimulator_fixture_without_live_mode_is_allowed(self):
+        data = json.dumps(mp_simulator_fixture()).encode()
+        self.assertEqual(require_sandbox_event(data), "SIMULATOR_ONLY")
+
+    def test_suspected_real_event_with_missing_live_mode_is_rejected(self):
+        data = mp_simulator_fixture()
+        data["date"] = "2026-10-14T10:55:00Z"
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
+
+    def test_simulator_with_explicit_live_true_is_always_rejected(self):
+        data = mp_simulator_fixture()
+        data["live_mode"] = True
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
+
+    def test_altered_simulator_identifier_is_rejected(self):
+        data = mp_simulator_fixture()
+        data["data"]["id"] = "987654"
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
 
 
 class RenderStrictHttpContract(unittest.TestCase):
@@ -156,6 +193,44 @@ class RenderStrictHttpContract(unittest.TestCase):
         n=self.server.received
         self.assertEqual(self.send(body,headers),401)
         self.assertEqual(self.server.received,n)
+
+
+    def test_signed_mp_simulator_without_live_mode_is_accepted_but_not_paid(self):
+        body, headers = signed(topic="subscription_preapproval", event_id="123456")
+        body = json.dumps(mp_simulator_fixture()).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0]+"\\n")):
+            self.assertEqual(self.send(body, headers), 200)
+        self.assertIn(
+            "C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC=subscription_preapproval",
+            output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
+        self.assertNotIn("1234509876", output.getvalue())
+
+    def test_mp_simulator_with_wrong_signature_is_rejected(self):
+        body, headers = signed(topic="subscription_preapproval",
+                               event_id="123456", secret="wrong-fake-secret")
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        self.assertEqual(self.send(body, headers), 401)
+        self.assertEqual(self.server.received, previous)
+
+    def test_expired_simulator_hmac_cannot_bypass_timestamp_window(self):
+        body, headers = signed(topic="subscription_preapproval",
+                               event_id="123456",
+                               ts=int(time.time()*1000)-300_001)
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        self.assertEqual(self.send(body, headers), 401)
+        self.assertEqual(self.server.received, previous)
+
+    def test_simulator_missing_hmac_is_rejected(self):
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        self.assertEqual(self.send(body, {}), 401)
+        self.assertEqual(self.server.received, previous)
 
 
 class LocalHttpContract(unittest.TestCase):
