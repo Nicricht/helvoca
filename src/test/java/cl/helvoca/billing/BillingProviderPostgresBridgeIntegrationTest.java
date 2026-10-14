@@ -17,6 +17,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.sql.Timestamp;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.util.HexFormat;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -278,6 +282,75 @@ class BillingProviderPostgresBridgeIntegrationTest {
             owner.execute("DROP FUNCTION IF EXISTS public.c5_test_subscription_update_audit_fn()");
             owner.execute("DROP TABLE IF EXISTS public.c5_test_subscription_update_audit");
         }
+    }
+
+    private static String signTestWebhook(String invoiceId, String requestId, long timestamp, String secret) {
+        try {
+            // Same HMAC input contract as the official Mercado Pago Java SDK.
+            String manifest = "id:" + invoiceId + ";request-id:" + requestId
+                    + ";ts:" + timestamp + ";";
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            return "ts:" + timestamp + ",v1:" + HexFormat.of().formatHex(
+                    mac.doFinal(manifest.getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException error) {
+            throw new AssertionError("Test JVM must support HmacSHA256", error);
+        }
+    }
+
+    @Test
+    void signedSdkValidatedWebhookReconcilesRealPostgresAndRejectsForgedOrExpiredSignatures() {
+        String invoiceId = "test-signed-invoice-a";
+        String requestId = "test-request-a";
+        String secret = "synthetic-test-only-hmac-secret-unique";
+        long timestamp = Instant.now().getEpochSecond();
+        var props = new MercadoPagoProperties();
+        props.setEnabled(true);
+        props.setAccessToken("TEST-only-test-token");
+        props.setWebhookSecret(secret);
+        props.setWebhookToleranceSeconds(300);
+        var controller = new MercadoPagoWebhookController(props, billing);
+        when(provider.getInvoice(invoiceId)).thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                invoiceId, subscriptionId(tenantA), "processed", "approved", "paid",
+                OffsetDateTime.parse("2026-10-13T19:00:00Z")));
+        String body = "{\\\"type\\\":\\\"subscription_authorized_payment\\\","
+                + "\\\"data\\\":{\\\"id\\\":\\\"" + invoiceId + "\\\"}}";
+        String good = signTestWebhook(invoiceId, requestId, timestamp, secret);
+
+        // Invalid HMAC must not reconcile or change another business.
+        assertEquals(401, scope.callAsSystem(() -> controller.webhook(
+                good.substring(0, good.length() - 1) + "0", requestId,
+                "subscription_authorized_payment", null, invoiceId, body)).getStatusCode().value());
+        assertEquals("TRIALING", stored(tenantA).get("status"));
+        assertEquals("TRIALING", stored(tenantB).get("status"));
+        verify(provider, never()).getInvoice(invoiceId);
+
+        // Correct HMAC is verified by the real SDK and routed through the real
+        // Spring billing service into PostgreSQL.
+        assertEquals(204, scope.callAsSystem(() -> controller.webhook(
+                good, requestId, "subscription_authorized_payment",
+                null, invoiceId, body)).getStatusCode().value());
+        Map<String, Object> settled = stored(tenantA);
+        assertEquals("ACTIVE", settled.get("status"));
+        assertEquals("PRO", settled.get("plan_code"));
+        assertEquals(invoiceId, settled.get("last_billing_invoice_id"));
+        assertEquals("approved", settled.get("last_billing_payment_status"));
+        assertEquals("TRIALING", stored(tenantB).get("status"));
+
+        assertEquals(204, scope.callAsSystem(() -> controller.webhook(
+                good, requestId, "subscription_authorized_payment",
+                null, invoiceId, body)).getStatusCode().value());
+        assertEquals(settled, stored(tenantA), "Duplicate signed webhook must be idempotent");
+        assertEquals("TRIALING", stored(tenantB).get("status"));
+
+        // Even a mathematically valid signature with an expired timestamp is
+        // rejected without accessing the payment provider or mutating storage.
+        String expired = signTestWebhook(invoiceId, requestId, timestamp - 3600, secret);
+        assertEquals(401, scope.callAsSystem(() -> controller.webhook(
+                expired, requestId, "subscription_authorized_payment",
+                null, invoiceId, body)).getStatusCode().value());
+        assertEquals(settled, stored(tenantA));
+        verify(provider, times(2)).getInvoice(invoiceId);
     }
 
     @Test
