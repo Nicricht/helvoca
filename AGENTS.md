@@ -6,6 +6,20 @@ Helvoca follows **First-Pass Engineering**: understand the complete impact befor
 
 Before implementation, read `software-factory/skill/first-pass-engineering/SKILL.md` when it is present so a fresh conversation does not depend on prior chat memory.
 
+## Mandatory documentation on every meaningful completed work item
+
+**Completion without durable documentation is NOT completion.** Before declaring a feature, bug fix, test suite, integration, audit, configuration change, or C0–C7 milestone finished, follow [`docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md`](docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md). The implementing agent is responsible; never make the user reconstruct prior work.
+
+1. **Before starting**, read the applicable existing documentation, issue/PR checkpoint, exact branch HEAD and valid CI. Find and reuse prior implementation, decisions and evidence; do not repeat a task/test/provider side effect merely because the conversation has changed.
+2. **During multi-step or interrupted work**, update the same PR's resume checkpoint with what is actually done, what is pending, any blocker and the single next action. In-progress, attempted, locally tested, CI-approved and production-certified are different states.
+3. **After each meaningful finished block, in the SAME working PR**, update the affected feature/runbook/architecture/operational documentation when behavior or procedures changed. Record **what and why**, scope and paths, acceptance criteria, exact branch/commit SHA, PR/Issue URLs, CI run URLs and actual outcomes, environment (offline/TEST/production), outstanding risks, decisions, explicitly unperformed external actions and the **next precise step**. Link to existing evidence rather than duplicating documents or rerunning successful tests.
+4. **Keep one status ledger**: for commercial Helvoca V1, update the existing [master Issue #823](https://github.com/Nicricht/helvoca/issues/823) under the affected C0–C7 gate and maintain its linked master plan. Do not invent parallel master plans, extra phases or unlinked status files. Other work uses its existing issue/PR.
+5. **Only report DONE when documentation and verification are both current for the exact final commit**. If any files change after a CI success, say the earlier verification is stale and recertify the affected scope. If production/live-provider checks remain unavailable, document `PENDING`/`NO-GO`, never `PASS`.
+6. **Protect secrets and customers**: never put API keys, tokens, dumps, passwords, decrypted personal data, sensitive logs or private evidence in Git, GitHub issues, PRs or chat. Record only a safe proof reference or redacted outcome.
+7. **Handoff standard**: a fresh agent must be able to reconstruct `repo → master gate → branch/PR → exact HEAD → completed changes → exact CI/evidence → blockers/holds → next safe action` using GitHub alone. If it cannot, the task is not ready for handoff.
+
+A small one-shot LOW-risk change may use a concise completion record in the existing PR; do not create bureaucracy or duplicate files for trivial edits. The documentation obligation itself always applies.
+
 ## Goal
 
 Optimize for one short correction loop: design broadly, test cheaply first, run the expensive certification once, and never lose engineering progress because a chat or session ended.
