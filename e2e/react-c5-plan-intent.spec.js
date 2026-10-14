@@ -32,7 +32,7 @@ test.describe('C5-A: public plan interest without automated payment', () => {
     expect(mutations).toEqual([]);
 
     await page.locator('article').filter({ has: page.getByRole('heading', { name: 'Negocio' }) }).getByRole('link', { name: 'Empezar' }).click();
-    await expect(page).toHaveURL(/\/app\/auth\?plan=NEGOCIO$/);
+    await expect(page).toHaveURL(/\/app\/auth\/?\?plan=NEGOCIO$/);
     await expect(page.getByTestId('selected-public-plan')).toContainText('Plan de interés: Negocio');
     await expect(page.getByTestId('selected-public-plan')).toContainText('no inicia un cobro');
     expect(mutations).toEqual([]);
@@ -83,7 +83,7 @@ test.describe('C5-A: public plan interest without automated payment', () => {
     await page.getByLabel('Contraseña').fill('clave-de-prueba-123');
     await page.getByRole('button', { name: 'Crear cuenta' }).click();
 
-    await expect(page).toHaveURL(/\/app\/plan\?plan=NEGOCIO$/);
+    await expect(page).toHaveURL(/\/app\/plan\/?\?plan=NEGOCIO$/);
     await expect(page.getByTestId('plan-intent-unpaid')).toContainText('Elegiste Negocio');
     await expect(page.getByTestId('plan-intent-unpaid')).toContainText('ningún cambio ni cobro');
     await expect(page.getByTestId('billing-state')).toContainText('Pagos automáticos aún no habilitados');
@@ -105,10 +105,10 @@ test.describe('C5-A: public plan interest without automated payment', () => {
 
   test('existing platform admin never inherits a business plan redirect', async ({ page }) => {
     await page.addInitScript(() => sessionStorage.setItem('helvoca_access_token', 'platform-test-token'));
+    await page.route('**/api/v1/**', route => route.fulfill(json({})));
     await page.route('**/api/v1/auth/me', route => route.fulfill(json({
       email: 'admin@helvoca.cl', roles: ['PLATFORM_ADMIN']
     })));
-    await page.route('**/api/v1/**', route => route.fulfill(json({})));
     await page.goto('/app/auth?plan=PRO');
     await expect(page).toHaveURL(/\/app\/platform\/?$/);
   });
