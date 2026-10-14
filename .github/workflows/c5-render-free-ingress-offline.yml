@@ -1,0 +1,39 @@
+name: C5 Render Free test receiver regression (no provider)
+
+on:
+  push:
+    branches:
+      - 'feat/c5-render-free-test-ingress-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-render-free-receiver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: TEST-only Render launch gate and local signed HTTP contract
+        run: |
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c5_render_test_webhook_entrypoint.py'
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c5_ephemeral_webhook_ingress.py'
+          python3 -m py_compile scripts/ops/c5_render_test_webhook_entrypoint.py scripts/ops/c5_ephemeral_webhook_ingress.py
+      - name: Static no-billing/no-secret-exposure deployment contract
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          entry = Path('scripts/ops/c5_render_test_webhook_entrypoint.py').read_text()
+          receiver = Path('scripts/ops/c5_ephemeral_webhook_ingress.py').read_text()
+          assert 'C5_RENDER_TEST_ONLY' in entry
+          assert 'C5_EPHEMERAL_MODE' in entry
+          assert '"0.0.0.0"' in entry
+          assert '"127.0.0.1"' in receiver
+          assert 'request.urlopen' not in entry + receiver
+          assert 'MERCADOPAGO_TEST_ACCESS_TOKEN' not in entry + receiver
+          assert 'MERCADOPAGO_ACCESS_TOKEN' not in entry + receiver
+          assert 'hmac.compare_digest' in receiver
+          assert 'log_message(self, *_):' in receiver
+          print('C5_RENDER_FREE_NO_PROVIDER_NO_PAYMENT_CONTRACT=PASS')
+          PY
