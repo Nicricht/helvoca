@@ -19,7 +19,7 @@ checks = {
         "mandatory for every chat/agent: qa evidence before done",
         "100% of applicable changed/affected quality dimensions",
         "local_simulation_pass",
-        "authenticated_provider_pass",
+        "authentic_provider_pass",
         "never claim 100% coverage",
     ],
     "docs/engineering/QA_POLICY.md": [
@@ -37,7 +37,7 @@ checks = {
         "evidence contract for every agent and every chat",
         "python, operations scripts and other executable scopes",
         "100% acceptance/failure-path test matrix",
-        "a signed local fixture cannot certify a real provider event",
+        "signed local fixture cannot certify a real provider event",
         "not certified",
     ],
     ".github/pull_request_template.md": [
