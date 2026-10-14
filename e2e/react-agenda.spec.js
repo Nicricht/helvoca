@@ -7,6 +7,9 @@ const json = body => ({
 });
 
 async function bootAgenda(page, options = {}) {
+  // Freeze the browser clock to the same week as this suite's
+  // October 2026 bookings. Timers remain active; product behavior is unchanged.
+  await page.clock.setFixedTime(new Date('2026-10-07T12:00:00.000Z'));
   await page.addInitScript(
     token => sessionStorage.setItem('helvoca_access_token', token),
     options.token || 'agenda-react-e2e'
