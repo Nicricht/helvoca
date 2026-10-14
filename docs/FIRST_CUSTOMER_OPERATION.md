@@ -103,7 +103,9 @@ Nunca ofrecer como parte automática del piloto: WhatsApp ilimitado, SLA enterpr
 - [ ] canal externo incluido tiene readiness/certificación del tenant, o queda explícitamente fuera hasta certificar;
 - [ ] merchant payment LIVE no se ofreció como función del producto;
 - [ ] medio autorizado para que el cliente pague a RecepVoz y datos de facturación/cobro están definidos;
-- [ ] términos y privacidad vigentes fueron puestos a disposición del cliente;
+- [ ] términos y privacidad vigentes fueron puestos a disposición del cliente **y revisados/aceptados por los responsables autorizados**, sin dar por aprobadas las políticas solo porque existen enlaces;
+- [ ] ficha `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`, sección **12 bis C6-A**, completada en expediente privado para roles de tratamiento, información sobre IA, base jurídica, derechos de datos, contactos de incidentes y aprobación humana/jurídica;
+- [ ] se acordaron por escrito cancelación del servicio, condiciones de cobro, impuestos, excedentes, soporte y reclamaciones aplicables;
 - [ ] criterio de éxito y fecha de revisión quedaron escritos;
 - [ ] no existe un bloqueo técnico P0 conocido que impida el alcance vendido.
 
