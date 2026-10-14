@@ -10,9 +10,9 @@ from email.message import Message
 from urllib.parse import urlencode
 
 try:
-    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event
+    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event, safe_rejection_reason
 except ModuleNotFoundError:
-    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event
+    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event, safe_rejection_reason
 
 SECRET = "c5-ephemeral-local-fixture-not-provider-secret"
 
@@ -102,6 +102,18 @@ def mp_simulator_fixture():
         "type": "subscription_preapproval",
         "version": 8,
     }
+
+
+class DiagnosticNoSecretLeakContract(unittest.TestCase):
+    def test_hmac_mismatch_is_classified_safely(self):
+        self.assertEqual(safe_rejection_reason(InvalidWebhook("HMAC mismatch")), "HMAC_MISMATCH")
+
+    def test_event_shape_is_not_called_credential_failure(self):
+        self.assertEqual(safe_rejection_reason(InvalidWebhook("event id required")), "EVENT_SHAPE")
+
+    def test_unrecognized_values_never_emerge_in_logs(self):
+        private = "not-for-logs-identity-or-token-123"
+        self.assertEqual(safe_rejection_reason(InvalidWebhook(private)), "UNKNOWN")
 
 
 class StrictSandboxEventContract(unittest.TestCase):
@@ -214,8 +226,15 @@ class RenderStrictHttpContract(unittest.TestCase):
                                event_id="123456", secret="wrong-fake-secret")
         body = json.dumps(mp_simulator_fixture()).encode()
         previous = self.server.received
-        self.assertEqual(self.send(body, headers), 401)
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0] + "\\n")):
+            self.assertEqual(self.send(body, headers), 401)
         self.assertEqual(self.server.received, previous)
+        self.assertIn("C5_TEST_WEBHOOK_REJECT_CAUSE=HMAC_MISMATCH", output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
+        self.assertNotIn("wrong-fake-secret", output.getvalue())
 
     def test_expired_simulator_hmac_cannot_bypass_timestamp_window(self):
         body, headers = signed(topic="subscription_preapproval",
