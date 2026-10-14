@@ -58,6 +58,18 @@ checks = {
         "authentic_provider_pass",
         "final head",
     ],
+    "docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md": [
+        "condición qa de cierre aplicable a todos los agentes",
+        "head final",
+        "no equivale",
+        "100% de cobertura",
+        "no al usuario",
+    ],
+    "README.md": [
+        "obligatorio para cualquier chat, asistente o agente que modifique helvoca",
+        "docs/engineering/qa_policy.md",
+        "issue #823",
+    ],
     "software-factory/skill/first-pass-engineering/SKILL.md": [
         "user is not responsible for selecting",
         "test level",
