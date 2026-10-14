@@ -96,6 +96,40 @@ class HmacContract(unittest.TestCase):
         with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
             verify(body, "type=subscription_authorized_payment", headers, SECRET)
 
+    def test_mp_simulator_conflicting_allowed_query_is_safely_normalized(self):
+        # MP TEST simulator sent a signed preapproval fixture with a conflicting
+        # recognized URL topic. Only the exact synthetic fixture may override.
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = json.dumps(mp_simulator_fixture()).encode()
+        self.assertEqual(
+            verify(payload, "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True),
+            ("subscription_preapproval", "123456"),
+        )
+
+    def test_simulator_override_cannot_accept_ordinary_test_event(self):
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = json.dumps({"live_mode": False, "type":"subscription_preapproval",
+                              "data":{"id":"123456"}}).encode()
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(payload, "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True)
+
+    def test_simulator_override_cannot_accept_modified_fixture(self):
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = mp_simulator_fixture()
+        payload["date"] = "2026-10-14T11:48:00Z"
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(json.dumps(payload).encode(), "type=subscription_authorized_payment",
+                   headers, SECRET, allow_simulator_topic_mismatch=True)
+
+    def test_simulator_override_cannot_bypass_wrong_hmac(self):
+        _, headers = signed("subscription_preapproval", "123456", secret="wrong-test-secret")
+        with self.assertRaisesRegex(InvalidWebhook, "HMAC mismatch"):
+            verify(json.dumps(mp_simulator_fixture()).encode(),
+                   "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True)
+
     def test_signed_query_topic_not_allowed(self):
         body, headers = signed("subscription_preapproval", "123456")
         with self.assertRaisesRegex(InvalidWebhook, "query topic unsupported"):
@@ -206,9 +240,9 @@ class RenderStrictHttpContract(unittest.TestCase):
         cls.server.server_close()
         cls.thread.join(timeout=3)
 
-    def send(self, body, headers):
+    def send(self, body, headers, path="/webhooks/v1/mercadopago"):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
-        conn.request("POST", "/webhooks/v1/mercadopago", body=body,
+        conn.request("POST", path, body=body,
                      headers={k: v for k, v in headers.items()})
         res = conn.getresponse()
         status = res.status
@@ -256,6 +290,19 @@ class RenderStrictHttpContract(unittest.TestCase):
             output.getvalue())
         self.assertNotIn("123456", output.getvalue())
         self.assertNotIn("1234509876", output.getvalue())
+
+    def test_signed_simulator_with_conflicting_recognized_query_returns_200(self):
+        _, headers = signed(topic="subscription_preapproval", event_id="123456")
+        payload = json.dumps(mp_simulator_fixture()).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0] + "\\n")):
+            self.assertEqual(self.send(payload, headers,
+                "/webhooks/v1/mercadopago?type=subscription_authorized_payment"), 200)
+        self.assertIn("C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC=subscription_preapproval",
+                      output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
 
     def test_mp_simulator_with_wrong_signature_is_rejected(self):
         body, headers = signed(topic="subscription_preapproval",
