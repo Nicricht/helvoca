@@ -59,6 +59,17 @@ Railway soporta **Cron Jobs nativos**: arrancan el servicio a una hora UTC, ejec
 
 Fuentes: [Railway Cron Jobs](https://docs.railway.com/cron-jobs) y [Railway pricing](https://docs.railway.com/pricing/plans).
 
+## Servicio Railway creado y verificado (2026-10-14)
+
+- Proyecto: `Helvoca`; environment: `production`; servicio **`helvoca-backup-cron`** (ID `42bfe173-2f69-4605-ae63-a144a4a6e1dd`).
+- **Estado verificado en Railway:** creado VACÍO, sin source, sin despliegue, sin cron, sin variables, sin dominio y sin montaje de volumen. API `helvoca-api` y `Postgres` conservan sus desplegados en `SUCCESS`. Ninguna escritura en base de datos ni gasto generado por ejecución de este servicio.
+- Código del futuro runner Railway-native: `scripts/ops/c1_railway_cron_backup.py`; contenedor preparado en `infra/backup-cron/Dockerfile`. Este contenedor tiene un **CMD inocuo**. No conectar automáticamente la rama o la imagen a Railway: hacerlo podría desplegar una nueva versión; requiere revisión de presupuesto y OAuth primero.
+- El runner usa `pg_dump` PostgreSQL 18 directamente sobre la **red privada de Railway**: no necesita Railway CLI. Exportación sin owner/ACL, solo lectura. Credenciales por entorno, NO por argumentos, logs o GitHub.
+- Variables que deberán configurarse en el servicio (valores omitidos): `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` (idealmente mediante referencias privadas al servicio Postgres y rol de backup read-only); `RCLONE_CONFIG_INSTITUTIONAL_TYPE=drive`, `RCLONE_CONFIG_INSTITUTIONAL_TOKEN` y `RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID`; `HELVOCA_C1_AGE_RECIPIENT` (solo clave pública). Para desplegar la primera ejecución se requieren además **dos habilitaciones**: `HELVOCA_C1_ALLOW_EXECUTION=read_only_encrypted_backup_approved` y comando `python3 scripts/ops/c1_railway_cron_backup.py --execute`.
+- **No configurar ahora secretos, source, cron, token OAuth, recipient ni variables compartidas de la API.** La credencial OAuth para Google Drive no proviene del conector ChatGPT: hay que autorizarla separadamente para el proceso de Railway. La clave privada de recuperación age se queda fuera de Railway y de Google Drive.
+- Un cron nativo en Railway trabaja en UTC. Antes de activar, revisar el horario, coste/consumo de ejecución y prueba de alertas; Railway puede omitir intervalos si un job anterior continúa ejecutándose.
+- Validación de código: GitHub Actions `#38515642709`, pruebas **56/56** sintéticas offline (17+9+10+9+11), sintaxis y guardas de seguridad. CI no ejecuta ni construye el contenedor contra Railway, no lee datos productivos y no certifica backups automáticos reales.
+
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
@@ -68,7 +79,10 @@ Fuentes: [Railway Cron Jobs](https://docs.railway.com/cron-jobs) y [Railway pric
 - [ ] Guardar y recuperar la passphrase manual existente en bóveda separada; verificar el procedimiento sin revelar la clave.
 - [ ] Elegir destino de ejecución automática independiente del PC y comprobar autenticación PostgreSQL backup read-only, Drive y mecanismo de cifrado no interactivo.
 - [x] Implementación opt-in de generación cifrada no interactiva y readback SHA-256 para Drive institucional, sin automatización activa.
-- [ ] Programar cron independiente del PC, métricas, alertas, retención solo dry-run inicialmente; verificar tests y dos ejecuciones reales sin cambios productivos.
+- [x] Crear servicio Railway `helvoca-backup-cron` vacío sin source/variables/cron/despliegue; verificar que API y Postgres no cambian.
+- [x] Preparar runner compatible con red privada Postgres PG18, imagen inerte y pruebas sintéticas 56/56.
+- [ ] Configurar credenciales institucionales OAuth, rol DB de solo lectura y recipient age custodiado fuera de Railway, con autorización de coste para una ejecución piloto.
+- [ ] Programar cron independiente del PC, métricas, alertas, retención solo dry-run inicialmente; verificar dos ejecuciones reales y recuperación.
 - [ ] Medir RPO y RTO desde origen y simulacro de recuperación autorizado.
 - [ ] Incorporar permisos y presupuestos operativos aprobados antes de activar un cron de producción.
 
