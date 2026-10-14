@@ -47,6 +47,18 @@ Los valores son **objetivos provisionales**, no compromisos existentes ni métri
 - El directorio `--private-root` del runner debe estar fuera de Git y carpetas sincronizadas. Plaintext existe solo de forma temporal en disco privado y se elimina tras cada intento. No se borran copias remotas.
 - La herramienta no implementa retención destructiva. Añadir solo vista previa de eliminaciones tras dos respaldos remotos válidos, con autorización y alarma de fallo comprobadas. CI ejecuta solo pruebas sintéticas y de guardas.
 
+## Decisión de despliegue del programador en Railway (2026-10-14)
+
+Railway soporta **Cron Jobs nativos**: arrancan el servicio a una hora UTC, ejecutan un proceso y terminan; no requieren un worker 24/7 consumiendo RAM entre ejecuciones. El servicio puede conllevar cargo de **CPU, memoria, transferencia y almacenamiento durante la ejecución**, según el plan. Railway omite una ejecución si la anterior sigue activa, por lo que se requiere comprobación externa de frescura del respaldo y alertas.
+
+- **Implementación actual:** `scripts/ops/c1_unattended_institutional_backup.py` está implementado y probado offline. Utiliza Railway CLI SSH autenticado, `age` y `rclone`. **NO está empaquetado ni certificado para Railway Cron**: un cron independiente no hereda el `railway login` interactivo del PC del operador.
+- **Siguiente trabajo de ingeniería:** crear variante para cron desplegado con `pg_dump` PostgreSQL 18 directo por la **red privada de Railway** usando variables de referencia del servicio Postgres, sin Railway CLI ni endpoint público. Utilizar `age` con clave pública, `rclone` con token OAuth institucional protegido y un directorio temporal efímero. No dar acceso de escritura a tablas de producción al usuario del backup.
+- La hora candidata será `30 6 * * *` **UTC** (03:30 en Chile cuando UTC-3, 02:30 cuando UTC-4). Para hora local constante se necesita un scheduler consciente de `America/Santiago`; de lo contrario documentar los cambios estacionales.
+- **No crear servicio cron real, no desplegar en producción y no establecer secrets de Google** mientras no exista consentimiento informado sobre coste y permisos, ni recipient público age con su clave privada fuera del servicio. No registrar tokens, passwords, claves privadas, archivos `.dump` ni configuraciones OAuth en GitHub o en este chat.
+- Se verificará con al menos una ejecución real habilitada por el operador y lectura remota de bytes/hashes, luego dos ejecuciones programadas consecutivas. El workflow de GitHub solo cubre casos sintéticos, nunca prueba un cron real.
+
+Fuentes: [Railway Cron Jobs](https://docs.railway.com/cron-jobs) y [Railway pricing](https://docs.railway.com/pricing/plans).
+
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
