@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       payer_email:
-        description: "Mercado Pago TEST payer email (@testuser.com)"
+        description: "Existing verified Buyer TEST email (@testuser.com). Do not use example test@testuser.com."
         required: true
-        default: "test@testuser.com"
+        default: ""
         type: string
       confirm_sandbox:
         description: "I confirm this run uses Mercado Pago TEST credentials only"
@@ -60,8 +60,11 @@ jobs:
             echo "Refusing to run: TEST token must start with APP_USR"
             exit 1
           fi
-          if [[ "$MERCADOPAGO_TEST_PAYER_EMAIL" != *@testuser.com ]]; then
-            echo "Refusing to run: payer must be a Mercado Pago testuser.com account"
+          # Reject placeholders before any provider call; no buyer identifiers in logs.
+          if [[ -z "${MERCADOPAGO_TEST_PAYER_EMAIL:-}" ||
+                "${MERCADOPAGO_TEST_PAYER_EMAIL,,}" == "test@testuser.com" ||
+                ! "$MERCADOPAGO_TEST_PAYER_EMAIL" =~ ^[[:alnum:]_.+-]+@testuser[.]com$ ]]; then
+            echo "Refusing to run: select an existing non-example Buyer TEST account"
             exit 1
           fi
 
