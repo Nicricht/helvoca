@@ -25,6 +25,20 @@
 - [ ] Tenant/security/financial/inventory boundaries were reviewed when applicable.
 
 
+## Mandatory QA evidence matrix (all chats/agents)
+
+<!-- REQUIRED before DONE, even when a different ChatGPT session continues this PR. A green CI does not equal 100% measured coverage or real-provider success. Every relevant N/A must include a technical reason and equivalent observable test evidence. -->
+
+| Changed behavior / invariant | Risk | Test level & adverse cases | Exact test/CI link and HEAD | Coverage measured (100%) or technical N/A | Outcome (PASS/PENDING/FAIL) |
+| --- | --- | --- | --- | --- | --- |
+| Describe each changed or affected scope | LOW/MEDIUM/HIGH | Unit / integration / PostgreSQL / tenant / replay / provider / browser | URL + SHA, no ancestor evidence | Measured metric numerator/denominator, behavior map or explicit N/A | PENDING |
+
+- [ ] Acceptance criteria AND material error paths for all affected behavior are mapped to tests.
+- [ ] Every applicable changed executable coverage dimension is verified at 100% (Java, frontend, Python/scripts or justified N/A) without weakening the policy.
+- [ ] Required Fast Gate and applicable Full Gate are green on the **final HEAD**, not only an earlier commit.
+- [ ] Provider testing explicitly distinguishes LOCAL_SIMULATION_PASS, PUBLIC_NETWORK_PASS, AUTHENTIC_PROVIDER_PASS, PERSISTENCE_PASS and PRODUCTION_VERIFIED. Mark unexercised boundaries PENDING.
+- [ ] No DONE or 100%-QA claim is made while applicable tests, coverage, provider integration, security or production checks are unverified.
+
 ## QA classification
 
 <!-- The implementing agent selects these. The user must not need to request test types manually. Check every applicable test level and justify every important N/A. -->
@@ -94,6 +108,26 @@ An inapplicable metric requires a technical N/A plus equivalent behavior-level p
 - CI / evidence valid for this HEAD:
 - Blockers / rulings:
 - Next step:
+
+## Mandatory documentation / completion record
+
+<!-- Rule: docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md. Document every meaningful finished block in THIS PR; for Helvoca V1 also link the relevant C0–C7 gate in Issue #823. Do not claim DONE with CI still pending or before updated docs/checkpoint. -->
+
+- [ ] Existing docs/runbook updated if actual behavior, architecture, configuration or operation changed (or explain N/A).
+- [ ] The completed work, motivation and affected files/behaviors are described.
+- [ ] Exact branch/PR/final HEAD, CI URL, actual test outcome and verified environment are recorded.
+- [ ] Real external actions **not performed** (deployment, migrations, calls, payments, backups) and remaining gates are explicit.
+- [ ] Decisions, safety boundaries, blockers and next precise action are documented.
+- [ ] For V1: Issue #823 and affected C0–C7 gate have a current checkpoint.
+- [ ] No secrets, private evidence or customer data were exposed; earlier valid evidence is linked, not rerun.
+
+Completion status: DONE_VERIFIED / DONE_OFFLINE_ONLY / IN_PROGRESS / BLOCKED / NO-GO
+
+Canonical documentation / runbook link (or N/A):
+
+Master gate / issue link (or N/A):
+
+Next exact action and owner:
 
 ## Final commit evidence
 
