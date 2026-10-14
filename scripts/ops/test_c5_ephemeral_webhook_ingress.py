@@ -10,9 +10,9 @@ from email.message import Message
 from urllib.parse import urlencode
 
 try:
-    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature
+    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event
 except ModuleNotFoundError:
-    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature
+    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event
 
 SECRET = "c5-ephemeral-local-fixture-not-provider-secret"
 
@@ -89,6 +89,74 @@ class HmacContract(unittest.TestCase):
     def test_real_email_or_token_not_in_logs(self):
         from scripts.ops import c5_ephemeral_webhook_ingress as mod
         self.assertEqual(mod.Handler.log_message(None, "fake email %s", "hello@example.com"), None)
+
+class StrictSandboxEventContract(unittest.TestCase):
+    def test_only_explicit_sandbox_event_is_eligible(self):
+        self.assertTrue(require_sandbox_event(b'{"live_mode":false}'))
+
+    def test_productive_flag_rejected(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"live_mode":true}')
+
+    def test_missing_flag_rejected(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"type":"subscription_authorized_payment"}')
+
+    def test_string_false_does_not_count_as_sandbox(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"live_mode":"false"}')
+
+
+class RenderStrictHttpContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = Collector(("127.0.0.1", 0), SECRET, require_test_mode=True)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join(timeout=3)
+
+    def send(self, body, headers):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
+        conn.request("POST", "/webhooks/v1/mercadopago", body=body,
+                     headers={k: v for k, v in headers.items()})
+        res = conn.getresponse()
+        status = res.status
+        res.read()
+        conn.close()
+        return status
+
+    def test_valid_signed_fake_test_webhook_is_acknowledged_and_counted(self):
+        body, headers = signed(event_id="981234")
+        body = json.dumps({"live_mode":False,"type":"subscription_authorized_payment",
+                           "data":{"id":"981234"}}).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        out = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: out.write(v[0]+"\\n")):
+            self.assertEqual(self.send(body,headers),204)
+        self.assertIn("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=subscription_authorized_payment",out.getvalue())
+        self.assertNotIn("981234",out.getvalue())
+
+    def test_signed_production_event_is_rejected_and_not_counted(self):
+        body,headers = signed(event_id="987654")
+        body = json.dumps({"live_mode":True, "type":"subscription_authorized_payment",
+                           "data":{"id":"987654"}}).encode()
+        n = self.server.received
+        self.assertEqual(self.send(body,headers),401)
+        self.assertEqual(self.server.received,n)
+
+    def test_signed_event_missing_environment_flag_is_rejected(self):
+        body, headers=signed(event_id="453212")
+        n=self.server.received
+        self.assertEqual(self.send(body,headers),401)
+        self.assertEqual(self.server.received,n)
+
 
 class LocalHttpContract(unittest.TestCase):
     @classmethod
