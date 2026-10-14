@@ -1,0 +1,73 @@
+name: C5 isolated public HTTPS webhook smoke (no provider)
+
+on:
+  push:
+    branches:
+      - 'feat/c5-temporary-webhook-ingress-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c5-isolated-https-ingress
+  cancel-in-progress: false
+
+jobs:
+  c5-signed-public-https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Offline HMAC, timestamp and HTTP receiver tests
+        run: |
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c5_ephemeral_webhook_ingress.py'
+          python3 -m py_compile scripts/ops/c5_ephemeral_webhook_ingress.py scripts/ops/c5_ephemeral_ingress_smoke.py
+      - name: Download pinned Cloudflare tunnel client with SHA256 integrity
+        run: |
+          set -euo pipefail
+          curl -fLSs --retry 2 --max-time 90 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.10.0/cloudflared-linux-amd64 \
+            -o ./cloudflared
+          echo "d33ff2d14475178d2012c2c56beba87389ac5ded27649519f198a7d3134a99db  cloudflared" | sha256sum -c -
+          chmod 700 ./cloudflared
+      - name: Verify external HTTPS delivery, valid signature and unsigned rejection
+        timeout-minutes: 4
+        shell: bash
+        run: |
+          set -euo pipefail
+          # No real Mercado Pago secrets or user data: random session-only key.
+          export C5_EPHEMERAL_MODE="test-only"
+          export C5_EPHEMERAL_HMAC_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$C5_EPHEMERAL_HMAC_SECRET"
+          export PORT=8765
+          export C5_CLOUDFLARED_LOG="$RUNNER_TEMP/c5-cloudflared.log"
+          python3 scripts/ops/c5_ephemeral_webhook_ingress.py > "$RUNNER_TEMP/c5-server.log" 2>&1 &
+          server_pid=$!
+          ./cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8765 --edge-ip-version 4 \
+            > "$C5_CLOUDFLARED_LOG" 2>&1 &
+          tunnel_pid=$!
+          trap 'kill "$tunnel_pid" "$server_pid" 2>/dev/null || true; rm -f "$C5_CLOUDFLARED_LOG" "$RUNNER_TEMP/c5-server.log"' EXIT
+          for i in $(seq 1 20); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8765/health; then break; fi
+            sleep 1
+          done
+          python3 scripts/ops/c5_ephemeral_ingress_smoke.py
+          # Tunnel terminates here; it is not a production or TEST payment endpoint.
+          echo "C5_EPHEMERAL_TUNNEL_DESTROYED_AFTER_SMOKE"
+      - name: Ensure receiver has no payment mutation, persistence or leak
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('scripts/ops/c5_ephemeral_webhook_ingress.py').read_text()
+          assert 'request.urlopen' not in source
+          assert 'ThreadingHTTPServer' in source
+          assert 'hmac.compare_digest' in source
+          assert 'log_message(self, *_):' in source
+          assert 'MAX_BODY = 4096' in source
+          workflow = Path('.github/workflows/c5-ephemeral-public-webhook-ingress.yml').read_text()
+          assert 'secrets.MERCADOPAGO' not in workflow.split('      - name: Ensure receiver')[0]
+          assert 'cloudflared' in workflow
+          assert 'sha256sum -c' in workflow
+          print('C5_EPHEMERAL_NO_PAYMENT_MUTATION=PASS')
+          PY
