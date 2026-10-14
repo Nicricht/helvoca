@@ -67,7 +67,7 @@ function PlanCard({ plan, index }: { plan: PlanOffer; index: number }) {
         <li><Check size={15} aria-hidden="true" /> Transferencia a humano cuando corresponda</li>
         <li><Check size={15} aria-hidden="true" /> {overage}</li>
       </ul>
-      <a className={plan.recommended ? styles.primaryPlanCta : styles.planCta} href="/">
+      <a className={plan.recommended ? styles.primaryPlanCta : styles.planCta} href={!plan.customPricing && ["EMPRENDE", "NEGOCIO", "PRO"].includes(plan.code) ? `/app/auth?plan=${plan.code}` : "/"}>
         {plan.customPricing ? "Cotizar" : "Empezar"} <ArrowRight size={15} aria-hidden="true" />
       </a>
     </motion.article>

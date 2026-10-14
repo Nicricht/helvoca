@@ -247,3 +247,23 @@ Run exactly one provider test before enabling a real customer:
 10. confirm a subsequent approved invoice returns the subscription to `ACTIVE`.
 
 Only after those ten checks should `MERCADOPAGO_ENABLED` be enabled with live credentials for real SaaS collection.
+
+
+## C5-A continuation: safe checkout handoff after choosing a plan (2026-10-14)
+
+**Scope:** frontend-only preparation, no live Mercado Pago, production, phone calls, database changes or charges. Part of [master C5 in Issue #823](https://github.com/Nicricht/helvoca/issues/823) and [PR #829](https://github.com/Nicricht/helvoca/pull/829), stacked over offline integration PR #826.
+
+**Why:** the browser previously attempted `window.open()` inside the asynchronous checkout mutation success callback. Browsers can block such popups, leaving the user unsure how to continue. A remote checkout URL from the billing API was also used for navigation without a local scheme validation.
+
+**Changed behavior:**
+- Selecting Emprende/Negocio/Pro from public pricing retains only an allowlisted plan identifier through registration/login into the authenticated Plan panel. This expresses **interest only**, never charges or activates a subscription.
+- When an eligible business admin chooses a different plan and confirms the action, the backend may create a **pending checkout**. The frontend does **not** automatically open a popup after the async request.
+- Only a validated absolute `https:` checkout URL without embedded URL credentials is rendered as a real `<a target="_blank" rel="noopener noreferrer">` link under **Cambio pendiente**. The user clicks **Continuar checkout** explicitly; browsers cannot block a deferred automatic popup because one is not attempted.
+- Unsafe or malformed links are **not rendered/clickable**; the page displays a safe error message. A pending checkout is **not proof of payment**, and the existing plan stays until the backend verifies the actual approved invoice.
+- Existing role separation stays intact. A platform admin is not redirected into business plan management by a plan query string. Enterprise remains custom quotation only.
+
+**Security boundary:** client-side HTTPS parsing is defense in depth, not provider identity certification. The backend, signed provider webhooks and approved payment are still authoritative for subscriptions/entitlements. C5 commercial `GO` still requires provider TEST real round-trip, webhook/idempotency and an authorized LIVE payment. Do not infer this from browser mocks.
+
+**Verification scope:** Playwright in Chromium with simulated API responses covers valid pending HTTPS link, no async popup, no duplicate checkout, rejected `javascript:` and HTTP schemes, rejected URLs with embedded credentials or malformed syntax, no changes before user confirmation, role isolation, and pricing→registration→plan continuity. The initial regression run [#38526786157](https://github.com/Nicricht/helvoca/actions/runs/38526786157) failed **as intended** (3 pre-fix checkout cases, 31 others passed); final-code verification must use the **final PR #829 HEAD/CI**, not the earlier RED run.
+
+**Operational next step:** finish browser CI on PR #829, update its checkpoint with exact commit/CI and outcomes, then continue remaining C5 TEST onboarding/invoice gates without a production deployment. Until C1 backup/restore and C2 release are authorized, keep PRs draft and production unchanged.

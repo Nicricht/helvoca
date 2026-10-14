@@ -1,0 +1,46 @@
+name: C5 offline plan-intent handoff
+
+on:
+  push:
+    branches:
+      - 'feat/c5-offline-plan-intent-handoff-*'
+  pull_request:
+    branches:
+      - 'feat/c2-commercial-v1-integration-preflight-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-plan-intent-no-payment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build React with TypeScript
+        run: npm run frontend:build
+      - name: Install isolated Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Real-browser plan interest without provider or production access
+        run: npx playwright test e2e/react-c5-plan-intent.spec.js e2e/react-pricing-migration.spec.js e2e/react-public-entry-migration.spec.js e2e/react-plan-consumption.spec.js
+      - name: Check C5 scope and no live provider calls
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          ui=Path('frontend/src/pages/Pricing/PricingPage.tsx').read_text()
+          auth=Path('frontend/src/pages/Auth/AuthPage.tsx').read_text()
+          plan=Path('frontend/src/pages/PlanConsumption/PlanConsumptionPage.tsx').read_text()
+          assert '"/api/v1/billing/checkout"' not in ui
+          assert '"/api/v1/billing/checkout"' not in auth
+          assert 'selectedPublicPlan' not in ui
+          assert 'selectedPlanDestination' in auth
+          assert 'no inicia un cobro ni activa una suscripción' in auth
+          assert 'ningún cambio ni cobro se inicia automáticamente' in plan
+          print('C5_OFFLINE_PLAN_INTENT_FAIL_CLOSED=PASS')
+          PY

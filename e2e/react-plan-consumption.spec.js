@@ -232,9 +232,11 @@ test.describe('React Plan y consumo pilot', () => {
     await expect(page.getByTestId('billing-current-plan')).toContainText('Emprende');
     await expect(page.getByTestId('billing-pending-plan')).toContainText('Negocio');
     await expect(page.getByTestId('billing-pending-plan')).toContainText('verificar');
-    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
-      'https://checkout.example.test/pre-e2e-1'
-    ]);
+    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([]);
+    const safeLink = page.getByRole('link', { name: /Continuar checkout/ });
+    await expect(safeLink).toHaveAttribute('href', 'https://checkout.example.test/pre-e2e-1');
+    await expect(safeLink).toHaveAttribute('target', '_blank');
+    await expect(safeLink).toHaveAttribute('rel', /noopener/);
   });
 
   test('continues an existing pending checkout without creating a duplicate checkout', async ({ page }) => {
@@ -274,13 +276,48 @@ test.describe('React Plan y consumo pilot', () => {
 
     await expect(page.getByTestId('billing-current-plan')).toContainText('Emprende');
     await expect(page.getByTestId('billing-pending-plan')).toContainText('Negocio');
-    await page.getByRole('button', { name: /Continuar checkout/ }).click();
-
+    const safeLink = page.getByRole('link', { name: /Continuar checkout/ });
+    await expect(safeLink).toHaveAttribute('href', 'https://checkout.example.test/pending');
+    await expect(safeLink).toHaveAttribute('rel', /noopener/);
     expect(calls.checkoutCalls()).toBe(0);
-    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([
-      'https://checkout.example.test/pending'
-    ]);
+    await expect.poll(() => page.evaluate(() => window.__openedCheckoutUrls)).toEqual([]);
   });
+
+  for (const unsafe of [
+    { label: 'javascript scheme', url: 'javascript:alert(document.domain)' },
+    { label: 'insecure HTTP scheme', url: 'http://checkout.example.test/unsafe' },
+    { label: 'embedded credentials', url: 'https://user:secret@checkout.example.test/unsafe' },
+    { label: 'malformed URL', url: 'not-a-checkout-url' }
+  ]) {
+    test('rejects unsafe pending checkout link: ' + unsafe.label, async ({ page }) => {
+      await page.addInitScript(() => {
+        window.__openedCheckoutUrls = [];
+        window.open = url => {
+          window.__openedCheckoutUrls.push(url);
+          return { closed: false };
+        };
+      });
+      const calls = await bootAuthenticated(page, {
+        billingStatus: {
+          provider: 'mercadopago',
+          billingEnabled: true,
+          checkoutConfigured: true,
+          currentPlanCode: 'EMPRENDE',
+          currentPlanName: 'Emprende',
+          pendingPlanCode: 'NEGOCIO',
+          pendingPlanName: 'Negocio',
+          checkoutUrl: unsafe.url,
+          awaitingProviderVerification: true
+        }
+      });
+      await page.goto('/app/plan');
+      await expect(page.getByTestId('billing-pending-plan')).toContainText('Cambio pendiente');
+      await expect(page.getByRole('link', { name: /Continuar checkout/ })).toHaveCount(0);
+      await expect(page.getByText('El enlace de checkout no es seguro', { exact: false })).toBeVisible();
+      expect(calls.checkoutCalls()).toBe(0);
+      expect(await page.evaluate(() => window.__openedCheckoutUrls)).toEqual([]);
+    });
+  }
 
   test('does not request admin-only billing management for an operator', async ({ page }) => {
     const calls = await bootAuthenticated(page, { roles: ['OPERATOR'], usageForbidden: true });
