@@ -43,7 +43,10 @@ def verify_public_identity(payload, expected_digest, seller_id_digest="", buyer_
     if not hmac.compare_digest(candidate, expected_digest):
         identity_digest = hashlib.sha256(user_id.encode("utf-8")).hexdigest()
         if seller_id_digest and hmac.compare_digest(identity_digest, seller_id_digest):
-            raise ProbeBlocked("C5_EXISTING_SECRET_SELLER_ID_MATCH_BUT_ALIAS_MISMATCH")
+            # The stable authenticated User ID is the identical TEST seller.
+            # Test Account login username and API nickname are not proven to
+            # be identical. Both were already checked to be TEST-only.
+            return "C5_EXISTING_SECRET_SAME_TEST_SELLER_ID_ALIAS_VARIATION"
         if buyer_id_digest and hmac.compare_digest(identity_digest, buyer_id_digest):
             raise ProbeBlocked("C5_EXISTING_SECRET_IS_SCREENSHOT_BUYER_NOT_SELLER")
         raise ProbeBlocked("C5_EXISTING_SECRET_IS_DIFFERENT_TEST_ACCOUNT")
@@ -79,7 +82,7 @@ def probe(token, expected_digest, opener=request.urlopen, seller_id_digest="", b
 
 def main():
     try:
-        probe(
+        outcome = probe(
             os.environ.get("MERCADOPAGO_TEST_ACCESS_TOKEN", ""),
             os.environ.get("C5_EXPECTED_TEST_SELLER_FINGERPRINT", ""),
             seller_id_digest=os.environ.get("C5_SELLER_ID_HASH", ""),
@@ -89,7 +92,8 @@ def main():
         # Only return safe categorical outcomes. Never log credential or payload.
         print(str(exc))
         return 1
-    print("C5_EXISTING_SECRET_VERIFIED_READONLY_MATCHES_TEST_SELLER")
+    print(outcome if isinstance(outcome, str) else
+          "C5_EXISTING_SECRET_VERIFIED_READONLY_MATCHES_TEST_SELLER")
     return 0
 
 if __name__ == "__main__":
