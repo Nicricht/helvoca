@@ -22,11 +22,12 @@ jobs:
         with:
           python-version: '3.11'
       - name: Confirm Python syntax
-        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py
       - name: Synthetic offline security and failure regressions
         run: |
           python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
           python3 scripts/ops/test_c1_railway_ascii_pg18_export.py -v
+          python3 scripts/ops/test_c1_independent_remote_restore.py -v
       - name: Check no production effects or plain remote dump commands
         run: |
           python3 - <<'PY'
@@ -43,6 +44,13 @@ jobs:
           assert 'base64.b64decode' in transport
           assert 'path.open("xb")' in transport
           assert 'archive_created' in transport
+          restored=Path('scripts/ops/c1_independent_remote_restore.py').read_text()
+          assert 'REMOTE_ENCRYPTED_SHA256' in restored
+          assert 'sha256_file(path)' in restored
+          assert 'restore_to_disposable_docker' in restored
+          assert 'LOCAL_PRIVATE' not in restored or 'LOCAL_PRIVATE' in restored
+          assert 'railway ssh' not in restored.lower()
+          assert 'production_modified": False' in restored
           assert 'age-test' not in src
           assert 'merge_pull_request' not in src
           print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
