@@ -22,12 +22,13 @@ jobs:
         with:
           python-version: '3.11'
       - name: Confirm Python syntax
-        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py
+        run: python3 -m py_compile scripts/ops/c1_replace_missing_offsite_archive.py scripts/ops/c1_railway_ascii_pg18_export.py scripts/ops/test_c1_replace_missing_offsite_archive.py scripts/ops/test_c1_railway_ascii_pg18_export.py scripts/ops/c1_independent_remote_restore.py scripts/ops/test_c1_independent_remote_restore.py scripts/ops/c1_unattended_institutional_backup.py scripts/ops/test_c1_unattended_institutional_backup.py
       - name: Synthetic offline security and failure regressions
         run: |
           python3 scripts/ops/test_c1_replace_missing_offsite_archive.py -v
           python3 scripts/ops/test_c1_railway_ascii_pg18_export.py -v
           python3 scripts/ops/test_c1_independent_remote_restore.py -v
+          python3 scripts/ops/test_c1_unattended_institutional_backup.py -v
       - name: Check no production effects or plain remote dump commands
         run: |
           python3 - <<'PY'
@@ -53,6 +54,16 @@ jobs:
           assert 'complete_production_rto_verified": False' in restored
           assert 'railway ssh' not in restored.lower()
           assert 'production_modified": False' in restored
+          unattended=Path('scripts/ops/c1_unattended_institutional_backup.py').read_text()
+          assert 'HELVOCA_C1_ALLOW_EXECUTION' in unattended
+          assert 'read_only_encrypted_backup_approved' in unattended
+          assert 'remote_cipher_digest' in unattended
+          assert 'C1_REMOTE_CIPHER_SHA256_MISMATCH' in unattended
+          assert 'TemporaryDirectory' in unattended
+          assert 'rclone, "copyto", "--immutable"' in unattended
+          assert 'rclone, "cat"' in unattended
+          assert 'rclone, "delete"' not in unattended
+          assert 'commercial_go": False' in unattended
           assert 'age-test' not in src
           assert 'merge_pull_request' not in src
           print('C1_MISSING_ARCHIVE_OFFLINE_SAFETY=PASS')
