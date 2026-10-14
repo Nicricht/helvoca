@@ -3,10 +3,7 @@ import os
 import unittest
 from unittest.mock import patch
 
-try:
-    from c5_render_test_webhook_entrypoint import settings, main
-except ModuleNotFoundError:
-    from scripts.ops.c5_render_test_webhook_entrypoint import settings, main
+from scripts.ops.c5_render_test_webhook_entrypoint import settings, main
 
 SECRET = "a" * 64
 
