@@ -36,6 +36,17 @@ Los valores son **objetivos provisionales**, no compromisos existentes ni métri
 7. **Protección de secretos y privacidad.** Secrets en gestor del entorno del job, no CLI argument/log/CI artifacts; alcance al backup solo el mínimo indispensable. No incluir PII, base de datos, `private.json`, key material ni tokens en GitHub. Preferir que los dumps de recuperación queden localizados y con TTL breve.
 8. **Pruebas de fallo.** Simular Drive desconectado, token revocado, cuota llena, CLI/Railway inaccesible, backup inválido, cifra corrupta, eliminación equivocada, job atrasado y alerta perdida, sin tocar producción.
 
+## Implementación preparada para ejecución automática, todavía desactivada
+
+- Herramienta: `scripts/ops/c1_unattended_institutional_backup.py`, destinada al **Google Drive institucional elegido por el titular** mediante un remoto rclone configurado en el runner.
+- Exporta PostgreSQL vía Railway SSH en modo lectura, valida PGDMP y SHA, cifra mediante **clave pública recipient de age**, sube solamente `.dump.age`, descarga ciphertext por `rclone cat` y valida tamaño y SHA-256.
+- **Doble autorización obligatoria**: bandera `--execute` y variable `HELVOCA_C1_ALLOW_EXECUTION=read_only_encrypted_backup_approved`. Sin ambas, el código no se conecta a proveedores.
+- No existe cron activo ni hay credenciales de Railway/rclone en repositorio; no se desplegó servicio ni se creó recurso de cobro.
+- Requiere runner 24/7 autorizado, Railway CLI no interactivo con permiso de exportación, rclone OAuth institucional renovable, `age` y recipient público de una **nueva clave de recuperación**. Guardar la clave privada fuera del runner, GitHub y Drive, en bóveda protegida.
+- La antigua passphrase del backup manual **no** descifra los nuevos backups age-recipient. Custodiar ambos secretos mientras se migra y ensayar recuperación con nueva clave antes de activar cron.
+- El directorio `--private-root` del runner debe estar fuera de Git y carpetas sincronizadas. Plaintext existe solo de forma temporal en disco privado y se elimina tras cada intento. No se borran copias remotas.
+- La herramienta no implementa retención destructiva. Añadir solo vista previa de eliminaciones tras dos respaldos remotos válidos, con autorización y alarma de fallo comprobadas. CI ejecuta solo pruebas sintéticas y de guardas.
+
 ## Puertas de habilitación (todas obligatorias)
 
 - [x] Backup nuevo, cifrado, copia externa institucional y restauración independiente reportada por operador.
@@ -44,7 +55,8 @@ Los valores son **objetivos provisionales**, no compromisos existentes ni métri
 - [ ] Verificar continuidad de acceso, cuota y mecanismo de recuperación de esa cuenta, más alertas antes de expiración; sin afirmar custodia garantizada.
 - [ ] Guardar y recuperar la passphrase manual existente en bóveda separada; verificar el procedimiento sin revelar la clave.
 - [ ] Elegir destino de ejecución automática independiente del PC y comprobar autenticación PostgreSQL backup read-only, Drive y mecanismo de cifrado no interactivo.
-- [ ] Implementar cron, métricas, alertas, retención solo dry-run inicialmente; verificar tests y dos ejecuciones reales sin cambios productivos.
+- [x] Implementación opt-in de generación cifrada no interactiva y readback SHA-256 para Drive institucional, sin automatización activa.
+- [ ] Programar cron independiente del PC, métricas, alertas, retención solo dry-run inicialmente; verificar tests y dos ejecuciones reales sin cambios productivos.
 - [ ] Medir RPO y RTO desde origen y simulacro de recuperación autorizado.
 - [ ] Incorporar permisos y presupuestos operativos aprobados antes de activar un cron de producción.
 
