@@ -125,30 +125,6 @@ class CloudRestoreTests(unittest.TestCase):
         self.report.write_text(json.dumps(self.metadata))
         self.assert_blocked("C1_PRIVATE_SOURCE_SIZE_INVALID")
 
-    def restore(self, *, dump=DUMP, docker_error=None, age_error=None):
-        observed = []
-        def simulate_age(_exe, args, *, code):
-            self.assertEqual(code, "C1_CLOUD_DECRYPT_FAILED")
-            self.assertEqual(args[0], "--decrypt")
-            self.assertEqual(args[-1], str(self.ciphertext))
-            observed.append("age")
-            if age_error:
-                raise age_error
-            Path(args[args.index("--output") + 1]).write_bytes(dump)
-        def simulate_pg(_exe, clear):
-            observed.append("pg")
-            self.assertEqual(clear.read_bytes(), dump)
-            if docker_error:
-                raise docker_error
-            return {"public_tables": 7, "core_tables": 6, "flyway_history_rows": 14}
-        with patch.object(c1, "require_docker_engine") as engine, \
-             patch.object(c1, "run_age", side_effect=simulate_age), \
-             patch.object(c1, "restore_to_disposable_docker", side_effect=simulate_pg):
-            def perform():
-                return c1.restore_downloaded(self.ciphertext, self.report,
-                                            self.root, "age-mock", "docker-mock")
-            return perform, observed, engine
-
     def test_offline_restore_and_private_temp_cleanup(self):
         self.assertEqual(c1.verified_inputs(self.ciphertext, self.report, self.root)["bytes"],
                          len(DUMP))
@@ -224,6 +200,28 @@ class CloudRestoreTests(unittest.TestCase):
              patch.object(c1, "write_private_report", return_value=self.evidence / "result.json") as save:
             self.assertEqual(c1.main(args), 0)
         save.assert_called_once()
+
+    def test_cli_uses_private_default_if_root_omitted(self):
+        args = ["--downloaded-ciphertext", str(self.ciphertext),
+                "--private-report", str(self.report)]
+        with patch.object(c1.shutil, "which", side_effect=["age", "docker"]), \
+             patch.object(c1, "local_private_root", return_value=self.root) as default_root, \
+             patch.object(c1, "restore_downloaded", return_value={"status": "PASS"}) as restore, \
+             patch.object(c1, "write_private_report", return_value=self.evidence / "result.json"):
+            self.assertEqual(c1.main(args), 0)
+        default_root.assert_called_once()
+        self.assertEqual(restore.call_args.args[2], self.root)
+
+    def test_main_module_executes_safe_failure_without_external_effects(self):
+        import runpy
+        import sys
+        with patch.object(sys, "argv", ["c1_verify_cloud_download_restore.py",
+                        "--downloaded-ciphertext", str(self.ciphertext),
+                        "--private-report", str(self.report), "--private-root", str(self.root)]), \
+             patch.object(c1.shutil, "which", return_value=None):
+            with self.assertRaises(SystemExit) as err:
+                runpy.run_path(c1.__file__, run_name="__main__")
+        self.assertEqual(err.exception.code, 2)
 
     def test_cli_generic_private_exception_returns_safe_code(self):
         args = ["--downloaded-ciphertext", str(self.ciphertext),
