@@ -111,6 +111,18 @@ class DiagnosticNoSecretLeakContract(unittest.TestCase):
     def test_event_shape_is_not_called_credential_failure(self):
         self.assertEqual(safe_rejection_reason(InvalidWebhook("event id required")), "EVENT_SHAPE")
 
+    def test_structural_rejections_have_distinct_safe_classes(self):
+        cases = {
+            "unrecognized or conflicting topic": "TOPIC_SHAPE",
+            "event id required": "EVENT_ID_MISSING",
+            "conflicting event id": "EVENT_ID_CONFLICT",
+            "event id invalid": "EVENT_ID_FORMAT",
+            "event id shape invalid": "EVENT_ID_FORMAT",
+        }
+        for problem, expected in cases.items():
+            with self.subTest(problem=problem):
+                self.assertEqual(safe_rejection_reason(InvalidWebhook(problem)), expected)
+
     def test_unrecognized_values_never_emerge_in_logs(self):
         private = "not-for-logs-identity-or-token-123"
         self.assertEqual(safe_rejection_reason(InvalidWebhook(private)), "UNKNOWN")
@@ -244,6 +256,17 @@ class RenderStrictHttpContract(unittest.TestCase):
         previous = self.server.received
         self.assertEqual(self.send(body, headers), 401)
         self.assertEqual(self.server.received, previous)
+
+    def test_public_webhook_handler_emits_safe_entry_marker(self):
+        # A proxy-level 502 does not reach this handler; 401 must show ingress.
+        from io import StringIO
+        from unittest.mock import patch
+        fake_secret = "PRIVATE_DO_NOT_LOG"
+        out = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: out.write(v[0] + "\\n")):
+            self.assertEqual(self.send(b'{"example":"PRIVATE_DO_NOT_LOG"}', {}), 401)
+        self.assertIn("C5_TEST_WEBHOOK_HANDLER_ENTERED", out.getvalue())
+        self.assertNotIn(fake_secret, out.getvalue())
 
     def test_simulator_missing_hmac_is_rejected(self):
         body = json.dumps(mp_simulator_fixture()).encode()
