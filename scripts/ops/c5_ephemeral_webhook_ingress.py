@@ -105,13 +105,32 @@ def verify(body, query, headers, secret, now_ms=None):
     return topic, event_id
 
 def require_sandbox_event(payload):
-    # An authentic HMAC is necessary but not sufficient to mark a test event.
-    # Production-labeled or unspecified events must not be acknowledged by
-    # Render's permanently public test-only receiver.
+    # Called ONLY after an authenticated HMAC, never as a replacement for it.
+    # Actual TEST events must explicitly declare live_mode=false.
     data = strict_json(payload)
-    if data.get("live_mode") is not False:
+    if data.get("live_mode") is False:
+        return "TEST_EVENT"
+    if "live_mode" in data:
         raise InvalidWebhook("non-test provider event")
-    return True
+    # Mercado Pago's built-in webhook simulator sends this documented-shaped
+    # fixed fixture without live_mode. Permit ONLY the exact synthetic example
+    # verified in the owner's developer-console screenshot, not a generic
+    # subscription or a production notification with live_mode omitted.
+    wrapped = data.get("data")
+    is_simulator = (
+        data.get("action") == "updated"
+        and data.get("entity") == "preapproval"
+        and data.get("type") == "subscription_preapproval"
+        and data.get("version") == 8
+        and data.get("date") == "2021-11-01T02:02:02Z"
+        and data.get("id") == "123456"
+        and isinstance(wrapped, dict) and wrapped.get("id") == "123456"
+        and isinstance(data.get("application_id"), str)
+        and re.fullmatch(r"[0-9]{4,24}", data["application_id"]) is not None
+    )
+    if is_simulator:
+        return "SIMULATOR_ONLY"
+    raise InvalidWebhook("non-test provider event")
 
 
 class Collector(ThreadingHTTPServer):
@@ -156,19 +175,28 @@ class Handler(BaseHTTPRequestHandler):
         try:
             content = self.rfile.read(size)
             topic, event_id = verify(content, parts.query, self.headers, self.server.secret)
-            if self.server.require_test_mode:
-                require_sandbox_event(content)
         except InvalidWebhook:
+            # Safe class-level diagnostic: never log request fields, reason,
+            # IDs, raw signature, tokens, or body content.
+            print("C5_TEST_WEBHOOK_REJECT_STAGE=HMAC_OR_ENVELOPE", flush=True)
             return self.respond(401)
         except Exception:
-            # Prevent exception content or private request data from reaching clients.
+            return self.respond(500)
+        try:
+            classification = require_sandbox_event(content) if self.server.require_test_mode else "OFFLINE_ONLY"
+        except InvalidWebhook:
+            print("C5_TEST_WEBHOOK_REJECT_STAGE=TEST_MODE", flush=True)
+            return self.respond(401)
+        except Exception:
             return self.respond(500)
         self.server.received += 1
         self.server.unique.add((topic, event_id))
         if self.server.require_test_mode:
-            # Topic belongs to a fixed allowlist; do not log raw event IDs,
-            # headers, signature, request body, payer, buyer or token.
-            print("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=" + topic, flush=True)
+            # Fixed safe topic from allowlist, never event ID/body/secret.
+            prefix = ("C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC="
+                      if classification == "SIMULATOR_ONLY" else
+                      "C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=")
+            print(prefix + topic, flush=True)
         # Mercado Pago documents HTTP 200/201 as successful webhook ACK.
         # 204 was accepted by our generic HTTP smoke, but can trigger provider retries.
         self.respond(200)
