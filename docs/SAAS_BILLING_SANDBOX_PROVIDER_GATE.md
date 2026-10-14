@@ -80,3 +80,15 @@ CI propuesto: `.github/workflows/c5-sandbox-webhook-contract-offline.yml` con Ja
 - **Estado del contrato offline:** `IN_PROGRESS` hasta CI del último commit, después registrar número de tests reales.
 - **Estado de sandbox proveedor:** `BLOCKED_EXTERNAL_PROVIDER` hasta obtener autorización, vendedor/comprador y secretos TEST verificados sin revelar datos. Este estado **no** se convierte en `DONE` por pasar las pruebas con mocks.
 - **Acción siguiente para quien retome:** leer PR #832 HEAD y CI exactos y registrar evidencia sin repetirla; averiguar primero **cómo demostrar TEST sin depender de un campo no documentado**, con credenciales en entorno aislado y sin hacer POST. No iniciar la etapa 3.
+
+
+
+### Hallazgo y corrección del SDK Java 3.7.0: unidades de tiempo en firmas
+
+**Bug reproducido en el primer CI de etapa 2:** [run #38529327212](https://github.com/Nicricht/helvoca/actions/runs/38529327212) **4 fallos en 7 pruebas HMAC** (los demás 26 tests Java pasaron). Firmas HMAC válidas con `ts` de 13 dígitos fueron rechazadas por el controlador. **No se usó una firma inventada para declarar GO**. Se leyó el código fuente del SDK Java tag `3.7.0`: su overload `WebhookSignatureValidator.validate(..., Duration)` calcula `Long.parseLong(ts) * 1000` y por tanto asume segundos; la documentación oficial muestra además `ts` de 13 dígitos en milisegundos. [Fuente SDK](https://github.com/mercadopago/sdk-java/blob/3.7.0/src/main/java/com/mercadopago/webhook/WebhookSignatureValidator.java), [firma y timestamp oficiales](https://www.mercadopago.cl/developers/es/docs/mp-point-v2/notifications?scope=prod).
+
+**Corrección aislada y cerrada a fallos:** `MercadoPagoWebhookController` sigue llamando a la **verificación criptográfica HMAC del SDK**, usando su overload sin tolerancia temporal. Solo después de una HMAC correcta, `MercadoPagoWebhookTimestampGuard` exige **un único timestamp de 10 dígitos (segundos) o 13 dígitos (milisegundos)** dentro de una ventana máxima de 5 minutos (o configuración positiva); rechaza los falsos, vencidos, futuros, repetidos y malformados. La firma corresponde al mismo header original. Para IDs alfanuméricos, usa minúsculas según manifiesto de Mercado Pago; el ID remoto original no se reemplaza en la reconciliación.
+
+**Verificación ampliada:** `MercadoPagoWebhookSignatureRoundTripTest`, `MercadoPagoWebhookTimestampGuardTest`, controlador existente con firma HMAC auténtica en lugar de SDK mockeado, y tests ya certificados de estados/duplicados de `BillingSubscriptionService`. Las pruebas HMAC reales y la ventana estricta no necesitan credenciales del proveedor, ni realizan escrituras a PostgreSQL productivo. Una prueba firmada correctamente puede probar el **contrato local** pero no acredita recepción de webhook de Mercado Pago TEST.
+
+**Estado:** hasta CI del último commit, `IN_PROGRESS`. C5 etapa 2 completa seguirá `BLOCKED_EXTERNAL_PROVIDER` sin entrega real, invoice aprobada y evidencia autenticada. Conservar la barrera de etapa 1 para credenciales TEST y no activar cobros reales. Próximo paso: confirmar CI exacto y documentar evidencia en PR #832 y #823 sin re-ejecutar pruebas ya válidas.
