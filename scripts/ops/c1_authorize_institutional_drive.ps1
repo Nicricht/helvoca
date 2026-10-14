@@ -5,7 +5,9 @@
 param(
     [string]$ProjectId = '41988ee6-f9f6-48eb-b726-abb973bb5740',
     [string]$EnvironmentId = '8bbc755a-58b5-46e8-8227-eefa4adbbce4',
-    [string]$ServiceId = '42bfe173-2f69-4605-ae63-a144a4a6e1dd'
+    [string]$ServiceId = '42bfe173-2f69-4605-ae63-a144a4a6e1dd',
+    [switch]$FreshAccount,
+    [string]$ExpectedEmail = ''
 )
 $ErrorActionPreference = 'Continue'
 # Native rclone and icacls may emit benign stderr on Windows PowerShell 5.1.
@@ -74,7 +76,490 @@ try {
     }
 
     $script:stage = 'OAUTH_CONFIG'
-    $remote = 'institutional'
+    if ([string]::IsNullOrWhiteSpace($ExpectedEmail)) { throw 'C1_EXPECTED_INSTITUTIONAL_EMAIL_REQUIRED' }
+    $ExpectedEmail = $ExpectedEmail.Trim().ToLowerInvariant()
+    if ($ExpectedEmail -notmatch '^[^@\s]+@duocuc\.cl
+    $existing = & $rcloneExe --config $conf listremotes
+    Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
+    if ($existing -notcontains "$($remote):") {
+        Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
+        Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
+        Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
+        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
+        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
+        Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
+        Secure-File $conf
+    }
+
+    # Fail CLOSED on mismatched account before creating or uploading anything.
+    # Google Drive about.get accepts the narrow drive.file OAuth scope.
+    $script:stage = 'GOOGLE_ACCOUNT_VERIFY'
+    $oauthConfText = [IO.File]::ReadAllText($conf)
+    $remoteEscaped = [regex]::Escape($remote)
+    $remoteSection = [regex]::Match($oauthConfText, '(?ms)^\[' + $remoteEscaped + '\]\s*\r?\n(?<body>.*?)(?=^\[|\z)')
+    if (-not $remoteSection.Success) { throw 'C1_OAUTH_REMOTE_SECTION_NOT_FOUND' }
+    $tokenMatch = [regex]::Match($remoteSection.Groups['body'].Value, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    # Refresh the token from the specifically verified remote only; never
+    # accidentally pick up an older personal-account token from rclone.conf.
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $remoteSection = [regex]::Match($rawConf, '(?ms)^\[' + [regex]::Escape($remote) + '\]\s*\r?\n(?<body>.*?)(?=^\[|\z)')
+    if (-not $remoteSection.Success) { throw 'C1_OAUTH_REMOTE_SECTION_NOT_FOUND' }
+    $tokenMatch = [regex]::Match($remoteSection.Groups['body'].Value, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+) { throw 'C1_EXPECTED_EMAIL_NOT_INSTITUTIONAL' }
+    # FreshAccount preserves the original OAuth remote unchanged, creating a
+    # separately named remote so a wrong prior Google login cannot be reused.
+    $remote = if ($FreshAccount) { 'institutional_c1_' + [guid]::NewGuid().ToString('N').Substring(0,12) } else { 'institutional' }
+    $existing = & $rcloneExe --config $conf listremotes
+    Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
+    if ($existing -notcontains "$($remote):") {
+        Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
+        Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
+        Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
+        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
+        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
+        Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
+        Secure-File $conf
+    }
+
+    # drive.file needs an app-created folder. The browser-created manual
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+)
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $tokenObject = $tokenMatch.Groups[1].Value | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenObject.access_token)) { throw 'C1_OAUTH_ACCESS_TOKEN_MISSING' }
+    try {
+        $apiResult = Invoke-RestMethod -Uri 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)' -Method Get -Headers @{ Authorization = 'Bearer ' + $tokenObject.access_token } -TimeoutSec 30 -ErrorAction Stop
+    } catch {
+        throw 'C1_OAUTH_DRIVE_IDENTITY_UNVERIFIABLE'
+    }
+    if ($null -eq $apiResult.user -or [string]::IsNullOrWhiteSpace($apiResult.user.emailAddress)) { throw 'C1_OAUTH_DRIVE_EMAIL_MISSING' }
+    if ($apiResult.user.emailAddress.Trim().ToLowerInvariant() -ne $ExpectedEmail) {
+        throw 'C1_OAUTH_ACCOUNT_MISMATCH'
+    }
+    Write-Host 'C1_GOOGLE_ACCOUNT_INSTITUTIONAL_VERIFIED'
+    # drive.file needs an app-created folder. The browser-created manual
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+) { throw 'C1_EXPECTED_EMAIL_NOT_INSTITUTIONAL' }
+    # FreshAccount preserves the original OAuth remote unchanged, creating a
+    # separately named remote so a wrong prior Google login cannot be reused.
+    $remote = if ($FreshAccount) { 'institutional_c1_' + [guid]::NewGuid().ToString('N').Substring(0,12) } else { 'institutional' }
+    $existing = & $rcloneExe --config $conf listremotes
+    Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
+    if ($existing -notcontains "$($remote):") {
+        Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
+        Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
+        Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
+        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
+        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
+        Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
+        Secure-File $conf
+    }
+
+    # drive.file needs an app-created folder. The browser-created manual
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+)
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+) { throw 'C1_EXPECTED_EMAIL_NOT_INSTITUTIONAL' }
+    # FreshAccount preserves the original OAuth remote unchanged, creating a
+    # separately named remote so a wrong prior Google login cannot be reused.
+    $remote = if ($FreshAccount) { 'institutional_c1_' + [guid]::NewGuid().ToString('N').Substring(0,12) } else { 'institutional' }
+    $existing = & $rcloneExe --config $conf listremotes
+    Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
+    if ($existing -notcontains "$($remote):") {
+        Write-Host 'C1: Autoriza con tu cuenta INSTITUCIONAL en el navegador.'
+        Write-Host 'C1: La app solo puede gestionar archivos creados por ella (drive.file).'
+        Write-Host 'C1: Si Google bloquea el OAuth compartido de rclone, deberas usar un cliente OAuth propio.'
+        # IMPORTANT: default rclone config create prints OAuth tokens; suppress it.
+        & $rcloneExe --config $conf config create $remote drive scope=drive.file config_is_local=true --no-output 1>$null 2>$null
+        Assert-NativeSuccess 'C1_GOOGLE_OAUTH_NOT_AUTHORIZED'
+        Secure-File $conf
+    }
+
+    # drive.file needs an app-created folder. The browser-created manual
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+)
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $tokenObject = $tokenMatch.Groups[1].Value | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenObject.access_token)) { throw 'C1_OAUTH_ACCESS_TOKEN_MISSING' }
+    try {
+        $apiResult = Invoke-RestMethod -Uri 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)' -Method Get -Headers @{ Authorization = 'Bearer ' + $tokenObject.access_token } -TimeoutSec 30 -ErrorAction Stop
+    } catch {
+        throw 'C1_OAUTH_DRIVE_IDENTITY_UNVERIFIABLE'
+    }
+    if ($null -eq $apiResult.user -or [string]::IsNullOrWhiteSpace($apiResult.user.emailAddress)) { throw 'C1_OAUTH_DRIVE_EMAIL_MISSING' }
+    if ($apiResult.user.emailAddress.Trim().ToLowerInvariant() -ne $ExpectedEmail) {
+        throw 'C1_OAUTH_ACCOUNT_MISMATCH'
+    }
+    Write-Host 'C1_GOOGLE_ACCOUNT_INSTITUTIONAL_VERIFIED'
+    # drive.file needs an app-created folder. The browser-created manual
+    # HelvocaBackups folder is neither renamed nor modified.
+    $script:stage = 'DRIVE_FOLDER'
+    $folderName = 'HelvocaBackups-Automaticos'
+    & $rcloneExe --config $conf mkdir "$($remote):$folderName" *> $null
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_FOLDER_CREATE_BLOCKED'
+    $entriesJson = & $rcloneExe --config $conf lsjson "$($remote):" --dirs-only
+    Assert-NativeSuccess 'C1_OAUTH_DRIVE_LIST_FAILED'
+    $entries = @($entriesJson | ConvertFrom-Json)
+    $folder = @($entries | Where-Object { $_.Name -eq $folderName -and $_.IsDir })
+    if ($folder.Count -ne 1 -or [string]::IsNullOrWhiteSpace($folder[0].ID)) {
+        throw 'C1_OAUTH_DRIVE_FOLDER_ID_UNVERIFIED'
+    }
+
+    # One tiny nonsensitive probe; this is NOT customer data.
+    $script:stage = 'OAUTH_READBACK_TEST'
+    $markerPath = Join-Path $private 'c1-check.tmp'
+    [IO.File]::WriteAllText($markerPath, 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE')
+    Secure-File $markerPath
+    $markerName = "C1_OAUTH_TEST_$([guid]::NewGuid().ToString('N')).txt"
+    $destination = "$($remote):$folderName/$markerName"
+    try {
+        & $rcloneExe --config $conf copyto --immutable $markerPath $destination *> $null
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_UPLOAD_FAILED'
+        $readback = & $rcloneExe --config $conf cat $destination
+        Assert-NativeSuccess 'C1_OAUTH_MARKER_READBACK_FAILED'
+        if (($readback -join '') -ne 'HELVOCA_C1_INSTITUTIONAL_OAUTH_PROBE') {
+            throw 'C1_OAUTH_MARKER_MISMATCH'
+        }
+    } finally { Remove-Item -LiteralPath $markerPath -ErrorAction SilentlyContinue }
+
+    $script:stage = 'LOCAL_OAUTH_TOKEN'
+    $rawConf = [IO.File]::ReadAllText($conf)
+    $tokenMatch = [regex]::Match($rawConf, '(?m)^[ \t]*token[ \t]*=[ \t]*(\{[^\r\n]+\})[ \t]*$')
+    if (-not $tokenMatch.Success) { throw 'C1_OAUTH_TOKEN_NOT_FOUND_LOCALLY' }
+    $oauthToken = $tokenMatch.Groups[1].Value
+    $tokenParsed = $oauthToken | ConvertFrom-Json
+    if ([string]::IsNullOrWhiteSpace($tokenParsed.refresh_token)) {
+        throw 'C1_OAUTH_REFRESH_TOKEN_MISSING'
+    }
+
+    # Set only the dedicated empty backup service; no deployment or cron.
+    $script:stage = 'RAILWAY_VARIABLE_UPLOAD'
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_TOKEN' $oauthToken
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_ROOT_FOLDER_ID' $folder[0].ID
+    Set-RailwayVar 'RCLONE_CONFIG_INSTITUTIONAL_SCOPE' 'drive.file'
+    Write-Host 'C1_INSTITUTIONAL_DRIVE_OAUTH_AND_RAILWAY_VARIABLES_PREPARED'
+    Write-Host 'No backups were executed, and Railway cron remains disabled.'
+    Write-Host 'Never share your local rclone.conf or any OAuth token.'
+} catch {
+    $code = $_.Exception.Message
+    if ($code -notmatch '^C1_[A-Z0-9_]+$') {
+        # Only the failing stage is emitted; raw exceptions may contain OAuth secrets.
+        $code = 'C1_OAUTH_UNEXPECTED_' + $script:stage
+    }
+    Write-Host "C1_OAUTH_BLOCKED: $code"
+    Write-Host 'No backup/production deployment requested. Do not paste OAuth details.'
+    exit 2
+}
+) { throw 'C1_EXPECTED_EMAIL_NOT_INSTITUTIONAL' }
+    # FreshAccount preserves the original OAuth remote unchanged, creating a
+    # separately named remote so a wrong prior Google login cannot be reused.
+    $remote = if ($FreshAccount) { 'institutional_c1_' + [guid]::NewGuid().ToString('N').Substring(0,12) } else { 'institutional' }
     $existing = & $rcloneExe --config $conf listremotes
     Assert-NativeSuccess 'C1_RCLONE_CONFIG_READ_FAILED'
     if ($existing -notcontains "$($remote):") {
