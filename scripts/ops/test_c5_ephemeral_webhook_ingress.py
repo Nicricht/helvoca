@@ -10,9 +10,9 @@ from email.message import Message
 from urllib.parse import urlencode
 
 try:
-    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature
+    from c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event, safe_rejection_reason
 except ModuleNotFoundError:
-    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature
+    from scripts.ops.c5_ephemeral_webhook_ingress import Collector, InvalidWebhook, verify, strict_json, parse_signature, require_sandbox_event, safe_rejection_reason
 
 SECRET = "c5-ephemeral-local-fixture-not-provider-secret"
 
@@ -86,9 +86,265 @@ class HmacContract(unittest.TestCase):
         with self.assertRaises(InvalidWebhook):
             verify(body, "type=subscription_authorized_payment&data.id=999999", headers, SECRET)
 
+    def test_bad_signature_has_priority_over_a_bad_topic(self):
+        body, headers = signed(event_id="123456", secret="wrong-test-secret")
+        with self.assertRaisesRegex(InvalidWebhook, "HMAC mismatch"):
+            verify(body, "type=orders", headers, SECRET)
+
+    def test_signed_conflicting_topic_is_classified(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(body, "type=subscription_authorized_payment", headers, SECRET)
+
+    def test_mp_simulator_conflicting_allowed_query_is_safely_normalized(self):
+        # MP TEST simulator sent a signed preapproval fixture with a conflicting
+        # recognized URL topic. Only the exact synthetic fixture may override.
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = json.dumps(mp_simulator_fixture()).encode()
+        self.assertEqual(
+            verify(payload, "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True),
+            ("subscription_preapproval", "123456"),
+        )
+
+    def test_simulator_override_cannot_accept_ordinary_test_event(self):
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = json.dumps({"live_mode": False, "type":"subscription_preapproval",
+                              "data":{"id":"123456"}}).encode()
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(payload, "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True)
+
+    def test_simulator_override_cannot_accept_modified_fixture(self):
+        _, headers = signed("subscription_preapproval", "123456")
+        payload = mp_simulator_fixture()
+        payload["date"] = "2026-10-14T11:48:00Z"
+        with self.assertRaisesRegex(InvalidWebhook, "topic conflict"):
+            verify(json.dumps(payload).encode(), "type=subscription_authorized_payment",
+                   headers, SECRET, allow_simulator_topic_mismatch=True)
+
+    def test_simulator_override_cannot_bypass_wrong_hmac(self):
+        _, headers = signed("subscription_preapproval", "123456", secret="wrong-test-secret")
+        with self.assertRaisesRegex(InvalidWebhook, "HMAC mismatch"):
+            verify(json.dumps(mp_simulator_fixture()).encode(),
+                   "type=subscription_authorized_payment", headers, SECRET,
+                   allow_simulator_topic_mismatch=True)
+
+    def test_signed_query_topic_not_allowed(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        with self.assertRaisesRegex(InvalidWebhook, "query topic unsupported"):
+            verify(body, "type=orders", headers, SECRET)
+
+    def test_signed_body_topic_not_allowed(self):
+        body, headers = signed("subscription_preapproval", "123456")
+        modified = json.dumps({"type":"orders","data":{"id":"123456"}}).encode()
+        with self.assertRaisesRegex(InvalidWebhook, "body topic unsupported"):
+            verify(modified, "", headers, SECRET)
+
     def test_real_email_or_token_not_in_logs(self):
         from scripts.ops import c5_ephemeral_webhook_ingress as mod
         self.assertEqual(mod.Handler.log_message(None, "fake email %s", "hello@example.com"), None)
+
+def mp_simulator_fixture():
+    """Fixed synthetic example from MP Developers' webhook simulator."""
+    return {
+        "action": "updated",
+        "application_id": "1234509876",
+        "data": {"id": "123456"},
+        "date": "2021-11-01T02:02:02Z",
+        "entity": "preapproval",
+        "id": "123456",
+        "type": "subscription_preapproval",
+        "version": 8,
+    }
+
+
+class DiagnosticNoSecretLeakContract(unittest.TestCase):
+    def test_hmac_mismatch_is_classified_safely(self):
+        self.assertEqual(safe_rejection_reason(InvalidWebhook("HMAC mismatch")), "HMAC_MISMATCH")
+
+    def test_event_shape_is_not_called_credential_failure(self):
+        self.assertEqual(safe_rejection_reason(InvalidWebhook("event id required")), "EVENT_ID_MISSING")
+
+    def test_structural_rejections_have_distinct_safe_classes(self):
+        cases = {
+            "topic missing": "TOPIC_MISSING",
+            "query topic unsupported": "TOPIC_QUERY_UNSUPPORTED",
+            "body topic unsupported": "TOPIC_BODY_UNSUPPORTED",
+            "topic conflict": "TOPIC_CONFLICT",
+            "event id required": "EVENT_ID_MISSING",
+            "conflicting event id": "EVENT_ID_CONFLICT",
+            "event id invalid": "EVENT_ID_FORMAT",
+            "event id shape invalid": "EVENT_ID_FORMAT",
+        }
+        for problem, expected in cases.items():
+            with self.subTest(problem=problem):
+                self.assertEqual(safe_rejection_reason(InvalidWebhook(problem)), expected)
+
+    def test_unrecognized_values_never_emerge_in_logs(self):
+        private = "not-for-logs-identity-or-token-123"
+        self.assertEqual(safe_rejection_reason(InvalidWebhook(private)), "UNKNOWN")
+
+
+class StrictSandboxEventContract(unittest.TestCase):
+    def test_only_explicit_sandbox_event_is_eligible(self):
+        self.assertTrue(require_sandbox_event(b'{"live_mode":false}'))
+
+    def test_productive_flag_rejected(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"live_mode":true}')
+
+    def test_missing_flag_rejected(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"type":"subscription_authorized_payment"}')
+
+    def test_string_false_does_not_count_as_sandbox(self):
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(b'{"live_mode":"false"}')
+
+
+    def test_only_exact_mpsimulator_fixture_without_live_mode_is_allowed(self):
+        data = json.dumps(mp_simulator_fixture()).encode()
+        self.assertEqual(require_sandbox_event(data), "SIMULATOR_ONLY")
+
+    def test_suspected_real_event_with_missing_live_mode_is_rejected(self):
+        data = mp_simulator_fixture()
+        data["date"] = "2026-10-14T10:55:00Z"
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
+
+    def test_simulator_with_explicit_live_true_is_always_rejected(self):
+        data = mp_simulator_fixture()
+        data["live_mode"] = True
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
+
+    def test_altered_simulator_identifier_is_rejected(self):
+        data = mp_simulator_fixture()
+        data["data"]["id"] = "987654"
+        with self.assertRaisesRegex(InvalidWebhook, "non-test"):
+            require_sandbox_event(json.dumps(data).encode())
+
+
+class RenderStrictHttpContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.server = Collector(("127.0.0.1", 0), SECRET, require_test_mode=True)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join(timeout=3)
+
+    def send(self, body, headers, path="/webhooks/v1/mercadopago"):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=3)
+        conn.request("POST", path, body=body,
+                     headers={k: v for k, v in headers.items()})
+        res = conn.getresponse()
+        status = res.status
+        res.read()
+        conn.close()
+        return status
+
+    def test_valid_signed_fake_test_webhook_is_acknowledged_and_counted(self):
+        body, headers = signed(event_id="981234")
+        body = json.dumps({"live_mode":False,"type":"subscription_authorized_payment",
+                           "data":{"id":"981234"}}).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        out = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: out.write(v[0]+"\\n")):
+            self.assertEqual(self.send(body,headers),200)
+        self.assertIn("C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=subscription_authorized_payment",out.getvalue())
+        self.assertNotIn("981234",out.getvalue())
+
+    def test_signed_production_event_is_rejected_and_not_counted(self):
+        body,headers = signed(event_id="987654")
+        body = json.dumps({"live_mode":True, "type":"subscription_authorized_payment",
+                           "data":{"id":"987654"}}).encode()
+        n = self.server.received
+        self.assertEqual(self.send(body,headers),401)
+        self.assertEqual(self.server.received,n)
+
+    def test_signed_event_missing_environment_flag_is_rejected(self):
+        body, headers=signed(event_id="453212")
+        n=self.server.received
+        self.assertEqual(self.send(body,headers),401)
+        self.assertEqual(self.server.received,n)
+
+
+    def test_signed_mp_simulator_without_live_mode_is_accepted_but_not_paid(self):
+        body, headers = signed(topic="subscription_preapproval", event_id="123456")
+        body = json.dumps(mp_simulator_fixture()).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0]+"\\n")):
+            self.assertEqual(self.send(body, headers), 200)
+        self.assertIn(
+            "C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC=subscription_preapproval",
+            output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
+        self.assertNotIn("1234509876", output.getvalue())
+
+    def test_signed_simulator_with_conflicting_recognized_query_returns_200(self):
+        _, headers = signed(topic="subscription_preapproval", event_id="123456")
+        payload = json.dumps(mp_simulator_fixture()).encode()
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0] + "\\n")):
+            self.assertEqual(self.send(payload, headers,
+                "/webhooks/v1/mercadopago?type=subscription_authorized_payment"), 200)
+        self.assertIn("C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC=subscription_preapproval",
+                      output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
+
+    def test_mp_simulator_with_wrong_signature_is_rejected(self):
+        body, headers = signed(topic="subscription_preapproval",
+                               event_id="123456", secret="wrong-fake-secret")
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        from io import StringIO
+        from unittest.mock import patch
+        output = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: output.write(v[0] + "\\n")):
+            self.assertEqual(self.send(body, headers), 401)
+        self.assertEqual(self.server.received, previous)
+        self.assertIn("C5_TEST_WEBHOOK_REJECT_CAUSE=HMAC_MISMATCH", output.getvalue())
+        self.assertNotIn("123456", output.getvalue())
+        self.assertNotIn("wrong-fake-secret", output.getvalue())
+
+    def test_expired_simulator_hmac_cannot_bypass_timestamp_window(self):
+        body, headers = signed(topic="subscription_preapproval",
+                               event_id="123456",
+                               ts=int(time.time()*1000)-300_001)
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        self.assertEqual(self.send(body, headers), 401)
+        self.assertEqual(self.server.received, previous)
+
+    def test_public_webhook_handler_emits_safe_entry_marker(self):
+        # A proxy-level 502 does not reach this handler; 401 must show ingress.
+        from io import StringIO
+        from unittest.mock import patch
+        fake_secret = "PRIVATE_DO_NOT_LOG"
+        out = StringIO()
+        with patch("builtins.print", side_effect=lambda *v, **k: out.write(v[0] + "\\n")):
+            self.assertEqual(self.send(b'{"example":"PRIVATE_DO_NOT_LOG"}', {}), 401)
+        self.assertIn("C5_TEST_WEBHOOK_HANDLER_ENTERED", out.getvalue())
+        self.assertNotIn(fake_secret, out.getvalue())
+
+    def test_simulator_missing_hmac_is_rejected(self):
+        body = json.dumps(mp_simulator_fixture()).encode()
+        previous = self.server.received
+        self.assertEqual(self.send(body, {}), 401)
+        self.assertEqual(self.server.received, previous)
+
 
 class LocalHttpContract(unittest.TestCase):
     @classmethod
@@ -128,7 +384,7 @@ class LocalHttpContract(unittest.TestCase):
         body, headers = signed(event_id="998877")
         n = self.server.received
         code, data = self.send("/webhooks/v1/mercadopago", body, headers)
-        self.assertEqual(code, 204)
+        self.assertEqual(code, 200)
         self.assertEqual(data, b"")
         self.assertEqual(self.server.received, n+1)
         self.assertIn(("subscription_authorized_payment", "998877"), self.server.unique)

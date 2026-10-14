@@ -65,8 +65,8 @@ def main():
         req = request.Request(target + "/webhooks/v1/mercadopago", data=body,
                               headers=headers, method="POST")
         with request.urlopen(req, timeout=15) as response:
-            if response.status != 204:
-                fail("SIGNED_POST_NOT_ACCEPTED")
+            if response.status != 200:
+                fail("SIGNED_POST_NOT_ACKNOWLEDGED_200")
         unsigned = request.Request(target + "/webhooks/v1/mercadopago", data=body,
                                    headers={"Content-Type": "application/json"}, method="POST")
         try:

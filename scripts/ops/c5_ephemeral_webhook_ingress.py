@@ -26,6 +26,36 @@ PREAPPROVAL = re.compile(r"[0-9a-fA-F-]{1,80}")
 class InvalidWebhook(ValueError):
     pass
 
+# Diagnostics are restricted to fixed categorical labels. Render Logs must
+# NEVER include raw payloads, IDs, timestamps, HMACs, keys, or headers.
+_SAFE_REJECT_CAUSES = {
+    "signature missing or too long": "SIGNATURE_FORMAT",
+    "invalid signature fields": "SIGNATURE_FORMAT",
+    "unexpected signature shape": "SIGNATURE_FORMAT",
+    "signature header ambiguity": "SIGNATURE_HEADER",
+    "request header ambiguity": "REQUEST_HEADER",
+    "request id invalid": "REQUEST_ID_FORMAT",
+    "invalid timestamp": "SIGNATURE_TIMESTAMP",
+    "stale or future timestamp": "SIGNATURE_TIMESTAMP",
+    "HMAC mismatch": "HMAC_MISMATCH",
+    "missing test-only secret": "SERVER_CONFIG",
+    "oversized body": "ENVELOPE",
+    "duplicate JSON field": "ENVELOPE",
+    "invalid JSON": "ENVELOPE",
+    "JSON object required": "ENVELOPE",
+    "duplicate query": "ENVELOPE",
+    "topic missing": "TOPIC_MISSING",
+    "query topic unsupported": "TOPIC_QUERY_UNSUPPORTED",
+    "body topic unsupported": "TOPIC_BODY_UNSUPPORTED",
+    "topic conflict": "TOPIC_CONFLICT",
+    "event id required": "EVENT_ID_MISSING",
+    "conflicting event id": "EVENT_ID_CONFLICT",
+    "event id invalid": "EVENT_ID_FORMAT",
+    "event id shape invalid": "EVENT_ID_FORMAT",
+}
+def safe_rejection_reason(exception):
+    return _SAFE_REJECT_CAUSES.get(str(exception), "UNKNOWN")
+
 def strict_json(blob):
     def unique_pairs(pairs):
         result = {}
@@ -58,7 +88,7 @@ def parse_signature(header):
         raise InvalidWebhook("invalid timestamp")
     return ts, fields["v1"].lower()
 
-def verify(body, query, headers, secret, now_ms=None):
+def verify(body, query, headers, secret, now_ms=None, allow_simulator_topic_mismatch=False):
     if not secret or len(secret) < 24:
         raise InvalidWebhook("missing test-only secret")
     if not isinstance(body, (bytes, bytearray)) or len(body) > MAX_BODY:
@@ -80,9 +110,8 @@ def verify(body, query, headers, secret, now_ms=None):
     for key in ("type", "data.id"):
         if len(params.get(key, [])) > 1:
             raise InvalidWebhook("duplicate query")
-    topic = params.get("type", [data.get("type")])[0]
-    if topic not in ALLOWED_TOPICS or data.get("type") not in (None, topic):
-        raise InvalidWebhook("unrecognized or conflicting topic")
+    # Authenticate the request before diagnosing its notification topic.
+    # A syntactically valid request with a wrong HMAC must never look trusted.
     wrapped = data.get("data")
     body_id = wrapped.get("id") if isinstance(wrapped, dict) else None
     query_id = params.get("data.id", [None])[0]
@@ -95,20 +124,80 @@ def verify(body, query, headers, secret, now_ms=None):
     event_id = query_id if query_id is not None else body_id
     if not isinstance(event_id, str):
         raise InvalidWebhook("event id invalid")
-    allowed = NUMBER if topic == "subscription_authorized_payment" else PREAPPROVAL
-    if not allowed.fullmatch(event_id):
+    # Bound and normalize identifier before HMAC, without inferring topic.
+    if not PREAPPROVAL.fullmatch(event_id):
         raise InvalidWebhook("event id shape invalid")
     manifest = f"id:{event_id.lower()};request-id:{request_id};ts:{ts};".encode()
     expected = hmac.new(secret.encode(), manifest, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, supplied):
         raise InvalidWebhook("HMAC mismatch")
+
+    # Fixed labels distinguish a real provider format mismatch from a
+    # bad signature, without publishing raw query, body, topic or IDs.
+    query_topic = params.get("type", [None])[0]
+    body_topic = data.get("type")
+    if query_topic is None and body_topic is None:
+        raise InvalidWebhook("topic missing")
+    if query_topic is not None and query_topic not in ALLOWED_TOPICS:
+        raise InvalidWebhook("query topic unsupported")
+    if body_topic is not None and body_topic not in ALLOWED_TOPICS:
+        raise InvalidWebhook("body topic unsupported")
+    if query_topic is not None and body_topic is not None and query_topic != body_topic:
+        # The TEST-only Mercado Pago developer simulator has been observed
+        # sending two *recognized* but different subscription topics in URL
+        # and its fixed synthetic POST body. Never generalize this rule to
+        # real TEST events, production events, or unauthenticated requests.
+        if not (allow_simulator_topic_mismatch
+                and query_topic == "subscription_authorized_payment"
+                and body_topic == "subscription_preapproval"):
+            raise InvalidWebhook("topic conflict")
+        try:
+            if require_sandbox_event(body) != "SIMULATOR_ONLY":
+                raise InvalidWebhook("topic conflict")
+        except InvalidWebhook:
+            raise InvalidWebhook("topic conflict") from None
+        topic = body_topic
+    else:
+        topic = query_topic if query_topic is not None else body_topic
+    if topic == "subscription_authorized_payment" and not NUMBER.fullmatch(event_id):
+        raise InvalidWebhook("event id shape invalid")
     return topic, event_id
+
+def require_sandbox_event(payload):
+    # Called ONLY after an authenticated HMAC, never as a replacement for it.
+    # Actual TEST events must explicitly declare live_mode=false.
+    data = strict_json(payload)
+    if data.get("live_mode") is False:
+        return "TEST_EVENT"
+    if "live_mode" in data:
+        raise InvalidWebhook("non-test provider event")
+    # Mercado Pago's built-in webhook simulator sends this documented-shaped
+    # fixed fixture without live_mode. Permit ONLY the exact synthetic example
+    # verified in the owner's developer-console screenshot, not a generic
+    # subscription or a production notification with live_mode omitted.
+    wrapped = data.get("data")
+    is_simulator = (
+        data.get("action") == "updated"
+        and data.get("entity") == "preapproval"
+        and data.get("type") == "subscription_preapproval"
+        and data.get("version") == 8
+        and data.get("date") == "2021-11-01T02:02:02Z"
+        and data.get("id") == "123456"
+        and isinstance(wrapped, dict) and wrapped.get("id") == "123456"
+        and isinstance(data.get("application_id"), str)
+        and re.fullmatch(r"[0-9]{4,24}", data["application_id"]) is not None
+    )
+    if is_simulator:
+        return "SIMULATOR_ONLY"
+    raise InvalidWebhook("non-test provider event")
+
 
 class Collector(ThreadingHTTPServer):
     daemon_threads = True
-    def __init__(self, address, secret):
+    def __init__(self, address, secret, require_test_mode=False):
         super().__init__(address, Handler)
         self.secret = secret
+        self.require_test_mode = require_test_mode
         self.received = 0
         self.unique = set()
 
@@ -133,6 +222,9 @@ class Handler(BaseHTTPRequestHandler):
         parts = urlsplit(self.path)
         if parts.path != "/webhooks/v1/mercadopago":
             return self.respond(404)
+        # A constant, content-free marker distinguishes app ingress from
+        # upstream proxy/cold-start failures even for malformed requests.
+        print("C5_TEST_WEBHOOK_HANDLER_ENTERED", flush=True)
         raw_length = self.headers.get_all("Content-Length")
         if raw_length is None or len(raw_length) != 1:
             return self.respond(411)
@@ -144,15 +236,35 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(413)
         try:
             content = self.rfile.read(size)
-            topic, event_id = verify(content, parts.query, self.headers, self.server.secret)
-        except InvalidWebhook:
+            topic, event_id = verify(
+                content, parts.query, self.headers, self.server.secret,
+                allow_simulator_topic_mismatch=self.server.require_test_mode)
+        except InvalidWebhook as exc:
+            # Only a fixed enum is logged; client always receives the same
+            # generic 401. Never log exception text, header, token or body.
+            print("C5_TEST_WEBHOOK_REJECT_STAGE=HMAC_OR_ENVELOPE", flush=True)
+            print("C5_TEST_WEBHOOK_REJECT_CAUSE=" + safe_rejection_reason(exc), flush=True)
             return self.respond(401)
         except Exception:
-            # Prevent exception content or private request data from reaching clients.
+            return self.respond(500)
+        try:
+            classification = require_sandbox_event(content) if self.server.require_test_mode else "OFFLINE_ONLY"
+        except InvalidWebhook:
+            print("C5_TEST_WEBHOOK_REJECT_STAGE=TEST_MODE", flush=True)
+            return self.respond(401)
+        except Exception:
             return self.respond(500)
         self.server.received += 1
         self.server.unique.add((topic, event_id))
-        self.respond(204)
+        if self.server.require_test_mode:
+            # Fixed safe topic from allowlist, never event ID/body/secret.
+            prefix = ("C5_AUTHENTICATED_SIMULATOR_RECEIPT_TOPIC="
+                      if classification == "SIMULATOR_ONLY" else
+                      "C5_AUTHENTICATED_TEST_RECEIPT_TOPIC=")
+            print(prefix + topic, flush=True)
+        # Mercado Pago documents HTTP 200/201 as successful webhook ACK.
+        # 204 was accepted by our generic HTTP smoke, but can trigger provider retries.
+        self.respond(200)
 
 def main():
     if os.getenv("C5_EPHEMERAL_MODE") != "test-only":

@@ -1,0 +1,61 @@
+name: C5 Render Free stable HTTPS smoke (no payment)
+
+# Post-deploy verification of Render test-only receiver (deploy dep-db7lb1t9fdbs73elgsv0).
+
+on:
+  push:
+    branches:
+      - 'feat/c5-render-free-test-ingress-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c5-render-stable-https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Wait for Render Free service to become ready, then reject unsigned POST
+        env:
+          C5_RENDER_TEST_HTTPS_ORIGIN: "https://helvoca-c5-test-webhook-ingress.onrender.com"
+        run: |
+          python3 - <<'PY'
+          import os
+          import time
+          from urllib import request, error
+          from urllib.parse import urlsplit
+          origin = os.environ.get("C5_RENDER_TEST_HTTPS_ORIGIN","").rstrip("/")
+          url = urlsplit(origin)
+          assert url.scheme == "https"
+          assert url.hostname == "helvoca-c5-test-webhook-ingress.onrender.com"
+          ready = False
+          for _ in range(55):
+              try:
+                  req = request.Request(origin + "/health", method="GET")
+                  with request.urlopen(req, timeout=9) as res:
+                      if res.status == 204:
+                          ready = True
+                          break
+              except (error.HTTPError, error.URLError, TimeoutError):
+                  pass
+              time.sleep(4)
+          if not ready:
+              raise SystemExit("C5_RENDER_HEALTH_STILL_NOT_READY")
+          print("C5_RENDER_STABLE_TLS_HEALTH=PASS")
+          payload = b'{"type":"subscription_authorized_payment","data":{"id":"123456"}}'
+          req = request.Request(
+              origin + "/webhooks/v1/mercadopago",
+              data=payload,
+              headers={"Content-Type":"application/json"},
+              method="POST"
+          )
+          try:
+              with request.urlopen(req, timeout=20):
+                  raise SystemExit("C5_RENDER_UNSIGNED_POST_WAS_ACCEPTED")
+          except error.HTTPError as exc:
+              if exc.code != 401:
+                  raise SystemExit("C5_RENDER_UNSIGNED_POST_REJECTED_UNEXPECTED_STATUS")
+          print("C5_RENDER_STABLE_HTTPS_UNSIGNED_REJECTED_401=PASS")
+          print("C5_RENDER_NO_PROVIDER_OR_PAYMENT=PASS")
+          PY
