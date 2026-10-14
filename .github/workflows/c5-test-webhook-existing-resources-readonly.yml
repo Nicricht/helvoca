@@ -1,0 +1,48 @@
+name: C5 existing TEST webhook resources inventory (no values)
+
+on:
+  push:
+    branches:
+      - 'audit/c5-existing-test-webhook-secret-*'
+
+permissions:
+  contents: read
+
+jobs:
+  existing-test-resource-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      C5_TEST_WEBHOOK_HMAC: ${{ secrets.MERCADOPAGO_TEST_WEBHOOK_SECRET }}
+      C5_UNSCOPED_WEBHOOK_HMAC: ${{ secrets.MERCADOPAGO_WEBHOOK_SECRET }}
+      C5_TEST_PAYER_EMAIL: ${{ secrets.MERCADOPAGO_TEST_PAYER_EMAIL }}
+      C5_TEST_RECEIVER_URL: ${{ vars.C5_TEST_WEBHOOK_URL }}
+    steps:
+      - name: Check existing GitHub TEST resource accessibility without exposing any value
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, urllib.parse
+          webhook = os.environ.get("C5_TEST_WEBHOOK_HMAC", "")
+          payer = os.environ.get("C5_TEST_PAYER_EMAIL", "")
+          unspecified = os.environ.get("C5_UNSCOPED_WEBHOOK_HMAC", "")
+          receiver = os.environ.get("C5_TEST_RECEIVER_URL", "")
+          # Only categorical statuses. Do not print env values, lengths, hashes,
+          # domains, account IDs or URLs.
+          print("C5_TEST_WEBHOOK_SIGNING_SECRET=" +
+                ("AVAILABLE_TO_CI" if len(webhook) >= 24 else "NOT_AVAILABLE_TO_CI"))
+          print("C5_UNSCOPED_WEBHOOK_SECRET_METADATA=" +
+                ("EXISTS_BUT_ENV_UNVERIFIED" if len(unspecified) >= 24
+                 else "NOT_AVAILABLE_TO_CI"))
+          print("C5_TEST_PAYER_EMAIL=" +
+                ("AVAILABLE_TO_CI" if re.fullmatch(r"testuser[0-9]+@testuser\.com", payer.lower())
+                 else "NOT_AVAILABLE_TO_CI"))
+          endpoint = urllib.parse.urlsplit(receiver)
+          safe = (endpoint.scheme == "https" and bool(endpoint.hostname)
+                  and endpoint.username is None and endpoint.password is None
+                  and endpoint.path == "/webhooks/v1/mercadopago")
+          print("C5_TEST_STABLE_HTTPS_WEBHOOK=" +
+                ("AVAILABLE_TO_CI" if safe else "NOT_AVAILABLE_TO_CI"))
+          print("C5_TEST_RESOURCE_INVENTORY_NO_VALUES_PRINTED=PASS")
+          PY
