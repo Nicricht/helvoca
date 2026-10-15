@@ -11,7 +11,7 @@
 
 Los comandos de pruebas de recuperación de los scripts de `scripts/ops/c1_*` no programan tareas ni tienen autorización para transferir datos productivos a otros servicios.
 
-## Política propuesta (pendiente de aprobación y medición)
+## Política operativa: objetivos RPO/RTO aprobados (medición pendiente)
 
 | Variable | Propuesta inicial | Puerta de aceptación |
 | --- | --- | --- |
@@ -23,7 +23,7 @@ Los comandos de pruebas de recuperación de los scripts de `scripts/ops/c1_*` no
 | Alertas | Backup vencido >26 h, upload incompleto, hash diferente, restore fallido, almacenamiento insuficiente | Destinatario de alertas real, prueba de alerta y acuse |
 | Ubicación | Google Drive institucional elegido por el titular | Propiedad institucional conocida; verificar acceso continuado, cuota, MFA, permisos y recuperación al perder afiliación |
 
-Los valores son **objetivos provisionales**, no compromisos existentes ni métricas observadas. Un backup diario por sí solo NO prueba RPO/RTO contractuales. Se recomienda revisar la necesidad de PITR antes de prometer RPO inferior a 24 horas.
+**Decisión del titular 2026-10-14 (Chile): RPO objetivo máximo 24 horas y RTO objetivo máximo 4 horas expresamente APROBADOS.** La frecuencia, retención, ensayos y alertas de la tabla continúan como **propuestas no activadas ni certificadas** para el cron opcional. Las metas aprobadas **todavía no están medidas ni garantizadas**, no son un SLA. Los respaldos nativos Railway Pro Daily/Weekly/Monthly fueron confirmados por el titular: su **última ejecución y frescura siguen sin certificación API**; el archivo offsite de 2026-10-13 sigue recuperable según informe privado previo, pero no demuestra frescura del RPO el 2026-10-15. No duplicar exportación, descarga ni restore ya verificados. Un programa de backup diario no prueba por sí solo un RPO contractual. Se necesitaría autorización separada para PITR, un ensayo end-to-end cronometrado que requiera nuevos recursos o el despliegue de cron OAuth.
 
 ## Arquitectura de automatización segura
 
