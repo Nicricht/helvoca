@@ -263,7 +263,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && target.trim().equals(forbiddenTarget.trim());
     }
 
-    private static String form(String key, String value) {
+    // Package-visible to verify Twilio form encoding without triggering provider calls.
+    static String form(String key, String value) {
         return URLEncoder.encode(key, StandardCharsets.UTF_8)
                 + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);
     }

@@ -25,6 +25,20 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
+    void twilioCertificationFormEncodingProtectsPhoneAndCallbackParameters() {
+        assertEquals("To=%2B56912345678",
+                TwilioCertificationStartupRunner.form("To", "+56912345678"));
+        assertEquals("StatusCallbackEvent=call+answered",
+                TwilioCertificationStartupRunner.form("StatusCallbackEvent", "call answered"));
+        assertEquals("a%26b=x%3D1%26y%3D%2B",
+                TwilioCertificationStartupRunner.form("a&b", "x=1&y=+"));
+        assertEquals("voice=Caf%C3%A9",
+                TwilioCertificationStartupRunner.form("voice", "Café"));
+        assertEquals("empty=",
+                TwilioCertificationStartupRunner.form("empty", ""));
+    }
+
+    @Test
     void maskedCertificationLogNumbersNeverDiscloseFullNumbers() {
         assertEquals("***", TwilioCertificationStartupRunner.mask(null));
         assertEquals("***", TwilioCertificationStartupRunner.mask(""));

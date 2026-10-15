@@ -56,8 +56,17 @@ added to this helper; the masking behavior itself is unchanged. The subsequent
 Full Gate also exposed an uncovered existing URL helper `trimTrailingSlash`
 (266/267 methods): targeted regression now asserts no trailing slash, one,
 many, preserved interior separators, root-only and empty input. Its logic is
-unchanged, with package-level test access only. New exact-HEAD Full Gate
-remains required; neither failure was waived. This does not
+unchanged, with package-level test access only. The next Full Gate
+[run #38733288443](https://github.com/Nicricht/helvoca/actions/runs/38733288443)
+ran 2,273 Java tests with zero failures/errors/skips but reported an
+uncovered adjacent URL-form helper `form`: changed lines 1101/1101 (100%),
+branches 869/869 (100%), and methods 267/268 (99.6%). Browser E2E was
+skipped by this fail-fast gate; specialized suites were 11/11 successful.
+The additional regression now verifies percent-encoding of Twilio E.164
+numbers, spaces, reserved key/value delimiters, UTF-8 characters, and
+empty values. The helper implementation and resulting requests are
+unchanged; only package-level test visibility was added. Another exact-HEAD
+Full Gate remains required; none of these failures were waived. This does not
 alter provider requests, call duration, quotas, authorization, consent or
 hangup behavior, and it does not prove a real consented call was run.
 Additional exception messages from other paths require separate review.
