@@ -67,6 +67,20 @@ This section supersedes **only** older unverified present-tense claims below. Hi
 
 **NO-GO pendiente:** custodio/operador, recuperabilidad del snapshot, frescura en ventana, ensayo RTO integral autorizado y medido, STOP efectivo por tenant/servicio, ventana y consentimiento explícito del merge. Ninguno de estos pasos de producción se ha ejecutado aquí.
 
+## C1 sin costo adicional: auditoría de frescura de snapshot nativo (2026-10-15)
+
+El repositorio ya dispone de `scripts/ops/railway_postgres_recovery_audit.py`. Se amplió el **auditor existente**, sin crear un servicio ni otro programa de backup: ejecuta únicamente `railway postgres pitr status --json` y `railway postgres pitr backup list --json` sobre el PostgreSQL seleccionado (consultas READ ONLY). La documentación oficial Railway confirma que `pitr backup list` enumera **volume backups**, incluso aunque el mismo grupo de comandos también incluya PITR. No ejecuta `enable`, `create`, `restore`, `delete`, ni cambios al proyecto.
+
+La consulta guarda la respuesta original **solo en un directorio privado local fuera de Git**, pero muestra únicamente una clasificación no sensible: `RECENT_COMPLETED_METADATA` si el proveedor informa explícitamente estado completado y sello de finalización UTC dentro de 24 horas, `STALE_COMPLETED_METADATA` si supera 24 horas, `NO_BACKUPS_LISTED`, `COMPLETION_UNVERIFIED` o `UNVERIFIED`. Un JSON con `createdAt` pero sin estado y hora explícita de finalización **NO** es prueba de backup completado. Si el proveedor cambia el formato, el auditor falla cerrado. Ninguna clasificación prueba la capacidad de restauración del volumen ni el RTO integral, y el resultado general permanece `RESTORE_PROOF_MISSING` / NO-GO.
+
+Para el operador **solo cuando corresponda verificar un snapshot fresco** (no repetir exportación/restore históricos), en una terminal local con Railway CLI autenticado:
+
+```powershell
+py -3 .\scripts\ops\railway_postgres_recovery_audit.py --output-dir "$env:LOCALAPPDATA\Helvoca\private-evidence\railway-c1"
+```
+
+**No publicar** en GitHub ni en el chat el contenido bruto del informe, los identificadores de backups, datos personales o secretos. Si el auditor indica `UNVERIFIED`, comprobar únicamente metadatos no sensibles del último backup completado en Postgres > Backups del Dashboard. La evidencia se registra para la ventana de release, no como garantía permanente. La restauración nativa aislada y el RTO completo siguen pendientes y requieren autorización separada si consumen recursos.
+
 ## Recovery layers
 
 ### Layer 1: Railway volume backup

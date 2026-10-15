@@ -50,5 +50,83 @@ class RecoveryInventoryTests(unittest.TestCase):
                 recovery.safe_write(root / "private", "report.json", b"{}")
 
 
+    def test_fresh_completed_native_backup_is_only_metadata_evidence(self):
+        from datetime import datetime, timezone
+        checked = datetime(2026, 10, 15, 10, 0, tzinfo=timezone.utc)
+        payload = b'{"backups":[{"id":"never-echo","status":"COMPLETED","completedAt":"2026-10-15T08:00:00Z"}]}'
+        finding = recovery.backup_freshness(payload, checked)
+        self.assertEqual("RECENT_COMPLETED_METADATA", finding["state"])
+        self.assertEqual(7200, finding["age_seconds"])
+        self.assertTrue(finding["completed_within_24h_by_metadata"])
+        self.assertNotIn("never-echo", str(finding))
+
+    def test_old_completed_native_backup_is_not_fresh(self):
+        from datetime import datetime, timezone
+        checked = datetime(2026, 10, 15, 10, 0, tzinfo=timezone.utc)
+        payload = b'{"items":[{"status":"success","finished_at":"2026-10-13T08:00:00+00:00"}]}'
+        finding = recovery.backup_freshness(payload, checked)
+        self.assertEqual("STALE_COMPLETED_METADATA", finding["state"])
+        self.assertFalse(finding["completed_within_24h_by_metadata"])
+
+    def test_missing_timestamp_or_completion_never_proves_freshness(self):
+        from datetime import datetime, timezone
+        checked = datetime(2026, 10, 15, 10, 0, tzinfo=timezone.utc)
+        for payload in (
+            b'[{"status":"PENDING","completedAt":"2026-10-15T08:00:00Z"}]',
+            b'[{"status":"COMPLETED","createdAt":"2026-10-15T08:00:00Z"}]',
+            b'[{"status":"COMPLETED","completedAt":"2026-10-15T08:00:00"}]',
+            b'[{"status":"COMPLETED","completedAt":"2026-10-16T08:00:00Z"}]',
+            b'[{"status":"COMPLETED","completedAt":"not-a-date"}]',
+            b'[1, null, {"status":"FAILED","completedAt":"2026-10-15T08:00:00Z"}]',
+        ):
+            with self.subTest(payload=payload):
+                finding = recovery.backup_freshness(payload, checked)
+                self.assertEqual("COMPLETION_UNVERIFIED", finding["state"])
+                self.assertFalse(finding["completed_within_24h_by_metadata"])
+
+    def test_invalid_unknown_and_empty_backup_lists_are_fail_closed(self):
+        from datetime import datetime, timezone
+        checked = datetime(2026, 10, 15, 10, 0, tzinfo=timezone.utc)
+        for raw in (b"not-json", b'{"unexpected":[]}', b"null"):
+            self.assertEqual("UNVERIFIED", recovery.backup_freshness(raw, checked)["state"])
+        self.assertEqual("NO_BACKUPS_LISTED",
+                         recovery.backup_freshness(b'{"backups":[]}', checked)["state"])
+        naive = datetime(2026, 10, 15, 10, 0)
+        self.assertEqual("UNVERIFIED",
+                         recovery.backup_freshness(b"[]", naive)["state"])
+
+    def test_nested_mixed_backup_list_uses_latest_verified_completion(self):
+        from datetime import datetime, timezone
+        checked = datetime(2026, 10, 15, 10, 0, tzinfo=timezone.utc)
+        raw = (b'{"data":{"volumeBackups":['
+               b'{"state":"SUCCEEDED","finishedAtUtc":"2026-10-14T08:00:00Z"},'
+               b'{"state":"SUCCEEDED","finishedAtUtc":"2026-10-15T09:00:00Z"},'
+               b'{"state":"FAILED","finishedAtUtc":"2026-10-15T09:30:00Z"}]}}')
+        result = recovery.backup_freshness(raw, checked)
+        self.assertEqual("RECENT_COMPLETED_METADATA", result["state"])
+        self.assertEqual(3600, result["age_seconds"])
+
+    def test_inventory_audit_adds_safe_freshness_without_claiming_restore(self):
+        from datetime import datetime, timezone
+        completed = datetime.now(timezone.utc).isoformat()
+        commands = []
+        def fake_runner(command, **kwargs):
+            commands.append(command)
+            body = (('{"backups":[{"id":"sensitive-backup-ref","status":"COMPLETED",'
+                     '"completedAt":"' + completed + '"}]}').encode()
+                    if "backup" in command else b'{"status":"off"}')
+            return subprocess.CompletedProcess(command, 0, body, b"")
+        with tempfile.TemporaryDirectory() as tmp:
+            report = recovery.audit("railway", Path(tmp) / "private", runner=fake_runner)
+        self.assertEqual(2, len(commands))
+        self.assertEqual("RECENT_COMPLETED_METADATA",
+                         report["volume_backup_freshness"]["state"])
+        self.assertFalse(report["restoration_test_completed"])
+        self.assertFalse(report["commercial_go"])
+        self.assertNotIn("sensitive-backup-ref",
+                         str(report["volume_backup_freshness"]))
+
+
+
 if __name__ == "__main__":
     unittest.main()

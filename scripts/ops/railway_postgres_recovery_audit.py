@@ -29,6 +29,76 @@ READ_ONLY_COMMANDS = (
 )
 
 
+
+def backup_freshness(raw: bytes, checked_at: datetime) -> dict:
+    """Conservative completion-age check; listing alone never proves restore."""
+    result = {
+        "state": "UNVERIFIED",
+        "latest_completed_at_utc": None,
+        "age_seconds": None,
+        "completed_within_24h_by_metadata": False,
+    }
+    if checked_at.tzinfo is None:
+        return result
+    try:
+        payload = json.loads(raw)
+    except (ValueError, TypeError):
+        return result
+
+    backups = payload if isinstance(payload, list) else None
+    if isinstance(payload, dict):
+        for key in ("backups", "volumeBackups", "items", "data"):
+            candidate = payload.get(key)
+            if isinstance(candidate, list):
+                backups = candidate
+                break
+            if key == "data" and isinstance(candidate, dict):
+                for nested_key in ("backups", "volumeBackups", "items"):
+                    nested = candidate.get(nested_key)
+                    if isinstance(nested, list):
+                        backups = nested
+                        break
+    if backups is None:
+        return result
+    if not backups:
+        result["state"] = "NO_BACKUPS_LISTED"
+        return result
+
+    completed = []
+    for backup in backups:
+        if not isinstance(backup, dict):
+            continue
+        status = backup.get("status", backup.get("state"))
+        if not isinstance(status, str) or status.upper() not in ("COMPLETED", "SUCCESS", "SUCCEEDED"):
+            continue
+        stamp = next((backup.get(key) for key in
+                      ("completedAt", "completed_at", "finishedAt", "finished_at",
+                       "completedTime", "finishedAtUtc")
+                      if isinstance(backup.get(key), str)), None)
+        if stamp is None:
+            continue
+        try:
+            finished = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if finished.tzinfo is not None and finished <= checked_at:
+            completed.append(finished)
+
+    if not completed:
+        result["state"] = "COMPLETION_UNVERIFIED"
+        return result
+    latest = max(completed).astimezone(timezone.utc)
+    age_seconds = int((checked_at - latest).total_seconds())
+    recent = age_seconds <= 24 * 60 * 60
+    result.update({
+        "state": "RECENT_COMPLETED_METADATA" if recent else "STALE_COMPLETED_METADATA",
+        "latest_completed_at_utc": latest.isoformat(),
+        "age_seconds": age_seconds,
+        "completed_within_24h_by_metadata": recent,
+    })
+    return result
+
+
 def safe_write(directory: Path, filename: str, content: bytes) -> Path:
     """Create owner-only output, outside Git; never print raw CLI bodies."""
     directory = directory.expanduser().absolute()
@@ -60,6 +130,8 @@ def safe_write(directory: Path, filename: str, content: bytes) -> Path:
 
 def audit(cli: str, output_dir: Path, runner=subprocess.run) -> dict:
     results = []
+    checked_at = datetime.now(timezone.utc)
+    backup_listing = b""
     for num, command in enumerate(READ_ONLY_COMMANDS):
         cmd = [cli, *command, "--project", PROJECT,
                "--environment", ENVIRONMENT, "--service", POSTGRES_SERVICE,
@@ -72,6 +144,9 @@ def audit(cli: str, output_dir: Path, runner=subprocess.run) -> dict:
         except (OSError, subprocess.TimeoutExpired):
             data, error, code = b"", b"", 127
 
+        if num == 1 and code == 0:
+            backup_listing = data
+
         # CLI output might contain volume IDs, repository paths or other
         # operational details. Store only locally; never echo or commit it.
         safe_write(output_dir, f"query-{num + 1}.stdout.private", data)
@@ -82,12 +157,17 @@ def audit(cli: str, output_dir: Path, runner=subprocess.run) -> dict:
             "response_sha256": sha256(data).hexdigest(),
             "output_present": bool(data),
         })
+    backup_list_succeeded = results[1]["completed_without_cli_error"]
+    backup_age = (backup_freshness(backup_listing, checked_at)
+                  if backup_list_succeeded else
+                  backup_freshness(b"", checked_at))
     result = {
         "project_id": PROJECT,
         "environment_id": ENVIRONMENT,
         "postgres_service_id": POSTGRES_SERVICE,
         "checked_at_utc": datetime.now(timezone.utc).isoformat(),
         "queries": results,
+        "volume_backup_freshness": backup_age,
         # These fields MUST remain false regardless of successful list/status:
         "restoration_test_completed": False,
         "original_volume_untouched_by_this_tool": True,
@@ -122,6 +202,7 @@ def main(argv: list[str] | None = None) -> int:
         "restore_test_completed": False,
         "production_deployment_authorized": False,
         "conclusion": "RESTORE_PROOF_MISSING",
+        "native_backup_freshness_metadata": report["volume_backup_freshness"]["state"],
         "local_evidence_directory": str(args.output_dir),
     }, indent=2))
     return 0 if all(q["completed_without_cli_error"] for q in report["queries"]) else 2
