@@ -274,7 +274,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         return out;
     }
 
-    private static String mask(String phone) {
+    // Package-visible for explicit privacy/short-input regression coverage.
+    static String mask(String phone) {
         if (phone == null || phone.length() < 5) return "***";
         return "***" + phone.substring(phone.length() - 4);
     }

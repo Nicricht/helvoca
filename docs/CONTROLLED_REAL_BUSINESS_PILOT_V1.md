@@ -46,7 +46,13 @@ raw Twilio HTTP error response (up to 400 characters) to an exception, which
 could then reach shared application logs. The C4/C6 safety fix retains a
 status-only diagnostic and replaces the provider body with the fixed marker
 `[provider response omitted]`, regardless of content or length. A targeted
-unit regression covers short/long/empty/null provider bodies. This does not
+unit regression covers short/long/empty/null provider bodies. The exact-HEAD
+Full Gate initially failed its mandatory 100% differential method threshold
+(265/266) because the pre-existing phone-number log masking helper `mask`
+was counted as an affected method but had no direct test. A second regression
+now verifies null/empty/short and E.164-shaped numbers remain hidden or
+limited to their final four digits. Only package-level test visibility was
+added to this helper; the masking behavior itself is unchanged. This does not
 alter provider requests, call duration, quotas, authorization, consent or
 hangup behavior, and it does not prove a real consented call was run.
 Additional exception messages from other paths require separate review.

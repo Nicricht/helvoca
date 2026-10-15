@@ -9,6 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TwilioCertificationStartupRunnerTest {
 
     @Test
+    void maskedCertificationLogNumbersNeverDiscloseFullNumbers() {
+        assertEquals("***", TwilioCertificationStartupRunner.mask(null));
+        assertEquals("***", TwilioCertificationStartupRunner.mask(""));
+        assertEquals("***", TwilioCertificationStartupRunner.mask("1234"));
+        assertEquals("***5678", TwilioCertificationStartupRunner.mask("12345678"));
+        assertEquals("***4321", TwilioCertificationStartupRunner.mask("+56912344321"));
+    }
+
+    @Test
     void twilioCreateCallErrorDiagnosticsNeverExposeProviderBody() {
         String sensitiveBody = "{\"message\":\"synthetic-caller@example.test token=private-token\"}";
         assertEquals("[provider response omitted]",
