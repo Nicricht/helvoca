@@ -30,14 +30,13 @@ Do not invent missing names or contact details. A blank owner/contact is a NO-GO
 
 ## Immediate stop controls
 
-There are two independent stop controls:
+**HIGH-RISK scope warning (verified in code, 2026-10-15): these are pilot-scoped controls, NOT universal emergency stops.** `ControlledPilotExternalEffectGuard.evaluate(...)` permits a tenant with no `pilot_launch_control` row and returns `allowed=true / pilotManaged=false / NOT_PILOT_MANAGED` even when `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`. This behavior is explicitly asserted in `ControlledPilotExternalEffectGuardTest.nonPilotTenantPreservesExistingBehaviorEvenWhenGlobalPilotSwitchIsOff`. Never infer that switching off this flag blocks all tenants, all provider routes, existing sessions, queued jobs or payments already sent.
 
-1. **Tenant kill switch:** put the pilot tenant in `PAUSED`.
-2. **Global kill switch:** set `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`.
+1. **Pilot-managed tenant:** verify the exact tenant has a `pilot_launch_control` record and put it in `PAUSED` using the authorized admin flow. Re-read its actual state and the guarded path's denial outcome; a missing row is **NO-GO**, not evidence of PAUSED.
+2. **Pilot-managed routes, multiple tenants:** set `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false` through the approved production change procedure if the incident owner authorizes it. Recheck the effective deployed value and guarded denial for each relevant managed tenant. This flag alone is **not** a global provider shutdown.
+3. **Unmanaged tenants / other routes / in-flight work:** escalate immediately to the incident owner and use the independently supported channel/provider/work-queue stop procedure for each affected route, with authorization and evidence of terminal cessation. If no safe scoped stop exists, keep `P0 / NO-GO`, contain ingress with an incident-approved platform mechanism and do not claim that effects have stopped. Do not improvise ad-hoc SQL, revoke shared credentials or stop all production blindly.
 
-Use the tenant switch for an isolated customer issue. Use the global switch immediately when tenant scope is uncertain, there is evidence of cross-tenant behavior, or more than one external-effect path may be unsafe.
-
-Stopping traffic comes before debugging.
+**Verify absence of new external effects and monitor in-flight work before debugging or reactivating.** If the control's scope is unknown, treat STOP as **unverified** and record the gap.
 
 ## P0 incidents
 
@@ -100,7 +99,7 @@ Rollback means returning the pilot to a known safe state, not blindly reversing 
 Preferred order:
 
 1. PAUSE tenant.
-2. Disable global external effects if scope is uncertain.
+2. Disable the **pilot-managed** external-effect flag via the approved operator procedure when needed; do **not** treat it as a universal kill switch. Verify the status of each affected tenant (including `NOT_PILOT_MANAGED`), route and pending job.
 3. Stop pending outbound/durable work using supported domain controls.
 4. Correct configuration through supported APIs/admin flows.
 5. Reverse business mutations through their domain operation when reversal is supported.
@@ -113,7 +112,7 @@ Preferred order:
 ## Reactivation checklist
 
 - [ ] root cause identified;
-- [ ] unsafe external effects remain blocked during verification;
+- [ ] all affected tenant/route/provider paths and previously queued/in-flight external effects have independently verified STOP or safe terminal outcomes, including `NOT_PILOT_MANAGED` where applicable;
 - [ ] regression test added when the defect is reproducible in code;
 - [ ] Fast Gate green;
 - [ ] Full Gate green;
@@ -126,7 +125,7 @@ Preferred order:
 
 ## C6-A: incidente de privacidad, solicitud de datos y consentimiento
 
-Esta guía no sustituye la evaluación legal. Si existe acceso cruzado entre empresas, exposición de transcripciones o contactos, uso de datos sin fundamento verificado, o una comunicación/llamada no autorizada, tratarlo como **P0 por defecto** hasta que el responsable designado descarte riesgo. Bloquear los efectos externos del tenant y, si el alcance es incierto, el switch global; preservar solo metadatos mínimos y la evidencia privada necesaria, sin difundir contenido personal en GitHub.
+Esta guía no sustituye la evaluación legal. Si existe acceso cruzado entre empresas, exposición de transcripciones o contactos, uso de datos sin fundamento verificado, o una comunicación/llamada no autorizada, tratarlo como **P0 por defecto** hasta que el responsable designado descarte riesgo. Bloquear y **comprobar** los efectos externos del tenant piloto gestionado; cuando el alcance sea incierto, usar el flag global del piloto solo para rutas gestionadas y confirmar además la contención independiente de rutas `NOT_PILOT_MANAGED`, proveedores y trabajos en vuelo. El flag no garantiza un STOP universal. Preservar solo metadatos mínimos y la evidencia privada necesaria, sin difundir contenido personal en GitHub.
 
 Para una solicitud de acceso, rectificación o supresión, **no realizar una eliminación SQL manual** ni asumir que la política `docs/DATA_RETENTION_POLICY.md` es una purga desplegada. Canalizar al responsable de privacidad verificado, comprobar identidad y tenant por procedimiento autorizado, evaluar obligaciones de conservación/documentación y registrar decisión/fecha de cierre de forma segura. La ruta pública `/data-deletion.html` es informativa, no prueba que un ticket esté atendido.
 
@@ -145,7 +144,9 @@ Record:
 - Call/operation/correlation id:
 - Severity: P0 / P1 / P2
 - Tenant paused: yes/no
-- Global switch disabled: yes/no
+- Pilot-managed switch disabled (verified effective): yes/no/not applicable
+- Unmanaged tenant / independent provider STOP verified: yes/no/not applicable
+- In-flight and queued effects terminal/contained: yes/no/not applicable
 - Journey Trace checked: yes/no
 - Root cause:
 - Corrective action:
