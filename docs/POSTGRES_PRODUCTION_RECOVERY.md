@@ -44,6 +44,29 @@ This section supersedes **only** older unverified present-tense claims below. Hi
 
 **Operational gate:** `RECOVERY_TARGETS=OWNER_APPROVED`, `C1_OFFSITE_RESTORE=PASS_OPERATOR_REPORTED`, `RAILWAY_NATIVE_SNAPSHOT_FRESHNESS=UNVERIFIED`, `FULL_SERVICE_RPO_RTO_MEASURED=NO`, `FLYWAY_PREDEPLOY=PASS_OPERATOR_REPORTED`, `C2_DEPLOY=NO-GO`. No automatic merge, migration, PITR, provider call, or restore follows from this note.
 
+## 2026-10-15 C2-B: ventana, STOP y rollback schema-aware (NO-GO)
+
+**Este procedimiento NO autoriza el merge ni operaciones productivas.** Control único [Issue #823](https://github.com/Nicricht/helvoca/issues/823) y [PR #846](https://github.com/Nicricht/helvoca/pull/846). Backup externo age/Drive ya restaurado en PG18 aislado según informe del operador: no repetir. Captura 2026-10-15 de Postgres > Backups: snapshot nativo Daily **126 MB, ~2h de antigüedad en ese momento**, pero sin prueba de recuperación del snapshot. Objetivos **RPO <=24h / RTO <=4h aprobados, NO medidos ni garantizados**.
+
+### Condiciones obligatorias antes de autorizar la publicación
+
+1. Responsable de release, responsable de recuperación/STOP y contacto de escalamiento nominados; ventana y congelación de cambios autorizadas. Sin responsables disponibles: NO-GO.
+2. Full CI y workflows relevantes en **SHA final**; verificar `main`, PR #846, estado de la rama y PG18/Flyway V99. El auditor read-only `STAGE_D_PRODUCTION_FLYWAY_READ_ONLY_VERIFIED` fue **reportado PASS por el operador 2026-10-15 02:29 UTC**; no repetir salvo nueva causa/caducidad de evidencia. Flyway V100-V103 **no aplicadas aún**.
+3. Comprobar la última copia nativa Railway **completada y fresca en la ventana real** y su capacidad recuperable. No usar Restore in-place como ensayo, no habilitar PITR sin permiso. Custodio autorizado debe poder recuperar la passphrase age fuera de GitHub, Railway y de la dependencia exclusiva del Drive institucional; comprobar continuidad, cuota y alerta sin publicar claves.
+4. Capacidad de **RTO extremo a extremo <=4h sigue UNMEASURED**. No existe entorno Railway staging/DR separado. Ensayo futuro: solo con **autorización específica de coste, recursos y manejo de datos**, PostgreSQL18 y backend separados del volumen activo, red sin tráfico externo ni proveedores LIVE, inicio `t0` al simular incidente y final `t1` cuando PG restore + Flyway/RLS + API /actuator/health sean funcionales. Reportar `t1-t0` y edad del punto de recuperación para RPO. No volver a repetir el restore histórico para simular esta prueba distinta.
+5. Confirmar valores efectivos de flags y rutas de pago/telefonía desde canal seguro, no solo nombres de variables. **El `ControlledPilotExternalEffectGuard` no es STOP universal:** sin fila `pilot_launch_control`, devuelve `allowed=true / NOT_PILOT_MANAGED` aunque `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`. Para piloto concreto, comprobar fila exacta y `PAUSED`; verificar también las demás rutas/proveedores. No declarar a otros tenants detenidos por ese flag.
+6. Solo tras cumplir puertas y autorización humana **explícita y separada para fusionar #846 a `main`** se programa el rollout. El merge a `main` auto-despliega, y `spring.flyway.enabled=true` puede ejecutar DDL.
+
+### Secuencia posterior autorizada y criterios STOP
+
+- Registrar SHA **real fusionado** a `main` (no confundir con PR HEAD/test merge), observar Railway deploy y Flyway V100 (provenance), V101 (restricciones), V102 (claims/FK/RLS), V103 (doble aprobación/auditoría/RLS) con checksums, sin versiones fallidas. Validar el catálogo en read-only tras arrancar.
+- Comprobar misma versión desplegada, health, errores/latencia, aislamiento multiempresa, RLS, compatibilidad de otros tenants y ausencia de efectos externos. Pruebas productivas solo no destructivas y expresamente autorizadas; proveedor real y pagos LIVE requieren sus permisos separados.
+- **STOP** inmediato por Flyway inconcluso, RLS/tenant incorrecto, acción externa indebida, pérdida de salud o responsable ausente. Pausar piloto y escalar antes de otra intervención.
+- **Rollback anterior a DDL:** puede considerarse volver a binario conocido con autorización y evidencia de compatibilidad. **Rollback posterior a V100-V103:** revertir contenedor/commit **NO revierte SQL** y el binario antiguo puede fallar contra el esquema migrado. Conservar DB, registrar migraciones, contener efectos; **no** ejecutar `DROP`, `flyway repair/undo`, edición del historial ni restauración productiva improvisada.
+- Si se necesita revertir datos/esquema: propietario de incidente aprueba plan específico, punto de restauración y pérdida estimada frente a RPO, preferentemente destino aislado; restaurar en producción es una actuación destructiva separada. Al cerrar, comprobar SHA, Flyway, API, RLS, salud y efectos; conservar RTO `UNMEASURED` si no hubo medición.
+
+**NO-GO pendiente:** custodio/operador, recuperabilidad del snapshot, frescura en ventana, ensayo RTO integral autorizado y medido, STOP efectivo por tenant/servicio, ventana y consentimiento explícito del merge. Ninguno de estos pasos de producción se ha ejecutado aquí.
+
 ## Recovery layers
 
 ### Layer 1: Railway volume backup
