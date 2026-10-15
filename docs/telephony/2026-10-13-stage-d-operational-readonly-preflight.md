@@ -1,5 +1,7 @@
 # Helvoca · Etapa D de 5 · Comprobación operacional read-only (2026-10-13)
 
+> **Actualización prevalente 2026-10-15:** el operador ya obtuvo `STAGE_D_PRODUCTION_FLYWAY_READ_ONLY_VERIFIED` a las 02:29 UTC mediante el auditor existente. Evidencia `PASS_OPERATOR_REPORTED`, JSON local privado no inspeccionado. Los párrafos históricos inferiores que afirman que sigue pendiente ejecutarlo quedan superados mientras producción no cambie. **No repetir** el auditor de rutina. PR #846 no fusionado, Flyway V100-V103 no aplicada. Ventana/rollback: [runbook C2-B](../POSTGRES_PRODUCTION_RECOVERY.md); [Issue #823](https://github.com/Nicricht/helvoca/issues/823).
+
 **Alcance:** validar hechos del entorno productivo antes de autorizar
 cualquier integración a `main`, V100–V103 o llamada real. No activar
 interrupciones, comprar números, publicar webhooks, ejecutar cambios
