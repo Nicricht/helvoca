@@ -268,7 +268,8 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private static String trimTrailingSlash(String value) {
+    // Package-visible for exact branch-boundary and URL integrity tests.
+    static String trimTrailingSlash(String value) {
         String out = value;
         while (out.endsWith("/")) out = out.substring(0, out.length() - 1);
         return out;

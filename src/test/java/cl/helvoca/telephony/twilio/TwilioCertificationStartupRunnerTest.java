@@ -9,6 +9,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TwilioCertificationStartupRunnerTest {
 
     @Test
+    void certificationCallbackBaseUrlStripsAllAndOnlyTrailingSlashes() {
+        assertEquals("https://example.test",
+                TwilioCertificationStartupRunner.trimTrailingSlash("https://example.test"));
+        assertEquals("https://example.test",
+                TwilioCertificationStartupRunner.trimTrailingSlash("https://example.test/"));
+        assertEquals("https://example.test",
+                TwilioCertificationStartupRunner.trimTrailingSlash("https://example.test////"));
+        assertEquals("https://example.test/sub/path",
+                TwilioCertificationStartupRunner.trimTrailingSlash("https://example.test/sub/path//"));
+        assertEquals("",
+                TwilioCertificationStartupRunner.trimTrailingSlash("/"));
+        assertEquals("",
+                TwilioCertificationStartupRunner.trimTrailingSlash(""));
+    }
+
+    @Test
     void maskedCertificationLogNumbersNeverDiscloseFullNumbers() {
         assertEquals("***", TwilioCertificationStartupRunner.mask(null));
         assertEquals("***", TwilioCertificationStartupRunner.mask(""));

@@ -52,7 +52,12 @@ Full Gate initially failed its mandatory 100% differential method threshold
 was counted as an affected method but had no direct test. A second regression
 now verifies null/empty/short and E.164-shaped numbers remain hidden or
 limited to their final four digits. Only package-level test visibility was
-added to this helper; the masking behavior itself is unchanged. This does not
+added to this helper; the masking behavior itself is unchanged. The subsequent
+Full Gate also exposed an uncovered existing URL helper `trimTrailingSlash`
+(266/267 methods): targeted regression now asserts no trailing slash, one,
+many, preserved interior separators, root-only and empty input. Its logic is
+unchanged, with package-level test access only. New exact-HEAD Full Gate
+remains required; neither failure was waived. This does not
 alter provider requests, call duration, quotas, authorization, consent or
 hangup behavior, and it does not prove a real consented call was run.
 Additional exception messages from other paths require separate review.
