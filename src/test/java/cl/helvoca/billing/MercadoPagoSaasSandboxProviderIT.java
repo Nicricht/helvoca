@@ -114,6 +114,9 @@ class MercadoPagoSaasSandboxProviderIT {
         properties.setEnabled(true);
         properties.setAccessToken(token);
         properties.setBackUrl("https://recepvoz.cl/pricing.html");
+        // External sandbox run is explicit opt-in. A secret must exist before checkout;
+        // this alone does not certify provider webhook delivery or its signature.
+        properties.setWebhookSecret(requiredEnv("MERCADOPAGO_TEST_WEBHOOK_SECRET"));
 
         MercadoPagoSubscriptionGateway gateway = new MercadoPagoSubscriptionGateway(properties);
         SubscriptionPaymentGateway.Checkout checkout;
@@ -152,9 +155,9 @@ class MercadoPagoSaasSandboxProviderIT {
         assertNotNull(remote.status());
         assertFalse(remote.status().isBlank());
 
-        System.out.println("MERCADOPAGO_SANDBOX_CERTIFIED subscriptionId=" + remote.id());
-        System.out.println("MERCADOPAGO_SANDBOX_STATUS=" + remote.status());
-        System.out.println("MERCADOPAGO_SANDBOX_CHECKOUT_URL=" + checkout.checkoutUrl());
+        // CI logs must never contain subscription identifiers, payer data, provider
+        // status values or checkout URLs, including in a successful sandbox run.
+        System.out.println("MERCADOPAGO_SANDBOX_SUBSCRIPTION_CREATE_READBACK_PASS");
     }
 
     private static String requiredEnv(String name) {

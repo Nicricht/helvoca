@@ -16,6 +16,22 @@ import static org.mockito.Mockito.*;
 class BillingSubscriptionServiceTest {
 
     @Test
+    void checkoutRejectsMissingWebhookSecretBeforeProviderOrDatabaseEffects() {
+        BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
+        SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        MercadoPagoProperties properties = configuredProperties();
+        properties.setWebhookSecret("");
+
+        BillingSubscriptionService service = new BillingSubscriptionService(
+                subscriptions, gateway, properties, jdbc, catalog);
+        assertThrows(IllegalStateException.class,
+                () -> service.createCheckout(UUID.randomUUID(), "owner@example.test", "EMPRENDE"));
+        verifyNoInteractions(gateway, subscriptions, jdbc, catalog);
+    }
+
+    @Test
     void checkoutAndSubscriptionAuthorizationKeepCurrentPlanUntilApprovedInvoice() {
         BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
         SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
@@ -535,6 +551,7 @@ class BillingSubscriptionServiceTest {
         properties.setEnabled(true);
         properties.setAccessToken("test-token");
         properties.setBackUrl("https://example.test/billing/return");
+        properties.setWebhookSecret("synthetic-test-webhook-signing-secret");
         return properties;
     }
 

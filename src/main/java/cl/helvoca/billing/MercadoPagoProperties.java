@@ -38,7 +38,7 @@ public class MercadoPagoProperties {
     }
 
     public boolean checkoutConfigured() {
-        return isEnabled() && !getAccessToken().isBlank() && getBackUrl().startsWith("https://");
+        return webhookConfigured() && getBackUrl().startsWith("https://");
     }
 
     public boolean webhookConfigured() {

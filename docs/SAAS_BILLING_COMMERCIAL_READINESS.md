@@ -134,6 +134,42 @@ Primary certification tests:
 
 The draft PR CI is the executable certification gate for these tests. The branch is synchronized with the current `main` baseline above; certification is not complete unless the integrated HEAD is green.
 
+## 2026-10-15 C5 · fail-closed readiness for SaaS checkout
+
+**Release branch only, not deployed to main.** A focused Java RED regression reproduced that
+`MercadoPagoProperties.checkoutConfigured()` could return true even while
+`webhookConfigured()` was false (no SaaS subscription webhook signing secret).
+The backend could then ask Mercado Pago to create a subscription while its
+webhook receiver would reject the event with HTTP 503. That is unsafe for
+commercial onboarding. The fix requires **both** a configured signed-webhook
+receiver and an HTTPS return URL before the standard customer checkout or
+self-service readiness can report checkout configured.
+
+The standalone, explicitly opted-in, **real TEST provider** integration exercise
+`MercadoPagoSaasSandboxProviderIT` now requires the independent environment
+variable `MERCADOPAGO_TEST_WEBHOOK_SECRET` before any test preapproval POST.
+This value must be entered only in the approved private TEST execution context;
+it must **not** be committed or used as the production secret. Its presence is
+merely a local prerequisite: the exercise does **not** validate registration,
+delivery, signature or persistence of a real provider webhook. Successful
+sandbox diagnostics are now fixed, redacted markers, never subscription IDs,
+buyer details, provider response content or checkout URLs.
+
+Observed Railway production environment (OAuth **variable names only**) lacks
+`MERCADOPAGO_WEBHOOK_SECRET` and `MERCADOPAGO_BACK_URL` for SaaS billing.
+The `HELVOCA_PAYMENT_RECEPVOZ_MP_SANDBOX_WEBHOOK_SECRET` variable is for a
+**different payment context** and must not be silently substituted. Existing
+`MERCADOPAGO_ENABLED` and `MERCADOPAGO_ACCESS_TOKEN` *names* do not prove
+valid enabled values or true provider delivery. No secret values were accessed.
+With the new fail-closed guard, this partial configuration cannot allow
+customer SaaS checkout even if a return URL is later added alone.
+
+**C5 remains NO-GO** until operator-approved safe deployment, exact TEST
+webhook delivered to deployed Java + PG with signature/idempotency proof and
+a separate LIVE business-payment authorization. No app deployment,
+provider registration, money movement or configuration write was authorized
+by this change.
+
 ## Production configuration required
 
 Values are named only; no secrets are stored here.

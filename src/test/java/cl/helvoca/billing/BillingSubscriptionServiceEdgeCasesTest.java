@@ -147,6 +147,7 @@ class BillingSubscriptionServiceEdgeCasesTest {
         properties.setEnabled(true);
         properties.setAccessToken("test-token");
         properties.setBackUrl("https://example.test/billing/return");
+        properties.setWebhookSecret("synthetic-test-webhook-signing-secret");
         return new BillingSubscriptionService(subscriptions, gateway, properties, mock(JdbcTemplate.class), catalog);
     }
 
