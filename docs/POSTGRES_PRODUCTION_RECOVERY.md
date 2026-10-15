@@ -127,46 +127,46 @@ After PITR is enabled:
 
 A PITR drill is successful only when the restored sibling starts, the required schema exists and the production source was never modified.
 
-### Layer 3: provider-independent logical dump
+### Layer 3: provider-independent logical dump (isolated, no production writes)
 
-Use `scripts/ops/postgres-restore-drill.sh` to prove that a logical dump can be restored independently of Railway snapshots.
+**HIGH-RISK recovery safety correction, 2026-10-15:** Do **not** use the old
+`scripts/ops/postgres-restore-drill.sh`. That script created/restored/dropped
+a scratch database **on `PGHOST`**, which could be production. Although
+it did not replace the source database, temporary schema and data writes,
+storage consumption and locks in production would not be an isolated recovery
+test. The legacy entry point is now **permanently disabled**, returns exit
+code 2 / `C1_LEGACY_SAME_SERVER_RESTORE_BLOCKED`, reads no credentials and
+invokes no database client. Offline regression tests simulate production-like
+environment variables and fake DB clients, and check that no command runs.
 
-The script requires PostgreSQL client tools:
+**Use the existing safe offline restore instead.** The already implemented
+`scripts/ops/c1_independent_remote_restore.py` validates the historically
+approved ciphertext's known SHA-256 and size, prompts for the age passphrase
+locally, decrypts only in a private temporary directory and restores to a
+disposable PostgreSQL 18 Docker instance with **no network**. Synthetic
+negative tests exist and the operator already reported
+`C1_REMOTE_DOWNLOAD_DECRYPT_AND_OFFLINE_PG18_RESTORE_VERIFIED` for that
+specific 2026-10-13 archive. **Do not repeat the same restore just to
+duplicate existing evidence.** Its pinned hash and size make the script
+unsuitable for arbitrary **new** backup files without new review.
 
-- `pg_dump`
-- `pg_restore`
-- `psql`
-- `createdb`
-- `dropdb`
-
-Provide connection variables for a safe administrative connection to the source server:
-
-```bash
-export PGHOST=...
-export PGPORT=5432
-export PGUSER=...
-export PGPASSWORD=...
-export PGDATABASE=...
-
-bash scripts/ops/postgres-restore-drill.sh
-```
-
-The script:
-
-1. creates a custom-format logical dump;
-2. creates a scratch database named `helvoca_restore_drill_<timestamp>`;
-3. restores into the scratch database with `--exit-on-error`;
-4. verifies Flyway history and five core tables;
-5. drops the scratch database automatically.
-
-It never drops or replaces the source database.
+**Future measured end-to-end C1 DR** requires distinct authorization for
+handling real data, operator key custody and any new billable resources.
+Restore a **fresh** independently verified encrypted backup only to a
+separate private PostgreSQL 18 with its own volume, no live provider
+credentials and no production traffic. Check Flyway, PK/FK/RLS, tenant
+isolation, API connectivity and health; measure real `t0` to `t1` and
+recovery point age, destroy the temporary resources, and store raw evidence
+only under private operator custody. A clean API start on an empty PG18 is
+not proof that real data can be recovered, and Railway native volume Restore
+must never be rehearsed in place on production.
 
 ## RPO and RTO
 
-Until PITR is enabled and certified:
+With PITR currently off and a daily native backup schedule configured:
 
-- snapshot RPO is bounded by the daily backup interval;
-- actual RTO is **unknown** until a restore drill is measured.
+- the schedule alone **does not guarantee a 24-hour RPO**. Verify an actually completed and restorable recovery point at the release window. The 2026-10-15 Railway UI capture reported native snapshots younger than 24 hours, but did not prove their restorability;
+- full-service RTO remains **unmeasured** until a real backup is restored to an isolated database and a functioning API, with elapsed time recorded.
 
 After PITR is certified, record the observed restore duration and oldest/newest restorable timestamps here or in the incident/release evidence.
 

@@ -10,6 +10,9 @@ on:
       - 'scripts/ops/test_railway_pg18_snapshot_drill.py'
       - 'scripts/ops/test_railway_postgres_recovery_audit.py'
       - 'scripts/ops/railway_postgres_recovery_audit.py'
+      - 'scripts/ops/postgres-restore-drill.sh'
+      - 'scripts/ops/test_railway_legacy_restore_script.py'
+      - 'docs/POSTGRES_PRODUCTION_RECOVERY.md'
       - '.github/workflows/pg18-recovery-offline.yml'
   workflow_dispatch:
 
