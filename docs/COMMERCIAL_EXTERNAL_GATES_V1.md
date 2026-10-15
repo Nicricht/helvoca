@@ -29,7 +29,7 @@ Do not place another real call merely to satisfy CI. Tenant-specific real-carrie
 
 ## Gate B — Mercado Pago SaaS sandbox provider round-trip
 
-Status: **REAL MERCADO PAGO TEST CHECKOUT + APPROVED INVOICE READBACK ALREADY VERIFIED / REAL WEBHOOK TO HELVOCA JAVA + POSTGRESQL NOT CERTIFIED**
+Status: **REAL MERCADO PAGO TEST CHECKOUT + APPROVED INVOICE READBACK VERIFIED / PROVIDER ROUND-TRIP PENDING (AUTHENTIC WEBHOOK TO HELVOCA JAVA + REAL POSTGRESQL)**
 
 Historical **genuine TEST evidence, do not spend or repeat without a new acceptance gap**:
 
