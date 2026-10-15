@@ -15,6 +15,8 @@ Once a tenant has a `pilot_launch_control` record, real external effects are fai
 
 The environment flag is the global safety switch. The existing tenant-scoped `PAUSED` state is the per-business kill switch.
 
+**Safety scope of the switch:** "global" means global to *enrolled controlled pilots*, not to every Helvoca tenant. With no `pilot_launch_control` row, the existing guard deliberately returns `NOT_PILOT_MANAGED` and allows that tenant through this pilot-specific check even when the environment flag is false. The preflight must never claim "no real traffic" merely because this flag is off. Before any commercial release, independently verify provider/channel-level STOP and the exact pilot tenant's enrollment and `PAUSED` state. Do not assume this switch suspends non-pilot tenants or substitute it for a universal emergency stop.
+
 ## External-effect boundaries
 
 The controlled-pilot guard is applied immediately before:

@@ -121,7 +121,7 @@ public class PilotGoNoGoService {
                 safeSwitchState,
                 true,
                 safeSwitchState
-                        ? (globalSwitchEnabled ? "Piloto RUNNING con switch global habilitado." : "Switch global apagado; no hay tráfico real.")
+                        ? (globalSwitchEnabled ? "Piloto RUNNING con switch global habilitado." : "Switch del piloto apagado: bloquea efectos para negocios inscritos; no detiene otros negocios.")
                         : "Apaga el switch global antes de dejar el piloto fuera de RUNNING."));
 
         List<InventoryService.StockView> tracked = stocks.stream()
