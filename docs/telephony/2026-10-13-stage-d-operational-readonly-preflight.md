@@ -5,6 +5,17 @@ cualquier integración a `main`, V100–V103 o llamada real. No activar
 interrupciones, comprar números, publicar webhooks, ejecutar cambios
 Flyway, liberar PR ni iniciar sesiones Gemini.
 
+## Seguimiento de producción 2026-10-14 (lecturas autenticadas)
+
+La auditoría del Issue maestro [#823](https://github.com/Nicricht/helvoca/issues/823) se retomó **sin ejecutar SQL en producción**, porque el conector Railway activo no ofrece una consola SQL read-only ni ejecución de Railway SSH. El script existente `scripts/ops/railway_pg18_flyway_readonly_preflight.py` está disponible y conserva su QA offline, pero **todavía no se ejecutó esta comprobación autenticada de catálogo**. No crear un segundo auditor ni pedir al operador que repita pruebas sin causa.
+
+- **GitHub:** `main@ca58693e167752bd6eab8ff4e9be770391fe4293`; candidato C2-A PR #842 HEAD `354f4920638ff1a4eacb974ff80f406b27abc6f3`, `ahead=462`, `behind=0`, DRAFT, CI [#38598336554](https://github.com/Nicricht/helvoca/actions/runs/38598336554) PASS. PR posteriores #843–#845 añaden mejoras y QA pero no despliegue.
+- **Railway real:** `helvoca-api` deploy ID `4636d0d9-7be0-4a66-abce-58c68ccaede5`, Git SHA `ca58693e167752bd6eab8ff4e9be770391fe4293`, estado SUCCESS desde 2026-10-11; Postgres 18 online, sin cambios staged. El dominio personalizado `recepvoz.cl` figura verificado, registro DNS propagado y certificado válido. En muestra de las últimas 24 h consultada en este checkpoint: **390 solicitudes, 0 respuestas HTTP 5xx**, pero **364 son 4xx**; no presentarlas como 390 solicitudes exitosas ni deducir disponibilidad garantizada.
+- **Historial Flyway visible en logs del despliegue del 11-10-2026:** `Current version of schema "public": 99` y `Schema "public" is up to date. No migration necessary.` Se verificó directamente su marca temporal `2026-10-11T09:11:36Z`. **Esto solo demuestra V99 en aquel arranque**, no Flyway actual ni permisos/estructura vigente de producción. Resultado `FLYWAY_CURRENT=UNVERIFIED` hasta consultar `flyway_schema_history` y catálogo dentro de una transacción autenticada READ ONLY.
+- **Aún no autorizadas:** fusión en `main`, migraciones V100–V103, nueva compra, cambios de backup/PITR, llamadas, pagos y escrituras productivas. La confirmación de Railway Pro + backup nativo de 126 MB y el restore externo previamente reportado están preservados en [#823](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6181716186); no repetir esas operaciones.
+
+**Decisión:** `C2-A=DONE_OFFLINE_ONLY`, `PRODUCTION_FLYWAY_READ_ONLY=PENDING`, `C1_CUSTODY_RPO_RTO=PENDING`, `PROD_DEPLOY=NO-GO`. La próxima operación habilitadora es obtener solo el resultado seguro del auditor **existente** en un canal autorizado cuando corresponda, luego confirmar responsable, ventana, rollback y autorización expresa. No usar este addendum como aprobación de despliegue.
+
 ## Observaciones verificadas mediante conexión de solo lectura
 
 - GitHub `main` sigue en `ca58693e167752bd6eab8ff4e9be770391fe4293`.
