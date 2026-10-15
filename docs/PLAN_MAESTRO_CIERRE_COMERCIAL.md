@@ -37,6 +37,13 @@ Dos hitos distintos:
 
 **Estado actualizado 2026-10-15:** `C2-A=DONE_OFFLINE_FULL_QA_AT_PREVIOUS_SHA`, `C1_RPO_RTO_TARGETS=OWNER_APPROVED`, `C1_FRESH_SNAPSHOT=UNVERIFIED`, `C1_FULL_SERVICE_RTO=UNMEASURED`, `C2_FLYWAY_PREDEPLOY=PASS_OPERATOR_REPORTED`, `C2-B_DEPLOY=NO-GO`, `HELVOCA_V1_COMERCIAL=NO-GO`. Este bloque no transforma la evidencia reportada del operador en una lectura directa de su informe privado.
 
+### Checkpoint C2-B verificado el 2026-10-15
+
+- **CI del HEAD anterior a esta actualización documental:** `b6e1c381e7d7bc8cfde645946b85223ba1690e4c`: [Full CI #38701084323](https://github.com/Nicricht/helvoca/actions/runs/38701084323) `completed/success`, **620 Playwright passed**; **11 workflows especializados SUCCESS**. El código no cambió en esta actualización; el **nuevo HEAD documental necesitará CI exacto**. No confundir cobertura diferencial con global.
+- Railway API + PG18 online; cron backup opcional sin despliegue y sin staging/DR aislado. La última captura del titular de Postgres > Backups mostró snapshot nativo 126 MB ~2h antes: frescura visual **al tomar la captura**, no restaurabilidad/RTO. RPO<=24h y RTO<=4h solo objetivos aprobados.
+- El control `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED` aparece por **nombre** en Railway, valor no verificado. `ControlledPilotExternalEffectGuard` permite `NOT_PILOT_MANAGED` si no existe `pilot_launch_control`: no es un kill switch global universal. Exigir piloto `PAUSED`, rutas externas bloqueadas, responsable/ventana y rollback **schema-aware** V100-V103 antes de solicitar permiso para `main`. [Runbook operativo](POSTGRES_PRODUCTION_RECOVERY.md).
+- `C1_RTO=UNMEASURED`, `C2-B_DEPLOY=NO-GO`, `COMMERCIAL_GO=NO-GO`. No merge, restore, SQL productivo, activación de pagos ni llamadas autorizadas por este checkpoint.
+
 ## Actualización operativa 2026-10-14: desarrollo primero, C1 antes de producción
 
 **Decisión explícita del titular:** posponer la automatización personalizada de Google Drive/rclone y priorizar cerrar software V1. La vía propuesta para recuperar C1 antes de despliegue será estudiar y, si se autoriza el precio, habilitar **backups nativos de Railway**, probar una restauración aislada y conservar el respaldo externo cifrado ya recuperado. No se ha comprado plan ni activado backup aquí. Nunca asumir que el backup nativo reemplaza automáticamente una copia independiente fuera de Railway.
