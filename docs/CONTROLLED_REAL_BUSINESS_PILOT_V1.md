@@ -39,6 +39,18 @@ Pausing a pilot must stop these effects without weakening the existing journey, 
 8. Observe Journey Trace, Conversation Quality, jobs, payments, inventory, and V6 reconciliation.
 9. Do not expand to another tenant until the first pilot has been reviewed.
 
+## Provider-error privacy rule (2026-10-15)
+
+The opt-in Twilio certification startup runner previously appended a truncated
+raw Twilio HTTP error response (up to 400 characters) to an exception, which
+could then reach shared application logs. The C4/C6 safety fix retains a
+status-only diagnostic and replaces the provider body with the fixed marker
+`[provider response omitted]`, regardless of content or length. A targeted
+unit regression covers short/long/empty/null provider bodies. This does not
+alter provider requests, call duration, quotas, authorization, consent or
+hangup behavior, and it does not prove a real consented call was run.
+Additional exception messages from other paths require separate review.
+
 ## Certification
 
 The branch must keep the existing Pilot End-to-End Certification V1, Full Gate, PostgreSQL/Flyway/Testcontainers, JaCoCo, and Playwright green. No coverage exception and no `continue-on-error` is allowed.

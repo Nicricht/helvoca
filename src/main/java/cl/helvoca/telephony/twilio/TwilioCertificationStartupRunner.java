@@ -279,9 +279,10 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         return "***" + phone.substring(phone.length() - 4);
     }
 
-    private static String truncate(String value) {
-        if (value == null) return "";
-        return value.length() <= 400 ? value : value.substring(0, 400);
+    // The Twilio API may include customer or credential data in error bodies.
+    // Even a truncated body is unsafe in shared provider/production logs.
+    static String truncate(String ignoredProviderBody) {
+        return "[provider response omitted]";
     }
 
     private static String rootMessage(Throwable error) {

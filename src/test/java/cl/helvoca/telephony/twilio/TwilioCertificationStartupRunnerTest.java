@@ -9,6 +9,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TwilioCertificationStartupRunnerTest {
 
     @Test
+    void twilioCreateCallErrorDiagnosticsNeverExposeProviderBody() {
+        String sensitiveBody = "{\"message\":\"synthetic-caller@example.test token=private-token\"}";
+        assertEquals("[provider response omitted]",
+                TwilioCertificationStartupRunner.truncate(sensitiveBody));
+        assertEquals("[provider response omitted]",
+                TwilioCertificationStartupRunner.truncate("X".repeat(1000)));
+        assertEquals("[provider response omitted]",
+                TwilioCertificationStartupRunner.truncate(""));
+        assertEquals("[provider response omitted]",
+                TwilioCertificationStartupRunner.truncate(null));
+    }
+
+    @Test
     void normalizesInboundCertificationDirection() {
         assertEquals("inbound-certification",
                 TwilioCertificationStartupRunner.normalizeDirection(" INBOUND-CERTIFICATION "));
