@@ -233,6 +233,29 @@ class TwilioPilotInFlightStopHandlerTest {
     }
 
     @Test
+    void unstartedStreamFrameHelpersRefuseMediaAndPlaybackWithoutTransport() {
+        // Normally requireStream rejects these frames first. Invoke the
+        // private defensive handlers directly to exercise their own
+        // !state.started guards, including a premature callback/race.
+        handler.afterConnectionEstablished(socket);
+        @SuppressWarnings("unchecked")
+        Map<String, ?> states = (Map<String, ?>) ReflectionTestUtils.getField(handler, "states");
+        assertNotNull(states);
+        Object state = states.get("pilot-socket");
+        assertNotNull(state);
+        JSONObject audio = new JSONObject().put("media",
+                new JSONObject().put("track", "inbound").put("payload", "unstarted"));
+        JSONObject mark = new JSONObject().put("mark",
+                new JSONObject().put("name", "unstarted"));
+
+        ReflectionTestUtils.invokeMethod(handler, "handleMedia", state, audio);
+        ReflectionTestUtils.invokeMethod(handler, "handleMark", state, mark);
+
+        verifyNoInteractions(providers, lifecycle, control, ai, pilotGuard);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, db.currentOrDenied().mode());
+    }
+
+    @Test
     void audioAndPlaybackFramesCannotResumeAfterDeadlineHasClosedStream() throws Exception {
         decision(true);
         validStart();
