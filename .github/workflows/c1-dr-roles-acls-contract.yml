@@ -1,0 +1,52 @@
+name: C1 DR PostgreSQL global roles and ACLs (offline)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - scripts/ops/c1_restore_global_roles_acls.py
+      - scripts/ops/test_c1_restore_global_roles_acls.py
+      - docs/POSTGRES_PRODUCTION_RECOVERY.md
+      - .github/workflows/c1-dr-roles-acls-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c1-roles-acls-offline:
+    name: C1 roles and ACL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile production-safe recovery helper and tests
+        run: |
+          python3 -m py_compile scripts/ops/c1_restore_global_roles_acls.py
+          python3 -m py_compile scripts/ops/test_c1_restore_global_roles_acls.py
+      - name: Install Python branch coverage
+        run: python3 -m pip install --disable-pip-version-check 'coverage>=7,<8'
+      - name: Enforce 100% helper statements and branches with offline adversarial tests
+        run: |
+          cd scripts/ops
+          python3 -m coverage run --branch --source=c1_restore_global_roles_acls -m unittest discover -v -s . -p 'test_c1_restore_global_roles_acls.py'
+          python3 -m coverage report -m --fail-under=100
+      - name: Assert no unapproved provider or production mutations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/ops/c1_restore_global_roles_acls.py")
+          s=p.read_text(encoding="utf-8")
+          for forbidden in ("--data-only", "pg_restore", "DROP DATABASE",
+                            "ALTER SYSTEM", "railway run", "accept_deploy",
+                            "create_service", "MERCADOPAGO_ACCESS_TOKEN",
+                            "TWILIO_AUTH_TOKEN", "pg_dumpall"):
+              assert forbidden not in s, f"unsafe C1 recovery contract: {forbidden}"
+          for required in ("--schema-only", "C1_DR_SERVICE_ID_INVALID",
+                           "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS",
+                           "SET LOCAL ROLE helvoca_runtime", "GRANT", "REVOKE",
+                           "ALTER DEFAULT PRIVILEGES", "C1_SOURCE_IDENTITY_MISMATCH"):
+              assert required in s, f"missing C1 recovery fence: {required}"
+          print("C1_PG18_DR_GLOBAL_ROLES_AND_ACLS_OFFLINE_CONTRACT=PASS")
+          PY
