@@ -8,6 +8,14 @@ Cada funcionalidad, corrección, prueba, integración, auditoría u operación c
 
 La documentación es una **parte del entregable**, no una tarea opcional posterior. El agente la escribe y actualiza; el usuario no debe recordar en qué archivo quedó algo ni reconstruir conversaciones previas.
 
+## PRE-CHANGE FRESH-CONTEXT WRITE GATE: acta antes de editar
+
+Cada sesión nueva que vaya a modificar cualquier archivo debe consultar el **HEAD remoto más reciente** de su rama/PR, el historial agregado desde el último checkpoint, las pruebas ya certificadas, el código y los tests existentes, las decisiones C0–C7 y las normas `AGENTS.md` y `docs/engineering/QA_POLICY.md`. No basta un resumen del chat anterior, una tabla histórica ni la presencia de una tarea marcada pendiente: debe identificarse una diferencia de aceptación real antes de crear código.
+
+Antes de la primera escritura, el agente registra en **el PR existente** un comentario breve `FRESH_CONTEXT_EVIDENCE_RECEIPT`: fecha UTC, branch/HEAD/base, cambios recientes, evidencia que ya existía, criterio adicional comprobablemente insatisfecho, mínimo cambio previsto, nivel de riesgo, matriz de QA 100% aplicable y **documento existente** que deberá actualizar. Si no hay brecha demostrable, no crea archivos ni repite suites, backup, llamadas o pruebas de pago. Si cambia el HEAD mientras trabaja, actualiza la auditoría antes de escribir nuevamente.
+
+**Al finalizar cada bloque:** documentar qué se cambió y qué ya estaba hecho en el runbook/documento pertinente si procede, estado exacto en el mismo PR y en Issue #823 para V1, SHA final, CI y cobertura realmente medida, límites de proveedor/entorno, lo que NO se ejecutó y una próxima acción. Un resultado `IN_PROGRESS` no es `DONE`. Esta regla amplía la trazabilidad existente, **no exige Markdown duplicado** ni modifica el estándar técnico de cobertura diferencial de `QA_POLICY.md`. Los chequeos de CI preservan la norma escrita pero no certifican que cualquier chat la haya leído.
+
 ## Condición QA de cierre aplicable a todos los agentes
 
 **Ningún chat, agente o implementación puede declarar DONE, 100% QA o integración certificada** solo porque pasó una suite de tests. Antes de cada modificación debe leer `AGENTS.md` y `docs/engineering/QA_POLICY.md`, comprobar el estado real del PR, definir una matriz de pruebas y después documentar en el **mismo PR**:

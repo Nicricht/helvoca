@@ -1,3 +1,19 @@
+## PRE-CHANGE FRESH-CONTEXT WRITE GATE (every new chat/agent)
+
+<!-- Before the FIRST file edit, record FRESH_CONTEXT_EVIDENCE_RECEIPT in THIS PR. Refresh the receipt if remote HEAD changes unexpectedly. A checklist alone cannot prove the agent read GitHub. -->
+
+- [ ] Read latest remote HEAD/base, latest PR and Issue #823 checkpoints and changes since the last checkpoint; no stale-chat assumptions.
+- [ ] Read AGENTS.md, QA_POLICY.md, COMPLETION_DOCUMENTATION_POLICY.md, invariants and the controlling plan; inspected relevant code and current CI.
+- [ ] Searched existing implementation/tests/resources and named the exact unmet criterion plus prior proof. Do not edit if already completed.
+- [ ] Recorded risk, 100%-QA affected-behavior test matrix, and existing documentation/runbook to update after implementation.
+- [ ] Linked the pre-change receipt actually posted in this PR; will update documentation/checkpoint and exact-final-HEAD QA before declaring DONE.
+
+FRESH_CONTEXT_EVIDENCE_RECEIPT PR comment URL (posted before first file change):
+
+Previous certified HEAD and latest remote HEAD:
+
+Evidence already valid / smallest new delta / docs to update:
+
 ## What changes?
 
 <!-- One concise description of the complete functional block. -->

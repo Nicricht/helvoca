@@ -48,6 +48,30 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void newChatMustEvidenceFreshRemoteHeadAndPriorCompletedWorkBeforeWrites() throws Exception {
+        String agents = read("AGENTS.md");
+        String template = read(".github/pull_request_template.md");
+        String completion = read("docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md");
+        String guard = read("scripts/ci/check-qa-governance.py");
+
+        assertTrue(agents.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(agents.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(agents.contains("latest remote HEAD"));
+        assertTrue(agents.contains("changed since the last checkpoint"));
+        assertTrue(agents.contains("Do not edit if the gap is already closed"));
+        assertTrue(agents.contains("docs/engineering/QA_POLICY.md"));
+        assertTrue(agents.contains("docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md"));
+
+        assertTrue(template.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(template.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(template.contains("changes since the last checkpoint"));
+        assertTrue(completion.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(completion.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(guard.contains("pre-change fresh-context write gate"));
+        assertTrue(guard.contains("fresh_context_evidence_receipt"));
+    }
+
+    @Test
     void fastGateRunsSoftwareFactoryContractTestsWhenFactoryChanges() throws Exception {
         String fastGate = read("scripts/ci/fast-gate.sh");
         assertTrue(fastGate.contains("python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v"));
