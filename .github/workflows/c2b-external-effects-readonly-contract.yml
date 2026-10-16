@@ -6,6 +6,8 @@ on:
     paths:
       - scripts/ops/c2b_external_effects_readonly_preflight.py
       - scripts/ops/test_c2b_external_effects_readonly_preflight.py
+      - scripts/ops/c2b_tenant_job_readonly_preflight.py
+      - scripts/ops/test_c2b_tenant_job_readonly_preflight.py
       - docs/POSTGRES_PRODUCTION_RECOVERY.md
       - .github/workflows/c2b-external-effects-readonly-contract.yml
   workflow_dispatch:
@@ -20,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile safe Python scripts
-        run: python3 -m py_compile scripts/ops/c2b_external_effects_readonly_preflight.py scripts/ops/test_c2b_external_effects_readonly_preflight.py
+        run: python3 -m py_compile scripts/ops/c2b_external_effects_readonly_preflight.py scripts/ops/test_c2b_external_effects_readonly_preflight.py scripts/ops/c2b_tenant_job_readonly_preflight.py scripts/ops/test_c2b_tenant_job_readonly_preflight.py
       - name: Install coverage instrumentation
         run: python3 -m pip install --disable-pip-version-check 'coverage>=7,<8'
       - name: Enforce 100 percent changed Python lines and branches
@@ -28,6 +30,30 @@ jobs:
           cd scripts/ops
           python3 -m coverage run --branch --source=c2b_external_effects_readonly_preflight -m unittest discover -v -s . -p 'test_c2b_external_effects_readonly_preflight.py'
           python3 -m coverage report -m --fail-under=100
+      - name: Verify tenant/job aggregate probe has 100 percent line and branch coverage
+        run: |
+          cd scripts/ops
+          python3 -m coverage erase
+          python3 -m coverage run --branch --source=c2b_tenant_job_readonly_preflight -m unittest discover -v -s . -p 'test_c2b_tenant_job_readonly_preflight.py'
+          python3 -m coverage report -m --fail-under=100
+      - name: Prevent mutation or secret exfiltration through tenant-job audit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('scripts/ops/c2b_tenant_job_readonly_preflight.py').read_text()
+          sql = s.split('SQL = """', 1)[1].split('"""', 1)[0]
+          assert sql.startswith('BEGIN TRANSACTION READ ONLY;')
+          assert sql.endswith('COMMIT;')
+          assert 'statement_timeout' in sql
+          assert 'rolsuper OR rolbypassrls' in sql
+          for forbidden in ('INSERT INTO', 'UPDATE ', 'DELETE FROM', 'CREATE TABLE',
+                            'DROP TABLE', 'ALTER TABLE', 'TRUNCATE ', 'COPY '):
+              assert forbidden.lower() not in sql.lower(), forbidden
+          for required in ('RAILWAY_PROJECT_ID', 'RAILWAY_ENVIRONMENT_ID',
+                           'RAILWAY_SERVICE_ID', 'C2B_NO_RELEASE_APPROVAL'):
+              assert required in s
+          print('C2B_TENANT_JOB_OFFLINE_READONLY_CONTRACT=PASS')
+          PY
       - name: Prevent mutation or secret exfiltration through startup audit
         run: |
           python3 - <<'PY'
