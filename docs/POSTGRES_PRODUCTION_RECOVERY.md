@@ -27,6 +27,8 @@ El operador ejecutó una reparación acotada a DR que creó `helvoca_runtime` y 
 
 **QA versionada:** `scripts/ops/test_c1_restore_global_roles_acls.py` y [workflow offline C1 roles y ACL](../.github/workflows/c1-dr-roles-acls-contract.yml) comprueban el contrato de acceso, identidades de destino, rechazo de SQL inyectado y ramas de error sin invocar Railway real. Sus pruebas no reemplazan la evidencia de restauración real anterior ni prueban una nueva instancia en producción. El script temporal del chat que contiene el ID de PostgreSQL DR eliminado **no se debe reusar**.
 
+**QA de integración adicional, 2026-10-16:** el mismo workflow de roles/ACL incorpora el job `c1-roles-acls-pg18` con **PostgreSQL 18 desechable y datos completamente ficticios**. Ejecuta [`scripts/ops/test_c1_pg18_roles_acl_integration.py`](../scripts/ops/test_c1_pg18_roles_acl_integration.py), comprueba primero el fallo **RED** esperado por roles globales ausentes, luego utiliza las funciones versionadas `extract_acl` y `compose_acl_sql` para reconstruir roles y permisos, comprueba idempotencia, atributos `NOLOGIN/NOBYPASSRLS`, acceso de sistema a ambos tenants, ausencia de visibilidad sin contexto tenant, aislamiento de lectura A/B y rechazo real de una escritura de A hacia otro tenant. El job **nunca se conecta a Railway**: solo puede dirigirse a `127.0.0.1:5432/helvoca_c1_ci` con `CI=true` y `C1_PG18_SYNTHETIC_CI=1`. No es evidencia de restaurar de nuevo una copia real de clientes, ni certifica el aislamiento adversarial de esa copia restaurada ya eliminada, ni implica RPO/RTO contractual. El job verde se registra en el PR/Issue maestro con su SHA exacto.
+
 
 
 
