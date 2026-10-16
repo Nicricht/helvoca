@@ -21,6 +21,17 @@ checks = {
         "local_simulation_pass",
         "authentic_provider_pass",
         "never claim 100% coverage",
+        # Anti-duplication requirement, triggered by new-chat status and work requests.
+        "mandatory anti-redundancy audit before status or next work",
+        "evidence-delta",
+        "delivered_and_verified",
+        "done_offline_not_deployed",
+        "external_acceptance_pending",
+        "not_verified",
+        "do not re-run historical success",
+        "do not promote optional improvements to mandatory v1 blockers",
+        "piloto_asistido_vendible",
+        "únicas brechas reales de aceptación",
     ],
     "docs/engineering/QA_POLICY.md": [
         "QA ownership",

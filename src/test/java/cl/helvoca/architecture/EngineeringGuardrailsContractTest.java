@@ -27,6 +27,27 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void freshChatCannotSilentlyDropEvidenceFirstAntiDuplicationContract() throws Exception {
+        String agents = read("AGENTS.md");
+        String fastGateContract = read("scripts/ci/check-qa-governance.py");
+        assertTrue(agents.contains("MANDATORY ANTI-REDUNDANCY AUDIT BEFORE STATUS OR NEXT WORK"));
+        assertTrue(agents.contains("docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md"));
+        assertTrue(agents.contains("Issue #823"));
+        assertTrue(agents.contains("DELIVERED_AND_VERIFIED"));
+        assertTrue(agents.contains("DONE_OFFLINE_NOT_DEPLOYED"));
+        assertTrue(agents.contains("EXTERNAL_ACCEPTANCE_PENDING"));
+        assertTrue(agents.contains("NOT_VERIFIED"));
+        assertTrue(agents.contains("verifiable evidence-delta"));
+        assertTrue(agents.contains("Do not re-run historical success"));
+        assertTrue(agents.contains("Do not promote optional improvements to mandatory V1 blockers"));
+        assertTrue(agents.contains("PILOTO_ASISTIDO_VENDIBLE"));
+        assertTrue(agents.contains("ÚNICAS BRECHAS REALES DE ACEPTACIÓN"));
+        assertTrue(agents.contains("what remains"));
+        assertTrue(fastGateContract.contains("mandatory anti-redundancy audit before status or next work"));
+        assertTrue(fastGateContract.contains("do not promote optional improvements to mandatory v1 blockers"));
+    }
+
+    @Test
     void fastGateRunsSoftwareFactoryContractTestsWhenFactoryChanges() throws Exception {
         String fastGate = read("scripts/ci/fast-gate.sh");
         assertTrue(fastGate.contains("python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v"));
