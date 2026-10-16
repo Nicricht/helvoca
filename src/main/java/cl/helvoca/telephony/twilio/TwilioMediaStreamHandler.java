@@ -37,6 +37,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private final TenantDatabaseContext databaseContext;
     private final TwilioCallBindingGuard bindingGuard;
     private final TwilioMediaSessionDeadline deadline;
+    private final TwilioPilotInFlightStopMonitor pilotStopMonitor;
     private final ConcurrentMap<String, StreamState> states = new ConcurrentHashMap<>();
 
     @Autowired
@@ -47,7 +48,8 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                                     TwilioCallControl callControl,
                                     TenantDatabaseContext databaseContext,
                                     TwilioCallBindingGuard bindingGuard,
-                                    TwilioMediaSessionDeadline deadline) {
+                                    TwilioMediaSessionDeadline deadline,
+                                    TwilioPilotInFlightStopMonitor pilotStopMonitor) {
         this.routeSigner = routeSigner;
         this.providers = providers;
         this.health = health;
@@ -56,10 +58,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         this.databaseContext = databaseContext;
         this.bindingGuard = bindingGuard;
         this.deadline = deadline;
+        this.pilotStopMonitor = pilotStopMonitor;
     }
 
-    // Existing isolated unit tests keep their prior constructor. Spring uses
-    // the annotated constructor with the one shared managed deadline bean.
+    // Legacy unit tests construct the handler without a production watcher.
     TwilioMediaStreamHandler(TwilioMediaRouteSigner routeSigner,
                              VoiceAiProviderRegistry providers,
                              VoiceProviderHealthRegistry health,
@@ -68,7 +70,19 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                              TenantDatabaseContext databaseContext,
                              TwilioCallBindingGuard bindingGuard) {
         this(routeSigner, providers, health, lifecycle, callControl, databaseContext,
-                bindingGuard, new TwilioMediaSessionDeadline(600));
+                bindingGuard, new TwilioMediaSessionDeadline(600), null);
+    }
+
+    TwilioMediaStreamHandler(TwilioMediaRouteSigner routeSigner,
+                             VoiceAiProviderRegistry providers,
+                             VoiceProviderHealthRegistry health,
+                             CallLifecycleService lifecycle,
+                             TwilioCallControl callControl,
+                             TenantDatabaseContext databaseContext,
+                             TwilioCallBindingGuard bindingGuard,
+                             TwilioMediaSessionDeadline deadline) {
+        this(routeSigner, providers, health, lifecycle, callControl, databaseContext,
+                bindingGuard, deadline, null);
     }
 
     @Override
@@ -209,6 +223,13 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             // This must be scheduled only after an authenticated, bound start.
             state.deadlineTask = deadline.schedule(() -> expireSession(socket, state));
             if (state.closed.get()) state.deadlineTask.cancel(false);
+            if (pilotStopMonitor != null) {
+                // Reconcile PAUSE from PostgreSQL even when this instance has
+                // no incoming frames or the operator used another replica.
+                state.stopTask = pilotStopMonitor.watch(context.businessId(),
+                        () -> stopPausedCall(socket, state));
+                if (state.closed.get()) state.stopTask.cancel(false);
+            }
         } catch (RuntimeException e) {
             // A failed provider/session initialization must not leave an active
             // call, an orphaned stream, or a live carrier connection.
@@ -222,7 +243,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     }
 
     private void handleMedia(StreamState state, JSONObject event) {
-        if (!state.started || state.ai == null) return;
+        if (!state.started || state.closed.get() || state.ai == null) return;
         JSONObject media = event.optJSONObject("media");
         if (media == null) return;
         String track = media.optString("track", "inbound");
@@ -232,7 +253,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     }
 
     private void handleMark(StreamState state, JSONObject event) {
-        if (!state.started || state.transport == null) return;
+        if (!state.started || state.closed.get() || state.transport == null) return;
         JSONObject mark = event.optJSONObject("mark");
         if (mark == null) return;
         state.transport.onPlaybackMark(mark.optString("name", null));
@@ -257,6 +278,26 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
         StreamState state = states.remove(session.getId());
         if (state != null) closeState(state, false);
         log.info("Twilio media WebSocket closed socket={} status={}", session.getId(), status);
+    }
+
+    private void stopPausedCall(WebSocketSession socket, StreamState state) {
+        // Exactly one winner against disconnect, carrier STOP and hard deadline.
+        if (!state.closed.compareAndSet(false, true)) return;
+        log.warn("PILOT_INFLIGHT_VOICE_STOP_REQUESTED call={}", state.callSid);
+        try {
+            // Blocks further outgoing audio BEFORE trying the carrier hangup.
+            ((TwilioVoiceTransportSession) state.transport).closeOnUpstreamFailure();
+        } catch (RuntimeException e) {
+            log.warn("PILOT_INFLIGHT_CARRIER_STOP_UNVERIFIED call={}", state.callSid);
+            try {
+                socket.close(CloseStatus.SERVER_ERROR);
+            } catch (java.io.IOException ignored) {
+                log.debug("Pilot STOP socket already unavailable call={}", state.callSid);
+            }
+        } finally {
+            cleanupState(state, true);
+            states.remove(socket.getId(), state);
+        }
     }
 
     private void expireSession(WebSocketSession socket, StreamState state) {
@@ -288,6 +329,8 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private void cleanupState(StreamState state, boolean failed) {
         ScheduledFuture<?> task = state.deadlineTask;
         if (task != null) task.cancel(false);
+        ScheduledFuture<?> stopTask = state.stopTask;
+        if (stopTask != null) stopTask.cancel(false);
         VoiceAiSession ai = state.ai;
         state.ai = null;
         state.transport = null;
@@ -316,6 +359,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private static final class StreamState {
         private final AtomicBoolean closed = new AtomicBoolean();
         private volatile ScheduledFuture<?> deadlineTask;
+        private volatile ScheduledFuture<?> stopTask;
         private volatile boolean started;
         private String streamSid;
         private String callSid;
