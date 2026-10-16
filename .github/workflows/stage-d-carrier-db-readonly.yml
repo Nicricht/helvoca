@@ -8,6 +8,8 @@ on:
     paths:
       - 'scripts/ops/twilio_carrier_db_readonly_audit.py'
       - 'scripts/ops/test_twilio_carrier_db_readonly_audit.py'
+      - 'scripts/ops/c2b_twilio_call_terminal_readonly.py'
+      - 'scripts/ops/test_c2b_twilio_call_terminal_readonly.py'
       - '.github/workflows/stage-d-carrier-db-readonly.yml'
   workflow_dispatch:
 
@@ -24,5 +26,9 @@ jobs:
         run: |
           python3 -m py_compile scripts/ops/twilio_carrier_db_readonly_audit.py
           python3 -m py_compile scripts/ops/test_twilio_carrier_db_readonly_audit.py
+          python3 -m py_compile scripts/ops/c2b_twilio_call_terminal_readonly.py
+          python3 -m py_compile scripts/ops/test_c2b_twilio_call_terminal_readonly.py
       - name: Execute mocked GET only and read-only database tests without credentials
-        run: python3 -m unittest discover -s scripts/ops -p 'test_twilio_carrier_db_readonly_audit.py' -v
+        run: |
+          python3 -m unittest discover -s scripts/ops -p 'test_twilio_carrier_db_readonly_audit.py' -v
+          python3 -m unittest discover -s scripts/ops -p 'test_c2b_twilio_call_terminal_readonly.py' -v
