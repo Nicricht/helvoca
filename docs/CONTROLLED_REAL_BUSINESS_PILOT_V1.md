@@ -21,11 +21,13 @@ The environment flag is the global safety switch. The existing tenant-scoped `PA
 
 The controlled-pilot guard is applied immediately before:
 
-- routing pilot calls to an AI voice provider;
+- routing pilot calls to an AI voice provider and revalidating trusted tenant STOP at the bound Twilio media WebSocket start;
 - sending a real WhatsApp message through Meta or Twilio WhatsApp outbound providers;
 - creating a real external payment intention.
 
 Pausing a pilot must stop these effects without weakening the existing journey, idempotency, reconciliation, retry, or certification gates.
+
+**Twilio admission race closure:** `TwilioCallBindingGuard.allowsMedia` (called by `TwilioMediaStreamHandler.handleStart` after route signature verification) now checks `Effect.VOICE` against the tenant ID of the *certified phone bound to the existing nonterminal call*, under the system database context and before AI session initialization. The Spring-injected guard is required. Pilot-control read failures deny stream start; a paused managed pilot cannot initiate a new AI session even if a signed TwiML route was issued earlier. Unmanaged tenants retain their historical behavior. Existing AI streams and carrier-side calls require a separate in-flight shutdown/verification procedure; no universal STOP is implied. The scoped unit regression covers lifecycle statuses, opt-in OFF, unmanaged, DB failure, carrier misbinding and the Spring constructor; code remains **offline candidate** until exact-HEAD CI is complete.
 
 **C2-B verified code scope (2026-10-16):** `MetaWhatsAppMessagingProvider` and `TwilioWhatsAppMessagingProvider` both consult `ControlledPilotExternalEffectGuard.Effect.WHATSAPP` before their respective outbound provider calls. Twilio previously lacked this guard; its final HTTP send boundary now rejects enrolled non-RUNNING pilots or a disabled pilot switch. `PaymentWorkflowService` also rechecks the pilot before recreating an externally missing provider order during reconciliation. These changes remain offline until their exact-HEAD GitHub CI passes and a separately authorized release deploys them. A tenant without a `pilot_launch_control` row remains `NOT_PILOT_MANAGED` and is not stopped by these checks. Pilot PAUSE does not recall an already submitted external message, end an in-flight voice stream, or universally stop all provider sessions.
 
