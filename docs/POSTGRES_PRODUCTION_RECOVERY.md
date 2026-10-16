@@ -29,6 +29,26 @@ El operador ejecutó una reparación acotada a DR que creó `helvoca_runtime` y 
 
 
 
+
+### C2-B · Auditor de variables efectivas, solo lectura (2026-10-16)
+
+La conexión Railway de GitHub/ChatGPT permite confirmar la **existencia de nombres** de variables, pero no los valores efectivos. Por seguridad, no declarar STOP, PAUSED o GO comercial a partir de nombres. Para la ventana autorizada de revisión de producción existe el auditor versionado `scripts/ops/c2b_external_effects_readonly_preflight.py`. Utiliza la CLI Railway autenticada y **solo lee** un conjunto fijo de flags del contenedor `helvoca-api` productivo, tras comprobar IDs de proyecto, entorno y servicio. No muestra secretos, no exporta variables generales, no cambia configuración, no ejecuta SQL, no llama a Twilio/Gemini/Mercado Pago.
+
+Cada flag se clasifica como `OFF` (exactamente false/0), `MISSING` o `NOT_OFF`; una variable ausente es un **bloqueo** hasta revisar el valor por defecto en la versión candidata. Importante: `HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED` está habilitado por defecto, y algunos workers/proveedores pueden tener efectos aunque el interruptor global del piloto esté apagado. Este auditor **no es una garantía universal de STOP**.
+
+Solo si hay ventana de revisión aprobada, con Railway CLI autenticada y el archivo del commit certificado presente en el equipo privado del operador:
+
+~~~powershell
+py -3 .\scripts\ops\c2b_external_effects_readonly_preflight.py --probe-read-only
+~~~
+
+- `C2B_STARTUP_FLAGS_NOT_OFF` identifica **solo nombres conocidos**, nunca sus valores; requiere autorización específica para cualquier cambio posterior.
+- `C2B_STARTUP_FLAGS_OFF_AT_PROBE_ONLY` demuestra únicamente que esas banderas estaban apagadas en ese instante; **no autoriza merge, cobro, llamada ni despliegue**.
+- `C2B_BLOCKED` ante identidad/SSH/respuesta extraña equivale a NO-GO, no a permiso para reintentar indiscriminadamente.
+
+Antes de considerar C2-B GO siguen siendo necesarias la verificación de `pilot_launch_control`/PAUSED para el tenant piloto, rutas `NOT_PILOT_MANAGED`, trabajos en vuelo, proveedores reales, snapshot recuperable y fresco, aprobación de responsable y ventana, rollback DDL-aware y consentimiento **separado** para fusionar el PR #846 a `main`. No introducir en GitHub secretos ni resultados de entorno distintos de los códigos seguros. QA sintética y adversarial: `scripts/ops/test_c2b_external_effects_readonly_preflight.py`; workflow específico `.github/workflows/c2b-external-effects-readonly-contract.yml`. El CI offline no significa que la lectura efectiva se haya ejecutado en Railway.
+
+
 ## Purpose
 
 RecepVoz production data must not rely on a single unverified volume. A backup is useful only when the team knows how it will be restored and what evidence is required before a recovery path is trusted.
