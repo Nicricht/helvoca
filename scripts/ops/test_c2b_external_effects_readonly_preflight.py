@@ -28,6 +28,30 @@ def script():
 
 
 class EffectFlagsTest(unittest.TestCase):
+    def test_extended_scope_has_known_independent_effect_runners(self):
+        # A green 19-flag legacy probe must not be misread as a complete STOP.
+        required = {
+            "OPENAI_LIVE_ENABLED",
+            "TWILIO_WHATSAPP_ENABLED",
+            "HELVOCA_WHATSAPP_CERTIFICATION_ON_STARTUP",
+            "HELVOCA_WHATSAPP_SENDER_ACTIVATE_ON_STARTUP",
+            "HELVOCA_WHATSAPP_WEBHOOK_CONFIGURE_ON_STARTUP",
+            "HELVOCA_WHATSAPP_REREGISTER_ON_STARTUP",
+            "HELVOCA_WHATSAPP_FALLBACK_TEMPLATE_ON_STARTUP",
+            "HELVOCA_MERCHANT_PAYMENT_BOOTSTRAP_ON_STARTUP",
+            "HELVOCA_MERCHANT_PAYMENT_CERTIFY_ON_STARTUP",
+            "HELVOCA_MERCHANT_PAYMENT_STATUS_CHECK_ON_STARTUP",
+            "HELVOCA_BOOKING_PURGE_ON_STARTUP",
+            "HELVOCA_BOOKING_TIME_REPAIR_ON_STARTUP",
+            "HELVOCA_COMMERCIAL_SANDBOX_CERTIFY_ON_STARTUP",
+            "HELVOCA_SAAS_BILLING_SANDBOX_CERTIFY_ON_STARTUP",
+        }
+        self.assertTrue(required.issubset(set(c.FLAGS)))
+        self.assertEqual(len(c.FLAGS), len(set(c.FLAGS)))
+        self.assertEqual(len(c.FLAGS), 46)
+        self.assertLessEqual(len(sample()), 8192)
+        self.assertEqual(len(c.parse(sample())), len(c.FLAGS))
+
     def test_command_pins_only_prod_api_and_never_uses_secrets(self):
         argv = c.command("C:\\Tools\\railway.cmd")
         self.assertEqual(argv[:6], ["C:\\Tools\\railway.cmd", "ssh", "--project", c.PROJECT,
