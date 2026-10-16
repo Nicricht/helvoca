@@ -2,11 +2,17 @@ package cl.helvoca.messaging.outbound;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.WhatsAppProperties;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
+import cl.helvoca.operations.PilotLaunchControl;
+import cl.helvoca.operations.PilotLaunchControlRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -23,6 +29,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
@@ -227,6 +234,114 @@ class TwilioWhatsAppMessagingProviderTest {
 
         assertTrue(error.getMessage().contains("multiple WhatsApp-enabled senders"));
         verifyNoInteractions(http);
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PilotLaunchControl.Status.class,
+            names = {"DRAFT", "READY", "PAUSED", "COMPLETED"})
+    void nonRunningManagedPilotCannotSendTwilioWhatsApp(PilotLaunchControl.Status status) {
+        UUID businessId = UUID.randomUUID();
+        stubSender(businessId);
+        TwilioWhatsAppMessagingProvider sender = guardedProvider(businessId, status, true);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class, () -> sender.send(command(businessId)));
+
+        assertTrue(error.getMessage().contains("PILOT_NOT_RUNNING"));
+        verifyNoInteractions(http, audit);
+        verify(phones, never()).save(any());
+    }
+
+    @Test
+    void disabledGlobalPilotSwitchBlocksManagedRunningTwilioWhatsApp() {
+        UUID businessId = UUID.randomUUID();
+        stubSender(businessId);
+        TwilioWhatsAppMessagingProvider sender = guardedProvider(
+                businessId, PilotLaunchControl.Status.RUNNING, false);
+
+        IllegalStateException error = assertThrows(
+                IllegalStateException.class, () -> sender.send(command(businessId)));
+
+        assertTrue(error.getMessage().contains("GLOBAL_KILL_SWITCH_ACTIVE"));
+        verifyNoInteractions(http, audit);
+        verify(phones, never()).save(any());
+    }
+
+    @Test
+    void runningManagedPilotStillSendsThroughTwilioWhenExplicitlyEnabled() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        stubSender(businessId);
+        stubSuccessfulTwilioSend();
+        TwilioWhatsAppMessagingProvider sender = guardedProvider(
+                businessId, PilotLaunchControl.Status.RUNNING, true);
+
+        assertEquals("SM0123456789abcdef0123456789abcdef",
+                sender.send(command(businessId)).providerMessageId());
+        verify(http).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void unmanagedTenantPreservesExistingTwilioWhatsAppBehaviorWithPilotSwitchOff() throws Exception {
+        UUID businessId = UUID.randomUUID();
+        stubSender(businessId);
+        stubSuccessfulTwilioSend();
+        TwilioWhatsAppMessagingProvider sender = guardedProvider(businessId, null, false);
+
+        assertEquals("SM0123456789abcdef0123456789abcdef",
+                sender.send(command(businessId)).providerMessageId());
+        verify(http).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    @Test
+    void unreadablePilotControlFailsClosedWithoutCallingTwilio() {
+        UUID businessId = UUID.randomUUID();
+        stubSender(businessId);
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenThrow(new IllegalStateException("control unavailable"));
+        TwilioWhatsAppMessagingProvider sender = provider();
+        ReflectionTestUtils.setField(sender, "pilotExternalEffects",
+                new ControlledPilotExternalEffectGuard(controls, true));
+
+        assertThrows(IllegalStateException.class, () -> sender.send(command(businessId)));
+        verifyNoInteractions(http, audit);
+        verify(phones, never()).save(any());
+    }
+
+    private TwilioWhatsAppMessagingProvider guardedProvider(
+            UUID businessId, PilotLaunchControl.Status status, boolean switchEnabled) {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        if (status == null) {
+            when(controls.findById(businessId)).thenReturn(Optional.empty());
+        } else {
+            PilotLaunchControl control = new PilotLaunchControl();
+            control.setBusinessId(businessId);
+            control.setStatus(status);
+            when(controls.findById(businessId)).thenReturn(Optional.of(control));
+        }
+        TwilioWhatsAppMessagingProvider sender = provider();
+        ReflectionTestUtils.setField(sender, "pilotExternalEffects",
+                new ControlledPilotExternalEffectGuard(controls, switchEnabled));
+        return sender;
+    }
+
+    private void stubSender(UUID businessId) {
+        PhoneNumber sender = new PhoneNumber();
+        sender.setBusinessId(businessId);
+        sender.setPhoneNumber("+56922222222");
+        sender.setWhatsappEnabled(true);
+        sender.setWhatsappProvider(TwilioWhatsAppMessagingProvider.ID);
+        sender.setWhatsappCertifiedAt(Instant.parse("2026-09-20T00:00:00Z"));
+        when(phones.findAllByBusinessIdAndActiveTrueAndWhatsappEnabledTrueOrderByCreatedAtDesc(businessId))
+                .thenReturn(List.of(sender));
+    }
+
+    private void stubSuccessfulTwilioSend() throws Exception {
+        @SuppressWarnings("unchecked")
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(201);
+        when(response.body()).thenReturn("{\\"sid\\":\\"SM0123456789abcdef0123456789abcdef\\"}");
+        when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response);
     }
 
     private TwilioWhatsAppMessagingProvider provider() {
