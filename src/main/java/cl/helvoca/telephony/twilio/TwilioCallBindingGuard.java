@@ -4,6 +4,7 @@ import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -22,13 +23,15 @@ public class TwilioCallBindingGuard {
     private final CallSessionRepository calls;
     private final TenantDatabaseContext databaseContext;
     private final java.util.function.Predicate<PhoneNumber> existingRoute;
+    private final ControlledPilotExternalEffectGuard pilotExternalEffects;
 
     @Autowired
     public TwilioCallBindingGuard(PhoneNumberRepository phones,
                                   CallSessionRepository calls,
                                   TenantDatabaseContext databaseContext,
-                                  TwilioVerifiedExistingVoiceRouteGate existingRouteGate) {
-        this(phones, calls, databaseContext, existingRouteGate::allows);
+                                  TwilioVerifiedExistingVoiceRouteGate existingRouteGate,
+                                  ControlledPilotExternalEffectGuard pilotExternalEffects) {
+        this(phones, calls, databaseContext, existingRouteGate::allows, pilotExternalEffects);
     }
 
     // Kept for pre-existing unit tests only. No Spring use and never opt-in.
@@ -42,10 +45,21 @@ public class TwilioCallBindingGuard {
                            CallSessionRepository calls,
                            TenantDatabaseContext databaseContext,
                            java.util.function.Predicate<PhoneNumber> existingRoute) {
+        this(phones, calls, databaseContext, existingRoute, null);
+    }
+
+    // Package-only legacy constructors preserve isolated carrier tests. Spring
+    // always injects the required pilot guard through its annotated constructor.
+    TwilioCallBindingGuard(PhoneNumberRepository phones,
+                           CallSessionRepository calls,
+                           TenantDatabaseContext databaseContext,
+                           java.util.function.Predicate<PhoneNumber> existingRoute,
+                           ControlledPilotExternalEffectGuard pilotExternalEffects) {
         this.phones = phones;
         this.calls = calls;
         this.databaseContext = databaseContext;
         this.existingRoute = existingRoute;
+        this.pilotExternalEffects = pilotExternalEffects;
     }
 
     public boolean allowsIncoming(String callSid, String destination, String caller, String accountSid) {
@@ -76,10 +90,23 @@ public class TwilioCallBindingGuard {
         return databaseContext.callAsSystem(() -> {
             PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(destination).orElse(null);
             if (!certified(phone, accountSid)) return false;
-            return calls.findByProviderCallId(callSid)
+            boolean bound = calls.findByProviderCallId(callSid)
                     .filter(call -> boundTo(call, phone, caller, destination))
                     .filter(call -> call.getStatus() != null && !call.getStatus().terminal())
                     .isPresent();
+            if (!bound) return false;
+
+            // Route admission can predate pilot PAUSE. Recheck the verified
+            // phone's tenant at WebSocket start before any AI session is created.
+            // Never read a tenant ID from the untrusted WebSocket parameters.
+            if (pilotExternalEffects == null) return true; // Isolated legacy unit tests only.
+            try {
+                return pilotExternalEffects.evaluate(
+                        phone.getBusinessId(), ControlledPilotExternalEffectGuard.Effect.VOICE).allowed();
+            } catch (RuntimeException ignored) {
+                // Losing pilot-control read access must not open a new AI session.
+                return false;
+            }
         });
     }
 
