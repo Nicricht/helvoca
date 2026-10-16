@@ -1,5 +1,34 @@
 # PostgreSQL production recovery and HA gate
 
+
+## C1 2026-10-16: recuperación REAL PostgreSQL 18 + API, roles/ACL y desmontaje (prevalece sobre los checkpoints históricos)
+
+**Resultado real sin cambiar producción:** el operador restauró en Railway DR aislado el respaldo cifrado nuevo del 2026-10-15 procedente de Google Drive. El PowerShell del custodio mostró `C1_CLOUD_DOWNLOAD_INTEGRITY_VERIFIED` y `C1_RAILWAY_DR_PG18_RESTORE_VERIFIED`. La transferencia/`pg_restore` tomó **5,5 s**, que NO representa el RTO completo. El primer arranque real de Java falló en Flyway V101, SQLSTATE `42704`: faltaba el rol global `helvoca_runtime`. Un `pg_dump --no-owner --no-acl` NO incluye roles globales de PostgreSQL ni las concesiones ACL; una restauración de tablas no basta.
+
+El operador ejecutó una reparación acotada a DR que creó `helvoca_runtime` y `helvoca_system` como `NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS`, recuperando **290 sentencias** `GRANT/REVOKE/ALTER DEFAULT PRIVILEGES` a partir de un `pg_dump --schema-only` del origen **solo lectura**. Después, la API DR reiniciada desde el SHA aprobado del PR #846 se conectó a PostgreSQL 18.6 por red privada: Railway registró **102 migraciones validadas, V101/V102/V103 aplicadas, catálogo V103** y estado **API ONLINE 1/1, deployment SUCCESS** con healthcheck `/actuator/health`. Los proveedores externos, jobs, seeds, llamadas y cobros LIVE permanecieron apagados; no había dominio público.
+
+**Ventana observada:** desde creación del PostgreSQL DR `2026-10-15T23:30:02.627Z` hasta API saludable `2026-10-16T00:06:56.628Z`: **36 min 54 s**. Incluyó base, restauración, diagnóstico, reconstrucción de roles/ACL y arranque API; **NO incluyó el download anterior de Drive ni una prueba adversarial cruzada de dos tenants**. No garantiza contractual ni sostenidamente RTO <=4h / RPO <=24h. Continuidad de backups, custodia independiente, frescura de snapshots y aislamiento adversarial siguen abiertos. Estado comercial `NO-GO`. [Acta real en Issue #823](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6204969940).
+
+**Limpieza verificada:** el agente eliminó exclusivamente API DR, Postgres DR y su volumen en el proyecto aislado. Railway devolvió **0 servicios, 0 volúmenes, 0 buckets, 0 staging, 0 pendingWork**; producción seguía online. Importe facturado **no consultado**. NO reactivar recursos para duplicar una prueba ya documentada.
+
+### Orden obligatorio en futuras recuperaciones expresamente autorizadas
+
+1. Verificar respaldo, SHA/bytes, custodio y clave `age`, presupuesto y autorización específica; probar destino **distinto a producción** antes de cualquier escritura. Proyecto DR existente `helvoca-c1-dr-isolated-20261015` quedó **vacío**. No usar Railway Restore in-place sobre origen ni fusionar `main`.
+2. Proveer PostgreSQL 18 DR con volumen privado y contraseña aleatoria; sin dominio ni proxy TCP. Restaurar la copia cifrada solo desde el PC del custodio con SSH binario, en directorio privado y sin canalizar bytes mediante PowerShell en modo texto. Validar tablas y catálogo antes de API.
+3. **Antes de arrancar la API (Flyway)** reconstruir ambos roles globales y ACL de producción. Ejecutable versionado: [`scripts/ops/c1_restore_global_roles_acls.py`](../scripts/ops/c1_restore_global_roles_acls.py). Requiere flag `--execute` y `--dr-service` con el UUID **del nuevo servicio PostgreSQL DR**, no el servicio antiguo ya destruido:
+
+   ~~~powershell
+   py -3 .\scripts\ops\c1_restore_global_roles_acls.py --execute --dr-service <UUID_DEL_NUEVO_POSTGRES_DR>
+   ~~~
+
+   Fija proyecto/entorno/servicio de origen y ejecuta **solo `pg_dump --schema-only` en producción**. Comprueba por SSH proyecto, entorno, servicio, usuario y DB de ambos extremos, vuelve a validar DR antes de escribir; aplica transaccionalmente **solo** roles de V40 y ACL derivadas del esquema, nunca filas de clientes. Rechaza SQL encadenado, dump corrupto, roles incompletos, error SSH, permisos que expondrían el historial Flyway o RLS no forzada; comprueba `SET LOCAL ROLE helvoca_runtime` sin contexto tenant: 0 filas visibles. No difundir SQL privado, claves, stderr ni PII. `C1_BLOCKED` es STOP, **no reintentar a ciegas**.
+4. Desplegar API DR desde commit pin con JDBC privado, JWT temporal independiente, healthcheck y límites de RAM/CPU; sin dominio público. Variables: `SEED_ENABLED=false`, `APP_JOBS_ENABLED=false`, **`HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED=false` (default TRUE)**, conciliación y certificación telefónica off, outbound off, Twilio, Mercado Pago, Meta, Gemini y OpenAI desactivados. El switch global de piloto **no es un STOP universal** para tenants sin fila de control; bloquear también workers y proveedores.
+5. Verificar migraciones y RLS bajo roles no privilegiados, intentos tenant A -> tenant B, autenticación, `/actuator/health`, tiempo t0/t1 y edad del respaldo, sin publicar registros personales. Borrar API, base y volumen **solo de DR** y confirmar inventario vacío + producción sana. Separar restauración real de pruebas sintéticas.
+
+**QA versionada:** `scripts/ops/test_c1_restore_global_roles_acls.py` y [workflow offline C1 roles y ACL](../.github/workflows/c1-dr-roles-acls-contract.yml) comprueban el contrato de acceso, identidades de destino, rechazo de SQL inyectado y ramas de error sin invocar Railway real. Sus pruebas no reemplazan la evidencia de restauración real anterior ni prueban una nueva instancia en producción. El script temporal del chat que contiene el ID de PostgreSQL DR eliminado **no se debe reusar**.
+
+
+
 ## Purpose
 
 RecepVoz production data must not rely on a single unverified volume. A backup is useful only when the team knows how it will be restored and what evidence is required before a recovery path is trusted.
