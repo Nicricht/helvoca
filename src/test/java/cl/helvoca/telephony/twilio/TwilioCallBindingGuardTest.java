@@ -287,6 +287,23 @@ class TwilioCallBindingGuardTest {
     }
 
     @Test
+    void springWiredMediaGateUsesAuthenticatedPhoneTenant() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(
+                Optional.of(pilot(PilotLaunchControl.Status.PAUSED)));
+        TwilioVerifiedExistingVoiceRouteGate routeGate =
+                mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        TwilioCallBindingGuard springWired = new TwilioCallBindingGuard(
+                phones, calls, databaseContext, routeGate,
+                new ControlledPilotExternalEffectGuard(controls, true));
+
+        assertFalse(springWired.allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+        verifyNoInteractions(routeGate);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @Test
     void mediaWebSocketNeverQueriesPilotControlForUnboundCarrierCall() {
         PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
         when(call.getBusinessId()).thenReturn(UUID.randomUUID());
