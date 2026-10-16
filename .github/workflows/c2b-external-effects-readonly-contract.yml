@@ -1,0 +1,46 @@
+name: C2-B effective external effects preflight (offline)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/ops/c2b_external_effects_readonly_preflight.py
+      - scripts/ops/test_c2b_external_effects_readonly_preflight.py
+      - docs/POSTGRES_PRODUCTION_RECOVERY.md
+      - .github/workflows/c2b-external-effects-readonly-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c2b-read-only-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile safe Python scripts
+        run: python3 -m py_compile scripts/ops/c2b_external_effects_readonly_preflight.py scripts/ops/test_c2b_external_effects_readonly_preflight.py
+      - name: Install coverage instrumentation
+        run: python3 -m pip install --disable-pip-version-check 'coverage>=7,<8'
+      - name: Enforce 100 percent changed Python lines and branches
+        run: |
+          cd scripts/ops
+          python3 -m coverage run --branch --source=c2b_external_effects_readonly_preflight -m unittest discover -v -s . -p 'test_c2b_external_effects_readonly_preflight.py'
+          python3 -m coverage report -m --fail-under=100
+      - name: Prevent mutation or secret exfiltration through startup audit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s = Path('scripts/ops/c2b_external_effects_readonly_preflight.py').read_text()
+          for forbidden in ('pg_restore', 'pg_dump', 'psql ', 'railway run', 'accept_deploy',
+                            'set_variables', 'TWILIO_AUTH_TOKEN', 'MERCADOPAGO_ACCESS_TOKEN',
+                            'GEMINI_API_KEY', 'env |', 'printenv -0', 'curl ', 'wget '):
+              assert forbidden not in s, f'Forbidden mutation or credential access: {forbidden}'
+          for required in ('RAILWAY_PROJECT_ID', 'RAILWAY_ENVIRONMENT_ID', 'RAILWAY_SERVICE_ID',
+                           'C2B_NO_RELEASE_APPROVAL',
+                           'HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED',
+                           'HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED'):
+              assert required in s, f'Missing mandatory C2-B safety fence: {required}'
+          print('C2B_EXTERNAL_EFFECTS_OFFLINE_SAFETY_CONTRACT=PASS')
+          PY
