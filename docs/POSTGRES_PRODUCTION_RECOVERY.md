@@ -134,6 +134,24 @@ py -3 .\scripts\ops\railway_postgres_recovery_audit.py --output-dir "$env:LOCALA
 
 **No publicar** en GitHub ni en el chat el contenido bruto del informe, los identificadores de backups, datos personales o secretos. Si el auditor indica `UNVERIFIED`, comprobar únicamente metadatos no sensibles del último backup completado en Postgres > Backups del Dashboard. La evidencia se registra para la ventana de release, no como garantía permanente. La restauración nativa aislada y el RTO completo siguen pendientes y requieren autorización separada si consumen recursos.
 
+## C2-B agregado de empresas y trabajos persistentes: solo lectura (2026-10-16)
+
+La API existente ya ofrece `GET /api/v1/operations/pilot-control`, `GET /api/v1/operations/pilot-preflight` y `GET /api/v1/observability/summary` **por tenant autenticado**. La última ofrece conteos de jobs `PENDING/FAILED/RUNNING` sin payloads. **Ninguna de esas rutas demuestra el estado global de todos los tenants**: no presentarlas como STOP universal ni publicar tokens. El flag de piloto tampoco protege a `NOT_PILOT_MANAGED`; `APP_JOBS_ENABLED=false` no cancela handlers ya ejecutándose.
+
+Para cerrar **solo la brecha de observabilidad de conteos globales** se incorporó `scripts/ops/c2b_tenant_job_readonly_preflight.py`, después de verificar que no existía un probe equivalente en el HEAD de PR #846. Sigue el patrón operativo de Stage D sin alterar aquel script ya certificado. Este nuevo programa consulta exclusivamente `business`, `pilot_launch_control` y `persistent_job` con `BEGIN TRANSACTION READ ONLY`, timeout SQL fijo de 10 segundos y Railway SSH con IDs **de proyecto/entorno/Postgres fijados**. Exige PostgreSQL 18 y privilegio de lectura global verificable (`rolsuper` o `rolbypassrls`) para **no informar falsos ceros ocultos por RLS**; falla cerrado si algo no coincide. No acepta SQL, identificadores tenant, secretos ni rutas desde entrada del operador.
+
+Produce únicamente los nueve conteos agregados (total de empresas; no inscritas en piloto; pilotos totales/`RUNNING`/`PAUSED`; jobs `PENDING`/`FAILED`/`RUNNING`, y `RUNNING` con lease vencido). Nunca descarga registros, `business_id`, teléfonos, payloads ni claves. Escribe acta privada **solo** en `LOCALAPPDATA/Helvoca/private-evidence`, nunca en Git. No hay `pg_dump`, `pg_restore`, llamadas a proveedores ni SQL modificador.
+
+**Ejecución reservada a operador ya autorizado con Railway CLI autenticada, únicamente cuando sea necesaria para la ventana C2-B** (no se ha ejecutado en producción con este checkpoint):
+
+```powershell
+py -3 .\scripts\ops\c2b_tenant_job_readonly_preflight.py --probe-read-only
+```
+
+Un resultado `C2B_TENANT_JOB_COUNTS_READ_ONLY_CAPTURED` prueba **observación agregada en ese instante**, no que un job no pueda reclamar otro lease, que un `RUNNING` esté interrumpido o que el proveedor no tenga efectos ya emitidos. Si hay trabajos en vuelo o tenants no gestionados, investigar rutas y aplicar contención **solo mediante procedimientos autorizados**, nunca `UPDATE/DELETE` ad hoc. Incluso con todos los contadores cero, **`C2B_STOP_ALL_TENANTS_AND_PROVIDERS=UNVERIFIED`** hasta evidencia de rutas, dependencias externas y ausencia de efectos terminales pendientes. No pedir nuevas desactivaciones de flags para forzar éxito numérico.
+
+QA offline: `scripts/ops/test_c2b_tenant_job_readonly_preflight.py`, protegido por el workflow C2-B existente. La ejecución no autoriza merge #846, migración V100–V103, restore, coste, llamada ni cobro. El operador no debe compartir el JSON privado en GitHub; solo los códigos y números agregados cuando proceda.
+
 ## Inventario reutilizable para el siguiente ensayo C1 (2026-10-15; NO-GO)
 
 Esta es una **preparación de solo lectura**, no una certificación de respaldo/restauración ni permiso para generar gastos:
