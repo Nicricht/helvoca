@@ -12,6 +12,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
+import java.util.regex.Pattern;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,7 +51,8 @@ class TwilioV99ToV103FlywayUpgradePostgresIntegrationTest {
             """;
 
     @Test
-    void flywayUpgradesPopulatedLegacyV99ToV103WithoutMutatingExistingPhoneOrTenant() {
+    void flywayUpgradesPopulatedLegacyV99ToV103WithoutMutatingExistingPhoneOrTenant(
+            @TempDir Path legacyMigrationDirectory) throws IOException {
         Flyway oldFlyway = migrations(MigrationVersion.fromVersion("99"));
         MigrateResult prepared = oldFlyway.migrate();
         assertTrue(prepared.success, "isolated V1-V99 baseline must migrate");
@@ -91,6 +97,34 @@ class TwilioV99ToV103FlywayUpgradePostgresIntegrationTest {
         assertEquals(4, upgraded.migrationsExecuted,
                 "Only V100, V101, V102 and V103 should run after V99");
         finalFlyway.validate();
+
+        // C2-B rollback boundary: run the *legacy* V1..V99 Flyway catalog
+        // against the already upgraded schema. This isolates Flyway's future-
+        // migration validation behavior without starting old application code.
+        // The PR's only changed migrations are V100..V103, preserving V1..V99.
+        Pattern oldMigration = Pattern.compile("V(?:[1-9]|[1-9][0-9])__.*[.]sql");
+        Path checkedInMigrations = Path.of("src/main/resources/db/migration");
+        int oldCount = 0;
+        try (var migrationPaths = Files.list(checkedInMigrations)) {
+            for (Path sql : migrationPaths
+                    .filter(path -> oldMigration.matcher(path.getFileName().toString()).matches())
+                    .toList()) {
+                Files.copy(sql, legacyMigrationDirectory.resolve(sql.getFileName()));
+                oldCount++;
+            }
+        }
+        assertTrue(oldCount >= 99, "Legacy V1..V99 catalog must be complete");
+
+        Flyway legacyCatalog = Flyway.configure()
+                .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+                .locations("filesystem:" + legacyMigrationDirectory.toAbsolutePath())
+                .load();
+        assertDoesNotThrow(legacyCatalog::validate,
+                "V99-only Flyway migrations must validate on V103 without schema rollback");
+        assertEquals(103L, owner.queryForObject(
+                "SELECT MAX(version::integer) FROM public.flyway_schema_history WHERE success",
+                Long.class), "Legacy Flyway validation must NOT roll back the upgraded schema");
+
 
         assertEquals(before, owner.queryForObject(PHONE_INVARIANT, String.class),
                 "Existing phone rows and metadata must not change");
