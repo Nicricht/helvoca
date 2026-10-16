@@ -38,6 +38,22 @@ checks = {
         "piloto_asistido_vendible",
         "únicas brechas reales de aceptación",
     ],
+    ".github/workflows/ci.yml": [
+        "Verify pre-change evidence receipt against GitHub",
+        "verify_prechange_receipt.py",
+        "test_verify_prechange_receipt.py",
+        "coverage report --fail-under=100",
+        "issues: read",
+        "pull-requests: read",
+    ],
+    "scripts/ci/verify_prechange_receipt.py": [
+        "FRESH_CONTEXT_EVIDENCE_RECEIPT_V2",
+        "author_association",
+        "AUDITED_HEAD",
+        "PRIOR_EVIDENCE",
+        "head_created",
+        "No trusted pre-change receipt",
+    ],
     "docs/engineering/QA_POLICY.md": [
         "QA ownership",
         "Test selection matrix",

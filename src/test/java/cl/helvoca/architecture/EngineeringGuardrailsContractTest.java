@@ -72,6 +72,24 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void freshContextHasLiveGitHubApiGateNotOnlyMarkdownWordChecks() throws Exception {
+        String workflow = read(".github/workflows/ci.yml");
+        String script = read("scripts/ci/verify_prechange_receipt.py");
+        String unitTests = read("scripts/ci/test_verify_prechange_receipt.py");
+        assertTrue(workflow.contains("Verify pre-change evidence receipt against GitHub"));
+        assertTrue(workflow.contains("python3 scripts/ci/verify_prechange_receipt.py"));
+        assertTrue(workflow.contains("coverage report --fail-under=100"));
+        assertTrue(workflow.contains("issues: read"));
+        assertTrue(workflow.contains("pull-requests: read"));
+        assertTrue(script.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT_V2"));
+        assertTrue(script.contains("author_association"));
+        assertTrue(script.contains("No trusted pre-change receipt"));
+        assertTrue(unitTests.contains("test_comment_after_commit_is_invalid"));
+        assertTrue(unitTests.contains("test_overlong_pagination_fails_closed"));
+        assertTrue(unitTests.contains("test_changed_head_fails_closed"));
+    }
+
+    @Test
     void fastGateRunsSoftwareFactoryContractTestsWhenFactoryChanges() throws Exception {
         String fastGate = read("scripts/ci/fast-gate.sh");
         assertTrue(fastGate.contains("python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v"));

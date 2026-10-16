@@ -16,6 +16,24 @@ Antes de la primera escritura, el agente registra en **el PR existente** un come
 
 **Al finalizar cada bloque:** documentar qué se cambió y qué ya estaba hecho en el runbook/documento pertinente si procede, estado exacto en el mismo PR y en Issue #823 para V1, SHA final, CI y cobertura realmente medida, límites de proveedor/entorno, lo que NO se ejecutó y una próxima acción. Un resultado `IN_PROGRESS` no es `DONE`. Esta regla amplía la trazabilidad existente, **no exige Markdown duplicado** ni modifica el estándar técnico de cobertura diferencial de `QA_POLICY.md`. Los chequeos de CI preservan la norma escrita pero no certifican que cualquier chat la haya leído.
 
+### Puerta automática de GitHub para cada nuevo commit de PR
+
+El Fast Gate protegido ahora exige una evidencia verificable **en un comentario del PR previo al commit**. Una nota genérica o una casilla marcada no basta. Publicar antes de crear el commit:
+
+```text
+FRESH_CONTEXT_EVIDENCE_RECEIPT_V2
+AUDITED_HEAD: <SHA exacto del HEAD que se leyó, padre directo del futuro commit>
+BASE_SHA: <SHA real de main/base del PR al auditar>
+BRANCH: <nombre exacto de la rama>
+PRIOR_EVIDENCE: <enlace GitHub a implementación/test/acta ya existente con una descripción verificable>
+NEW_DELTA: <criterio adicional preciso no acreditado; no repetir historial>
+AFFECTED_FILES: <archivos reales mínimos que se cambiarán>
+QA_PLAN: <riesgo, matriz de tests y 100% de dimensiones aplicables>
+DOC_TARGET: <documento existente que se actualizará y checkpoint en PR/Issue>
+```
+
+`scripts/ci/verify_prechange_receipt.py` consulta el SHA vigente del PR, su commit padre, autoría autorizada y fecha de creación del recibo usando **GET** autenticados de GitHub. El comentario debe proceder de OWNER, COLLABORATOR o MEMBER, ser anterior o simultáneo a la fecha del commit, y contener los ocho campos no vacíos con el SHA/base/rama correctos. Si falta, el Fast Gate obligatorio **falla cerrado**; el código se mantiene en la rama y no puede superar ese requisito de `main`. En el mismo job se ejecutan 23 pruebas adversariales Python y cobertura instrumentada al 100% de sus sentencias y ramas. Es un **control de trazabilidad**, no análisis semántico automático: todavía corresponde al agente verificar que `PRIOR_EVIDENCE` y `NEW_DELTA` son verdaderos antes de intervenir. El control no detiene por sí mismo un asistente que no accede al repositorio ni sustituye el review humano o los demás QA/proveedor. Para varios commits, renovar el recibo por commit y revisar el HEAD nuevamente; no reutilizar el recibo anterior.
+
 ## Condición QA de cierre aplicable a todos los agentes
 
 **Ningún chat, agente o implementación puede declarar DONE, 100% QA o integración certificada** solo porque pasó una suite de tests. Antes de cada modificación debe leer `AGENTS.md` y `docs/engineering/QA_POLICY.md`, comprobar el estado real del PR, definir una matriz de pruebas y después documentar en el **mismo PR**:

@@ -10,6 +10,8 @@ on:
 permissions:
   contents: read
   statuses: write
+  issues: read
+  pull-requests: read
 
 # Enforce exact-head CI; outdated PR runs cancel before spending more time.
 concurrency:
@@ -132,6 +134,18 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Verify pre-change evidence receipt against GitHub
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HELVOCA_PR_NUMBER: ${{ github.event.pull_request.number }}
+          HELVOCA_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m pip install --disable-pip-version-check --quiet coverage==7.13.3
+          python3 -m coverage run --branch --source=verify_prechange_receipt -m unittest discover -s scripts/ci -p 'test_verify_prechange_receipt.py' -v
+          python3 -m coverage report --fail-under=100
+          python3 scripts/ci/verify_prechange_receipt.py
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
