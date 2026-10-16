@@ -52,3 +52,31 @@ On October 14, 2026, [workflow #38563207070](https://github.com/Nicricht/helvoca
 For V1, record the current gate and required approvals in Issue #823 before any new external call. C1/C2 production safeguards stay in force.
 
 The provider webhook + approved invoice round trip remains a separate gate until its provider-side notification path is proven.
+
+## 2026-10-16: bounded read-only invoice discovery (C5, PR #846)
+
+Helvoca's own SaaS subscription invoices are distinct from tenant customers' merchant payments.
+The existing `cl.helvoca.payment.MerchantPaymentStatusReconciliationWorker` **must not**
+be used as a SaaS billing worker.
+
+A new method `SubscriptionPaymentGateway.searchInvoices(externalSubscriptionId, offset, limit)`
+uses Mercado Pago Java SDK 3.7.0 `InvoiceClient.search(MPSearchRequest, MPRequestOptions)`
+to query `GET /authorized_payments/search`, with an explicit `preapproval_id` filter.
+The method only returns a bounded page of invoice IDs and total count; it **never**
+retrieves entitlements, changes PostgreSQL, or sends payments. Limits are 1 through 20;
+offset must be nonnegative. Invalid IDs, inconsistent provider pagination,
+missing invoice IDs and mismatched preapproval IDs fail closed.
+
+This is an internal gateway method, **not an active scheduler or public HTTP endpoint**.
+Nothing is automatically polled, and no real provider search is executed by unit tests.
+A future, separately verified and disabled-by-default recovery worker must safely select
+only SaaS-owned subscriptions, query bounded pages, re-fetch each invoice with
+`getInvoice(invoiceId)`, and invoke existing billing reconciliation only after
+validating tenant/subscription identity and payment truth. That future work requires
+RED->GREEN, PostgreSQL/Testcontainers, duplicate/out-of-order and concurrency evidence,
+and fresh exact-HEAD QA. No recovered invoice may bypass the original paid-invoice gate.
+Never confuse this recovery method with the still-unverified *authentic signed webhook*
+delivery to isolated Java plus real PostgreSQL.
+
+Provider reference:
+https://www.mercadopago.cl/developers/es/reference/online-payments/subscriptions/authorized-payment-search/get

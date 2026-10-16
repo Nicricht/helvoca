@@ -182,6 +182,83 @@ class MercadoPagoSubscriptionGatewayTest {
         }
     }
 
+
+    @Test
+    void allowsAnEmptyLastPageWithoutInventingInvoices() throws Exception {
+        @SuppressWarnings("unchecked")
+        MPResultsResourcesPage<Invoice> result = mock(MPResultsResourcesPage.class);
+        ResultsPaging paging = mock(ResultsPaging.class);
+        when(result.getPaging()).thenReturn(paging);
+        when(result.getResults()).thenReturn(List.of());
+        when(paging.getTotal()).thenReturn(0);
+        when(paging.getLimit()).thenReturn(20);
+        when(paging.getOffset()).thenReturn(0);
+        try (MockedConstruction<InvoiceClient> clients = mockConstruction(InvoiceClient.class,
+                (client, context) -> when(client.search(any(MPSearchRequest.class),
+                        any(MPRequestOptions.class))).thenReturn(result))) {
+            var page = new MercadoPagoSubscriptionGateway(configuredProperties()).searchInvoices("pre-a", 0, 20);
+            assertTrue(page.invoiceIds().isEmpty());
+            assertEquals(0, page.total());
+            assertEquals(1, clients.constructed().size());
+        }
+    }
+
+    @Test
+    void rejectsWrongPageLimitAndTooManyResults() throws Exception {
+        @SuppressWarnings("unchecked")
+        MPResultsResourcesPage<Invoice> result = mock(MPResultsResourcesPage.class);
+        ResultsPaging paging = mock(ResultsPaging.class);
+        when(result.getPaging()).thenReturn(paging);
+        when(result.getResults()).thenReturn(List.of());
+        when(paging.getTotal()).thenReturn(10);
+        when(paging.getOffset()).thenReturn(0);
+        when(paging.getLimit()).thenReturn(19);
+        try (MockedConstruction<InvoiceClient> clients = mockConstruction(InvoiceClient.class,
+                (client, context) -> when(client.search(any(MPSearchRequest.class),
+                        any(MPRequestOptions.class))).thenReturn(result))) {
+            var gateway = new MercadoPagoSubscriptionGateway(configuredProperties());
+            assertThrows(IllegalStateException.class, () -> gateway.searchInvoices("pre-a", 0, 20));
+            when(paging.getLimit()).thenReturn(1);
+            when(result.getResults()).thenReturn(List.of(mock(Invoice.class), mock(Invoice.class)));
+            assertThrows(IllegalStateException.class, () -> gateway.searchInvoices("pre-a", 0, 1));
+            assertEquals(2, clients.constructed().size());
+        }
+    }
+
+    @Test
+    void rejectsNullInvoiceAndMissingInvoiceId() throws Exception {
+        @SuppressWarnings("unchecked")
+        MPResultsResourcesPage<Invoice> result = mock(MPResultsResourcesPage.class);
+        ResultsPaging paging = mock(ResultsPaging.class);
+        when(result.getPaging()).thenReturn(paging);
+        when(paging.getTotal()).thenReturn(1);
+        when(paging.getOffset()).thenReturn(0);
+        when(paging.getLimit()).thenReturn(20);
+        when(result.getResults()).thenReturn(java.util.Collections.singletonList(null));
+        try (MockedConstruction<InvoiceClient> clients = mockConstruction(InvoiceClient.class,
+                (client, context) -> when(client.search(any(MPSearchRequest.class),
+                        any(MPRequestOptions.class))).thenReturn(result))) {
+            var gateway = new MercadoPagoSubscriptionGateway(configuredProperties());
+            assertThrows(IllegalStateException.class, () -> gateway.searchInvoices("pre-a", 0, 20));
+            Invoice noId = mock(Invoice.class);
+            when(noId.getId()).thenReturn(null);
+            when(result.getResults()).thenReturn(List.of(noId));
+            assertThrows(IllegalStateException.class, () -> gateway.searchInvoices("pre-a", 0, 20));
+            assertEquals(2, clients.constructed().size());
+        }
+    }
+
+    @Test
+    void nullProviderPageFailsClosed() throws Exception {
+        try (MockedConstruction<InvoiceClient> clients = mockConstruction(InvoiceClient.class,
+                (client, context) -> when(client.search(any(MPSearchRequest.class),
+                        any(MPRequestOptions.class))).thenReturn(null))) {
+            var gateway = new MercadoPagoSubscriptionGateway(configuredProperties());
+            assertThrows(IllegalStateException.class, () -> gateway.searchInvoices("pre-a", 0, 20));
+            assertEquals(1, clients.constructed().size());
+        }
+    }
+
     private static MercadoPagoProperties configuredProperties() {
         MercadoPagoProperties properties = new MercadoPagoProperties();
         properties.setEnabled(true);
