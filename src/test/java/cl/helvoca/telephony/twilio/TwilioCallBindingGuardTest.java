@@ -5,9 +5,14 @@ import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallStatus;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
+import cl.helvoca.operations.PilotLaunchControl;
+import cl.helvoca.operations.PilotLaunchControlRepository;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -214,6 +219,94 @@ class TwilioCallBindingGuardTest {
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
 
+
+    @Test
+    void mediaWebSocketRejectsPilotPausedSinceInitialIngress() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(
+                Optional.of(pilot(PilotLaunchControl.Status.PAUSED)));
+        TwilioCallBindingGuard protectedGuard = withPilot(controls, true);
+
+        // Carrier ingress has already been admitted, but pilot control changes
+        // before the authenticated media WebSocket attempts to start AI.
+        assertTrue(protectedGuard.allowsIncoming(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertFalse(protectedGuard.allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PilotLaunchControl.Status.class,
+            names = {"DRAFT", "READY", "PAUSED", "COMPLETED"})
+    void mediaWebSocketRejectsAllNonRunningManagedPilots(PilotLaunchControl.Status status) {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(Optional.of(pilot(status)));
+
+        assertFalse(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @Test
+    void mediaWebSocketRejectsRunningPilotWhenPilotSwitchIsOff() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(
+                Optional.of(pilot(PilotLaunchControl.Status.RUNNING)));
+
+        assertFalse(withPilot(controls, false).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+    }
+
+    @Test
+    void mediaWebSocketAllowsArmedRunningPilot() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(
+                Optional.of(pilot(PilotLaunchControl.Status.RUNNING)));
+
+        assertTrue(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @Test
+    void mediaWebSocketPreservesUnmanagedTenantWhenPilotSwitchOff() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(Optional.empty());
+
+        assertTrue(withPilot(controls, false).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+    }
+
+    @Test
+    void mediaWebSocketDeniesWhenPilotControlRepositoryIsUnavailable() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenThrow(new IllegalStateException("unavailable"));
+
+        assertFalse(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    @Test
+    void mediaWebSocketNeverQueriesPilotControlForUnboundCarrierCall() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(call.getBusinessId()).thenReturn(UUID.randomUUID());
+
+        assertFalse(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verifyNoInteractions(controls);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
+    }
+
+    private TwilioCallBindingGuard withPilot(PilotLaunchControlRepository controls, boolean enabled) {
+        return new TwilioCallBindingGuard(phones, calls, databaseContext,
+                phone -> false, new ControlledPilotExternalEffectGuard(controls, enabled));
+    }
+
+    private PilotLaunchControl pilot(PilotLaunchControl.Status status) {
+        PilotLaunchControl control = new PilotLaunchControl();
+        control.setBusinessId(businessId);
+        control.setStatus(status);
+        return control;
+    }
 
     @Test
     void independentlyAuthorizedExistingPhoneCanReachAllFourBoundRoutesWithoutWeakeningIdentity() {
