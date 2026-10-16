@@ -56,19 +56,19 @@ El acceso Railway utilizado expone estado de despliegue, variables por **nombre*
 ## C2-B · Compatibilidad de validación Flyway del catálogo legado (ensayo offline)
 
 **Estado: código de prueba añadido a PR #846; resultado de CI del HEAD nuevo pendiente.** La prueba existente
-\`TwilioV99ToV103FlywayUpgradePostgresIntegrationTest\` se amplía sobre el mismo PostgreSQL 18
+`TwilioV99ToV103FlywayUpgradePostgresIntegrationTest` se amplía sobre el mismo PostgreSQL 18
 Testcontainers desechable: crea V99, inserta tenant/número sintéticos, aplica las cuatro migraciones
 V100–V103, y después valida esa base usando un catálogo temporal compuesto **únicamente**
 por los ficheros V1–V99 que ya están en el árbol. Se comprueba que el catálogo anterior
 está completo, que la validación no requiera revertir las migraciones y que el esquema
-conserve la versión 103. El PR solo añade V100–V103 respecto de \`main\` (nombres
+conserve la versión 103. El PR solo añade V100–V103 respecto de `main` (nombres
 verificados en los archivos modificados del PR); no vuelve a restaurar un respaldo real.
 
 **Límite imprescindible:** este ensayo prueba la compatibilidad del validador Flyway con
 los scripts históricos y el esquema actualizado. **NO arranca el binario exacto de
-\`main@ca58693e\`, ni comprueba todas sus consultas JPA/controladores, runtime RLS,
+`main@ca58693e`, ni comprueba todas sus consultas JPA/controladores, runtime RLS,
 efectos en vuelo o compatibilidad de negocio.** Por eso, aunque el CI pase, un rollback
-del binario a V99 contra la V103 real sigue \`NOT_VERIFIED\`, nunca \`GO\` por esta prueba
+del binario a V99 contra la V103 real sigue `NOT_VERIFIED`, nunca `GO` por esta prueba
 aislada. Ante problemas productivos no hacer DROP/DOWN migrations improvisadas.
 
 ## 6. Límite de responsabilidad de esta etapa
