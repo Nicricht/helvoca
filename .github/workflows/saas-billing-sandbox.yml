@@ -31,6 +31,7 @@ jobs:
       HELVOCA_SAAS_BILLING_SANDBOX_LIVE_TEST: "true"
       MERCADOPAGO_TEST_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
       MERCADOPAGO_ACCESS_TOKEN: ${{ secrets.MERCADOPAGO_TEST_ACCESS_TOKEN }}
+      MERCADOPAGO_TEST_WEBHOOK_SECRET: ${{ secrets.MERCADOPAGO_TEST_WEBHOOK_SECRET }}
       MERCADOPAGO_TEST_PAYER_EMAIL: ${{ inputs.payer_email }}
 
     steps:
@@ -58,6 +59,10 @@ jobs:
           fi
           if [[ "$MERCADOPAGO_TEST_ACCESS_TOKEN" != APP_USR* ]]; then
             echo "Refusing to run: TEST token must start with APP_USR"
+            exit 1
+          fi
+          if [[ -z "${MERCADOPAGO_TEST_WEBHOOK_SECRET:-}" ]]; then
+            echo "Missing repository secret MERCADOPAGO_TEST_WEBHOOK_SECRET"
             exit 1
           fi
           # Reject placeholders before any provider call; no buyer identifiers in logs.
