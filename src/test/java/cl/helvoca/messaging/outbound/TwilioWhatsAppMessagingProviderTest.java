@@ -339,7 +339,7 @@ class TwilioWhatsAppMessagingProviderTest {
         @SuppressWarnings("unchecked")
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(201);
-        when(response.body()).thenReturn("{\\"sid\\":\\"SM0123456789abcdef0123456789abcdef\\"}");
+        when(response.body()).thenReturn("{\"sid\":\"SM0123456789abcdef0123456789abcdef\"}");
         when(http.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
                 .thenReturn(response);
     }
