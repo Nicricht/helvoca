@@ -117,7 +117,7 @@ class TwilioV99ToV103FlywayUpgradePostgresIntegrationTest {
                 SELECT COUNT(*) FROM public.flyway_schema_history
                 WHERE version IS NOT NULL AND version::integer <= 99 AND success
                 """, Integer.class);
-        assertEquals(appliedLegacyCount, oldCount,
+        assertEquals(appliedLegacyCount.intValue(), oldCount,
                 "Legacy V1..V99 catalog must exactly match successful recorded migrations");
 
         Flyway legacyCatalog = Flyway.configure()
