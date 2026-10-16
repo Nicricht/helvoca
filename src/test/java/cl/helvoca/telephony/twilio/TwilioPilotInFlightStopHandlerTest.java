@@ -11,11 +11,13 @@ import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -228,6 +230,59 @@ class TwilioPilotInFlightStopHandlerTest {
         verify(control).hangup(ACCOUNT, CALL);
         verify(deadlineFuture).cancel(false);
         verify(lifecycle).updateStatus(callId, "failed", null);
+    }
+
+    @Test
+    void audioAndPlaybackFramesCannotResumeAfterDeadlineHasClosedStream() throws Exception {
+        decision(true);
+        validStart();
+        JSONObject media = new JSONObject().put("event", "media").put("streamSid", STREAM)
+                .put("media", new JSONObject()
+                        .put("track", "inbound").put("payload", "before-stop"));
+        JSONObject mark = new JSONObject().put("event", "mark").put("streamSid", STREAM)
+                .put("mark", new JSONObject().put("name", "observed-mark"));
+
+        handler.handleTextMessage(socket, new TextMessage(media.toString()));
+        handler.handleTextMessage(socket, new TextMessage(mark.toString()));
+        verify(ai).acceptInboundAudio("before-stop");
+
+        // Unlike the pilot STOP cleanup, expiry intentionally retains its
+        // closed state until the carrier WebSocket disconnect callback.
+        deadlineTick.run();
+        handler.handleTextMessage(socket, new TextMessage(media.toString()));
+        handler.handleTextMessage(socket, new TextMessage(mark.toString()));
+        verify(ai, times(1)).acceptInboundAudio("before-stop");
+        verify(ai).close();
+        verify(control, times(1)).hangup(ACCOUNT, CALL);
+        verify(checkFuture).cancel(false);
+    }
+
+    @Test
+    void defensiveStartedStreamWithoutAiOrTransportDropsBothFrameTypes() throws Exception {
+        decision(true);
+        validStart();
+
+        // Simulate transient/incomplete collaborator publication while the
+        // authenticated stream state remains marked started and not closed.
+        // This checks both null-object guard outcomes independently of STOP.
+        @SuppressWarnings("unchecked")
+        Map<String, ?> states = (Map<String, ?>) ReflectionTestUtils.getField(handler, "states");
+        assertNotNull(states);
+        Object state = states.get("pilot-socket");
+        assertNotNull(state);
+        ReflectionTestUtils.setField(state, "ai", null);
+        ReflectionTestUtils.setField(state, "transport", null);
+
+        handler.handleTextMessage(socket, new TextMessage(
+                new JSONObject().put("event", "media").put("streamSid", STREAM)
+                        .put("media", new JSONObject().put("payload", "no-provider")).toString()));
+        handler.handleTextMessage(socket, new TextMessage(
+                new JSONObject().put("event", "mark").put("streamSid", STREAM)
+                        .put("mark", new JSONObject().put("name", "no-transport")).toString()));
+
+        verify(ai, never()).acceptInboundAudio(anyString());
+        verifyNoInteractions(control);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, db.currentOrDenied().mode());
     }
 
     @Test
