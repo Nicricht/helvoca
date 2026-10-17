@@ -29,18 +29,24 @@ Do not place another real call merely to satisfy CI. Tenant-specific real-carrie
 
 ## Gate B — Mercado Pago SaaS sandbox provider round-trip
 
-Status: **AUTOMATED HARNESS GREEN / PROVIDER ROUND-TRIP PENDING**
+Status: **REAL MERCADO PAGO TEST CHECKOUT + APPROVED INVOICE READBACK VERIFIED / PROVIDER ROUND-TRIP PENDING (AUTHENTIC WEBHOOK TO HELVOCA JAVA + REAL POSTGRESQL)**
 
-PR #586 certifies the fail-closed one-shot sandbox harness. It cannot complete the provider round-trip without an authorized Mercado Pago TEST account.
+Historical **genuine TEST evidence, do not spend or repeat without a new acceptance gap**:
 
-Required external proof:
+- [SaaS Billing Sandbox One-Shot #36360314081](https://github.com/Nicricht/helvoca/actions/runs/36360314081), terminal success: authenticated provider TEST preapproval created and read back as `pending`, using the previously verified test buyer.
+- [Mercado Pago Subscription Readback #36360749617](https://github.com/Nicricht/helvoca/actions/runs/36360749617), terminal success: provider TEST invoice with nested `payment.status=approved`, distinct from invoice lifecycle `processed`.
+- [SaaS Billing Sandbox Invoice Bridge #36360833820](https://github.com/Nicricht/helvoca/actions/runs/36360833820), terminal success: approved invoice consumed into simulated billing ACTIVE/entitlements/idempotency through **mock repositories/JDBC**, NOT real PostgreSQL persistence.
+
+The separate TEST seller credential and TEST buyer already exist; do **not** ask the owner to recreate them. See `docs/SAAS_BILLING_SANDBOX_PROVIDER_GATE.md` for scope and failed example-buyer rerun. Real **signed provider** `subscription_preapproval` and `subscription_authorized_payment` delivery to the actual Helvoca **Java** webhook, persistence in a **disposable isolated PostgreSQL**, duplicate replay and rejected→approved renewal, and resulting entitlements remain **UNVERIFIED**. A successful HTTP 200 at a standalone simulator or a mock database does not satisfy this gate. No merchant LIVE charge or production provider activation is authorized.
+
+Remaining acceptance matrix (historical proofs above must be reused):
 
 1. TEST credentials only;
 2. non-production tenant;
 3. Mercado Pago `@testuser.com` buyer;
 4. EMPRENDE or NEGOCIO;
-5. recurring checkout created;
-6. test buyer completes provider flow;
+5. recurring checkout created in historical TEST provider run (**PASS historical**);
+6. test buyer completed the historical provider flow producing an approved invoice (**PASS historical**);
 7. signed `subscription_preapproval` accepted;
 8. signed `subscription_authorized_payment` accepted;
 9. duplicate invoice notification produces no second state transition;
@@ -73,8 +79,8 @@ Status: **SAFETY CAGE IMPLEMENTED / CUSTOMER-SPECIFIC DATA PENDING**
 
 Main already contains Controlled Real Business Pilot V1 with:
 
-- global external-effect kill switch;
-- tenant PAUSED kill switch;
+- **pilot-managed-route flag**, `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`, **not a universal kill switch**: tenants with no `pilot_launch_control` row return `NOT_PILOT_MANAGED` / `allowed=true` even if the flag is false, as proved by `ControlledPilotExternalEffectGuardTest.nonPilotTenantPreservesExistingBehaviorEvenWhenGlobalPilotSwitchIsOff`;
+- **pilot tenant** `PAUSED` control, which must be verified to have a real `pilot_launch_control` row and actual denial on each relevant guarded route;
 - preflight GO/NO-GO;
 - guard before voice, Meta WhatsApp and external payment-intent creation;
 - Launch Cage operational visibility;
@@ -91,6 +97,8 @@ Customer-specific activation still requires:
 - completed external channel certification for each enabled channel;
 - rollback/support owner;
 - no unresolved P0.
+
+**High-risk STOP coverage:** unmanaged tenants, unguarded routes, in-flight jobs, provider effects and already-sent payment attempts need independent containment, incident-owner approval and terminal verification. The pilot flag alone is NOT evidence that all effects ceased. If the scope of STOP cannot be proved, keep P0 / NO-GO and do not reactivate. See `docs/FIRST_CUSTOMER_ROLLBACK_SUPPORT.md` for the exact stop decision tree and proof checklist.
 
 Use `FIRST_CUSTOMER_ROLLBACK_SUPPORT.md` for incidents and reactivation.
 

@@ -47,4 +47,15 @@ class TwilioSignatureValidationFilterTest {
 
         assertTrue(filter.shouldNotFilter(request));
     }
+
+    @Test
+    void bothStatusCallbacksRequireSignedTwilioFormRequests() {
+        TwilioSignatureValidationFilter filter =
+                new TwilioSignatureValidationFilter(mock(TwilioSignatureValidator.class));
+        assertFalse(filter.shouldNotFilter(
+                new MockHttpServletRequest("POST", "/webhooks/v1/twilio/status")));
+        assertFalse(filter.shouldNotFilter(
+                new MockHttpServletRequest("POST", "/webhooks/v1/twilio/stream-status")));
+    }
+
 }

@@ -2,6 +2,7 @@ package cl.helvoca.messaging.outbound;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.messaging.WhatsAppProperties;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.telephony.twilio.TwilioProperties;
@@ -34,6 +35,9 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
     private final WhatsAppProperties whatsApp;
     private final HttpClient http;
     private final AuditService auditService;
+
+    @Autowired(required = false)
+    private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
     @Autowired
     public TwilioWhatsAppMessagingProvider(TwilioProperties twilio,
@@ -129,6 +133,12 @@ public class TwilioWhatsAppMessagingProvider implements MessagingProvider {
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
+            // The Twilio transport is a separate outbound provider from Meta.
+            // Check the tenant's pilot STOP immediately before the network effect.
+            if (pilotExternalEffects != null) {
+                pilotExternalEffects.requireAllowed(
+                        command.businessId(), ControlledPilotExternalEffectGuard.Effect.WHATSAPP);
+            }
             HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new IllegalStateException("Twilio rejected WhatsApp message with HTTP " + response.statusCode());

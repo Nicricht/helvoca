@@ -1,0 +1,215 @@
+name: Helvoca Part 2 PG16/PG18 & V99-to-V103 Flyway Upgrade (isolated)
+
+on:
+  push:
+    branches:
+      - 'test/voice-release-part2-pg18-upgrade-*'
+  pull_request:
+    paths:
+      - '.github/workflows/voice-release-part2-pg18-upgrade.yml'
+      - 'scripts/ci/voice_part2_migration_contract.py'
+      - 'scripts/ci/test_voice_part2_migration_contract.py'
+      - 'src/main/resources/db/migration/V10*.sql'
+      - 'src/test/java/cl/helvoca/phone/TwilioV99ToV103FlywayUpgradePostgresIntegrationTest.java'
+      - 'src/test/java/cl/helvoca/phone/TwilioVerifiedExistingMigrationPostgresIntegrationTest.java'
+      - 'src/test/java/cl/helvoca/security/PostgresRowLevelSecurityIntegrationTest.java'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  immutable-migration-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check frozen V100-V103 migration contents and no auto-backfill
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part2_migration_contract.py' -v
+          python3 scripts/ci/voice_part2_migration_contract.py
+
+  flyway-upgrade-and-compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_image: ['postgres:16-alpine', 'postgres:18-alpine']
+    env:
+      HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      OPENAI_LIVE_ENABLED: 'false'
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Run selected real Flyway and tenant RLS tests in disposable Testcontainers
+        shell: bash
+        run: |
+          set -euo pipefail
+          tests="TwilioVerifiedExistingMigrationPostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest"
+          if [[ "${{ matrix.pg_image }}" == "postgres:18-alpine" ]]; then
+            tests="$tests,TwilioV99ToV103FlywayUpgradePostgresIntegrationTest"
+          fi
+          mvn --batch-mode --no-transfer-progress -Dhelvoca.test.postgres.image="${{ matrix.pg_image }}" -Dtest="$tests" test
+
+# C2-B: prove the actual previous main binary can start on the forward-only
+  # V103 schema. Never touch Railway or download a production archive.
+  legacy-main-binary-on-v103:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PREVIOUS_MAIN_SHA: ca58693e167752bd6eab8ff4e9be770391fe4293
+    steps:
+      - name: Checkout current candidate
+        uses: actions/checkout@v7
+      - name: Checkout exactly the deployed pre-release main commit
+        uses: actions/checkout@v7
+        with:
+          ref: ca58693e167752bd6eab8ff4e9be770391fe4293
+          path: previous-main
+          persist-credentials: false
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Compile real candidate and historical main binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C previous-main rev-parse HEAD)" = "$PREVIOUS_MAIN_SHA"
+          mvn --batch-mode --no-transfer-progress -Dmaven.test.skip=true package
+          (cd previous-main && mvn --batch-mode --no-transfer-progress -Dmaven.test.skip=true package)
+      - name: Run previous main binary against disposable V103 over internal Docker network
+        shell: bash
+        run: |
+          set -euo pipefail
+          net="helvoca-c2b-legacy-$GITHUB_RUN_ID"
+          db="c2b-pg18-$GITHUB_RUN_ID"
+          current="c2b-new-api-$GITHUB_RUN_ID"
+          old="c2b-old-api-$GITHUB_RUN_ID"
+          cleanup() {
+            docker rm -f "$current" "$old" "$db" >/dev/null 2>&1 || true
+            docker network rm "$net" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          docker pull postgres:18-alpine
+          docker pull eclipse-temurin:21-jre
+          docker pull curlimages/curl:8.12.1
+          docker network create --internal "$net" >/dev/null
+          test "$(docker network inspect -f '{{.Internal}}' "$net")" = true
+          docker run -d --name "$db" --network "$net" --network-alias c2b-db \
+            -e POSTGRES_DB=helvoca -e POSTGRES_USER=helvoca \
+            -e POSTGRES_PASSWORD=synthetic-ci-only postgres:18-alpine >/dev/null
+          ready_db=false
+          for n in $(seq 1 45); do
+            if docker exec "$db" pg_isready -U helvoca -d helvoca >/dev/null 2>&1; then
+              ready_db=true
+              break
+            fi
+            sleep 2
+          done
+          test "$ready_db" = true
+
+          # No production credentials, mounted source, host ports or public
+          # egress enter either application container. All providers/workers OFF.
+          cat > c2b-legacy-synthetic.env <<'ENVVARS'
+          DB_URL=jdbc:postgresql://c2b-db:5432/helvoca
+          DB_USERNAME=helvoca
+          DB_PASSWORD=synthetic-ci-only
+          SEED_ENABLED=false
+          APP_JOBS_ENABLED=false
+          HELVOCA_INVENTORY_RESERVATION_EXPIRY_ENABLED=false
+          HELVOCA_OUTBOUND_DELIVERY_ENABLED=false
+          HELVOCA_OUTBOUND_PROVIDER=NONE
+          HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false
+          HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED=false
+          HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP=false
+          HELVOCA_BUSINESS_IMPORT_AI_ENABLED=false
+          TWILIO_PROVISIONING_ENABLED=false
+          TWILIO_WHATSAPP_ENABLED=false
+          HELVOCA_WHATSAPP_CERTIFICATION_ON_STARTUP=false
+          HELVOCA_WHATSAPP_SENDER_ACTIVATE_ON_STARTUP=false
+          TWILIO_CERTIFICATION_CALL_ON_STARTUP=false
+          TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED=false
+          META_WHATSAPP_ENABLED=false
+          META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED=false
+          MERCADOPAGO_ENABLED=false
+          HELVOCA_MERCHANT_PAYMENT_BOOTSTRAP_ON_STARTUP=false
+          OPENAI_LIVE_ENABLED=false
+          GEMINI_LIVE_ENABLED=false
+          SPRINGDOC_API_DOCS_ENABLED=false
+          SPRINGDOC_SWAGGER_UI_ENABLED=false
+          ENVVARS
+
+          shopt -s nullglob
+          new_jars=(target/helvoca-*.jar)
+          old_jars=(previous-main/target/helvoca-*.jar)
+          test "${#new_jars[@]}" -eq 1
+          test "${#old_jars[@]}" -eq 1
+          probe() {
+            local container="$1"
+            local ready=false
+            local response
+            for n in $(seq 1 75); do
+              if test "$(docker inspect -f '{{.State.Running}}' "$container")" != true; then
+                docker logs --tail 100 "$container" || true
+                return 1
+              fi
+              response="$(docker run --rm --network "$net" curlimages/curl:8.12.1 \
+                -fsS --connect-timeout 2 --max-time 5 \
+                "http://$container:8080/actuator/health" 2>/dev/null || true)"
+              if [[ "$response" == *'"status":"UP"'* ]]; then
+                ready=true
+                break
+              fi
+              sleep 2
+            done
+            if test "$ready" != true; then
+              docker logs --tail 100 "$container" || true
+              return 1
+            fi
+            local pricing
+            pricing="$(docker run --rm --network "$net" curlimages/curl:8.12.1 \
+              -fsS --connect-timeout 2 --max-time 10 \
+              "http://$container:8080/api/v1/public/pricing")"
+            printf '%s' "$pricing" | python3 -c \
+              'import json,sys; assert isinstance(json.load(sys.stdin), list)'
+          }
+          docker run -d --name "$current" --network "$net" \
+            --env-file c2b-legacy-synthetic.env \
+            -v "$PWD/${new_jars[0]}:/app/helvoca.jar:ro" \
+            eclipse-temurin:21-jre java -jar /app/helvoca.jar >/dev/null
+          probe "$current"
+          docker stop "$current" >/dev/null
+
+          sql() {
+            docker exec "$db" psql -U helvoca -d helvoca -At -v ON_ERROR_STOP=1 -c "$1"
+          }
+          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103') AND success")" = 4
+          sql "INSERT INTO business(id,name) VALUES ('00000000-0000-0000-0000-000000000191','Synthetic V103 rollback tenant')" >/dev/null
+          sql "INSERT INTO phone_number(id,business_id,phone_number,provider,external_id,active) VALUES ('00000000-0000-0000-0000-000000000192','00000000-0000-0000-0000-000000000191','+12025550199','TWILIO','PNcccccccccccccccccccccccccccccccc',TRUE)" >/dev/null
+          checksum_before="$(sql "SELECT md5(string_agg(row_to_json(p)::text, ',' ORDER BY p.id)) FROM phone_number p")"
+          docker run -d --name "$old" --network "$net" \
+            --env-file c2b-legacy-synthetic.env \
+            -v "$PWD/${old_jars[0]}:/app/helvoca.jar:ro" \
+            eclipse-temurin:21-jre java -jar /app/helvoca.jar >/dev/null
+          probe "$old"
+          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103') AND success")" = 4
+          test "$(sql "SELECT MAX(version::integer) FROM flyway_schema_history WHERE success")" = 103
+          test "$(sql "SELECT md5(string_agg(row_to_json(p)::text, ',' ORDER BY p.id)) FROM phone_number p")" = "$checksum_before"
+          test "$(sql "SELECT COUNT(*) FROM phone_number WHERE twilio_binding_source IS NULL AND twilio_account_sid IS NULL AND voice_verified_at IS NULL")" = 1
+          echo "C2B_LEGACY_MAIN_BINARY_V103_PG18_SYNTHETIC_SMOKE_PASS"
+

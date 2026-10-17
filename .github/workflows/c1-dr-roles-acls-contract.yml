@@ -1,0 +1,107 @@
+name: C1 DR PostgreSQL global roles and ACLs (offline)
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - scripts/ops/c1_restore_global_roles_acls.py
+      - scripts/ops/test_c1_restore_global_roles_acls.py
+      - scripts/ops/test_c1_pg18_roles_acl_integration.py
+      - docs/POSTGRES_PRODUCTION_RECOVERY.md
+      - .github/workflows/c1-dr-roles-acls-contract.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c1-roles-acls-offline:
+    name: C1 roles and ACL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile production-safe recovery helper and tests
+        run: |
+          python3 -m py_compile scripts/ops/c1_restore_global_roles_acls.py
+          python3 -m py_compile scripts/ops/test_c1_restore_global_roles_acls.py
+      - name: Install Python branch coverage
+        run: python3 -m pip install --disable-pip-version-check 'coverage>=7,<8'
+      - name: Enforce 100% helper statements and branches with offline adversarial tests
+        run: |
+          cd scripts/ops
+          python3 -m coverage run --branch --source=c1_restore_global_roles_acls -m unittest discover -v -s . -p 'test_c1_restore_global_roles_acls.py'
+          python3 -m coverage report -m --fail-under=100
+      - name: Assert no unapproved provider or production mutations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("scripts/ops/c1_restore_global_roles_acls.py")
+          s=p.read_text(encoding="utf-8")
+          for forbidden in ("--data-only", "pg_restore", "DROP DATABASE",
+                            "ALTER SYSTEM", "railway run", "accept_deploy",
+                            "create_service", "MERCADOPAGO_ACCESS_TOKEN",
+                            "TWILIO_AUTH_TOKEN", "pg_dumpall"):
+              assert forbidden not in s, f"unsafe C1 recovery contract: {forbidden}"
+          for required in ("--schema-only", "C1_DR_SERVICE_ID_INVALID",
+                           "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS",
+                           "SET LOCAL ROLE helvoca_runtime", "GRANT", "REVOKE",
+                           "ALTER DEFAULT PRIVILEGES", "C1_SOURCE_IDENTITY_MISMATCH"):
+              assert required in s, f"missing C1 recovery fence: {required}"
+          print("C1_PG18_DR_GLOBAL_ROLES_AND_ACLS_OFFLINE_CONTRACT=PASS")
+          PY
+
+
+  c1-roles-acls-pg18:
+    name: C1 restored roles and real PostgreSQL18 two-tenant RLS
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: helvoca_c1_synthetic_postgres_ci_only
+          POSTGRES_DB: helvoca_c1_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d helvoca_c1_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    env:
+      CI: "true"
+      C1_PG18_SYNTHETIC_CI: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install local PostgreSQL client (never Railway CLI)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+      - name: Confirm Python test syntax
+        run: python3 -m py_compile scripts/ops/test_c1_pg18_roles_acl_integration.py
+      - name: RED missing role, GREEN ACL reconstruction, A/B RLS and denied write
+        run: |
+          cd scripts/ops
+          python3 test_c1_pg18_roles_acl_integration.py
+      - name: Assert no production connection or provider configuration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("scripts/ops/test_c1_pg18_roles_acl_integration.py").read_text()
+          for forbidden in (
+              "railway ssh", "mcp__Railway", "postgres.railway.internal",
+              "MERCADOPAGO_ACCESS_TOKEN", "TWILIO_AUTH_TOKEN",
+              "getenv('DATABASE_URL')", 'getenv("DATABASE_URL")',
+              "host=os.environ", "DROP DATABASE", "ALTER SYSTEM",
+          ):
+              assert forbidden not in s, f"unsafe real-PG18 synthetic test: {forbidden}"
+          for required in ("127.0.0.1", "helvoca_c1_ci",
+                           "C1_PG18_SYNTHETIC_CI", "SET LOCAL ROLE helvoca_runtime",
+                           "CROSS_TENANT_INSERT_ACCEPTED",
+                           "C1_PG18_ROLES_ACL_TWO_TENANTS_REAL_DATABASE=PASS"):
+              assert required in s, f"missing required C1 PG18 invariant: {required}"
+          print("C1_PG18_SYNTHETIC_RESTORED_ROLES_AND_RLS=PASS")
+          PY

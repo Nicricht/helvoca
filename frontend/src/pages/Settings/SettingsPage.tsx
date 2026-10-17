@@ -195,7 +195,7 @@ export function SettingsPage() {
   const readiness = useMemo(() => {
     const status = model.onboarding.data;
     if (!status) return "Estado parcial";
-    if (status.readyForCalls) return "Listo para atender";
+    if (status.readyForCalls) return "Base configurada · voz pendiente de certificación";
     return "Configuración pendiente";
   }, [model.onboarding.data]);
 

@@ -1,5 +1,9 @@
 # RecepVoz - Product V1
 
+> **[Plan maestro único de cierre comercial V1](docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md)** · [Tablero de avance C0–C7 (Issue #823)](https://github.com/Nicricht/helvoca/issues/823). Es la fuente rectora para terminar y comercializar el producto. No abrir nuevos programas de fases ni repetir pruebas ya certificadas.
+
+> **Obligatorio para cualquier chat, asistente o agente que modifique Helvoca:** antes de programar o declarar un trabajo terminado, leer [AGENTS.md](AGENTS.md), [QA_POLICY.md](docs/engineering/QA_POLICY.md) y la [política de documentación y continuidad](docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md). Exigir evidencia QA del **HEAD final** y cobertura 100% aplicable; no confundir tests verdes, simulaciones o despliegues con certificación comercial real. El checkpoint maestro V1 está en [Issue #823](https://github.com/Nicricht/helvoca/issues/823). No saltar los gates de seguridad ni fusionar a producción sin su autorización específica.
+
 RecepVoz es un SaaS multi-tenant de atención telefónica con IA para empresas. El backend cuenta con autenticación, aislamiento por tenant, clientes, servicios, reservas, conocimiento empresarial, telefonía, agente de voz, herramientas controladas por backend y trazabilidad de llamadas.
 
 ## Enfoque de producto

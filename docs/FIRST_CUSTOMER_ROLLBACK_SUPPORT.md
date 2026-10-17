@@ -30,14 +30,21 @@ Do not invent missing names or contact details. A blank owner/contact is a NO-GO
 
 ## Immediate stop controls
 
-There are two independent stop controls:
+**HIGH-RISK scope warning (verified in code, 2026-10-15): these are pilot-scoped controls, NOT universal emergency stops.** `ControlledPilotExternalEffectGuard.evaluate(...)` permits a tenant with no `pilot_launch_control` row and returns `allowed=true / pilotManaged=false / NOT_PILOT_MANAGED` even when `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`. This behavior is explicitly asserted in `ControlledPilotExternalEffectGuardTest.nonPilotTenantPreservesExistingBehaviorEvenWhenGlobalPilotSwitchIsOff`. Never infer that switching off this flag blocks all tenants, all provider routes, existing sessions, queued jobs or payments already sent.
 
-1. **Tenant kill switch:** put the pilot tenant in `PAUSED`.
-2. **Global kill switch:** set `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false`.
+1. **Pilot-managed tenant:** verify the exact tenant has a `pilot_launch_control` record and put it in `PAUSED` using the authorized admin flow. Re-read its actual state and the guarded path's denial outcome; a missing row is **NO-GO**, not evidence of PAUSED.
+2. **Pilot-managed routes, multiple tenants:** set `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED=false` through the approved production change procedure if the incident owner authorizes it. Recheck the effective deployed value and guarded denial for each relevant managed tenant. This flag alone is **not** a global provider shutdown.
+3. **Unmanaged tenants / other routes / in-flight work:** escalate immediately to the incident owner and use the independently supported channel/provider/work-queue stop procedure for each affected route, with authorization and evidence of terminal cessation. If no safe scoped stop exists, keep `P0 / NO-GO`, contain ingress with an incident-approved platform mechanism and do not claim that effects have stopped. Do not improvise ad-hoc SQL, revoke shared credentials or stop all production blindly.
 
-Use the tenant switch for an isolated customer issue. Use the global switch immediately when tenant scope is uncertain, there is evidence of cross-tenant behavior, or more than one external-effect path may be unsafe.
+**Active Twilio voice watchdog (C2-B, offline candidate 2026-10-16):** each application instance schedules a local recurring check for **each active authenticated voice WebSocket** using the tenant UUID returned by the persisted call lifecycle context, not custom WebSocket parameters. Default 3-second interval, configurable only between 1 and 30 seconds. It rereads the committed `pilot_launch_control` and `HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED` through the guarded read-only path with SYSTEM scope; on DENY or unreadable state, the owning instance prevents further outbound audio, invokes authenticated Twilio hangup for the already-bound AccountSid/CallSid, closes the WebSocket and AI, and cancels its timers. One CAS winner prevents duplicate STOP from carrier disconnect or deadline, and retries/other tenants are not indiscriminately stopped. **Critical evidence limitation:** a provider hangup request, a local socket close, or a changed local call status does **not** prove the carrier call is terminal or billed cost is zero. A paused tenant's real calls must be reconciled against carrier terminal callbacks/status by the authorized incident owner; a failed/unknown outcome is **STOP_INFLIGHT_UNVERIFIED**, escalated rather than green. Also, the check interval is not a zero-latency atomic barrier against a simultaneous PAUSE, and transient database outages fail closed for any session whose control state cannot be read. This watcher is not deployed until same-HEAD offline CI and release approval pass.
 
-Stopping traffic comes before debugging.
+**Twilio voice WebSocket admission boundary (C2-B, 2026-10-16):** Twilio voice ingress checks the pilot before returning TwiML. A pause can occur between that response and the authenticated media WebSocket `start` event. The production-wired `TwilioCallBindingGuard.allowsMedia` now verifies the certified carrier AccountSid/phone/existing nonterminal call binding **and re-evaluates `Effect.VOICE` for the business ID taken from the verified phone**, not from untrusted `customParameters`. `DRAFT`, `READY`, `PAUSED`, `COMPLETED`, an enrolled RUNNING tenant with pilot switch OFF, or a failed pilot-control read deny creation of the *new* AI session: the WebSocket receives a policy-violation close before provider/session creation. Unmanaged tenants retain their preexisting behavior. This protects only **new media-session admission**. It does **not** terminate AI streams already active when PAUSE occurs, hang up carrier calls independently, or recall external provider effects. In-flight STOP remains an explicit operator NO-GO until certified independently.
+
+**Twilio WhatsApp outbound boundary (C2-B, 2026-10-16):** unlike Meta WhatsApp, `TwilioWhatsAppMessagingProvider.send` previously reached `HttpClient.send` without a controlled-pilot guard. It now applies `Effect.WHATSAPP` immediately before the Twilio HTTP request. An enrolled tenant in `PAUSED`, `DRAFT`, `READY` or `COMPLETED` state, or an enrolled RUNNING tenant with the global pilot switch off, cannot emit a new Twilio WhatsApp message through this provider; an unavailable control repository fails before the HTTP call. An authorized RUNNING tenant and `NOT_PILOT_MANAGED` tenant keep their established behavior. This is not proof of cessation of previously submitted messages, other routes, live provider-side processing, or tenants without pilot enrollment. The separate `TWILIO_WHATSAPP_ENABLED` feature flag must not be toggled merely to manufacture a release green gate.
+
+**Payment-order recovery boundary (C2-B, 2026-10-16):** `PaymentWorkflowService.refreshFromProvider` may encounter a missing external order and recover it by calling `PaymentProviderAdapter.create` while answering payment status or reconciling. This is a **new outbound payment effect**, not a read-only status check. The recovery path now re-evaluates `ControlledPilotExternalEffectGuard.Effect.PAYMENT` immediately before calling `create`. A stopped **enrolled** pilot does not recreate a provider order; its last known payment remains for later reconciliation. An authorized RUNNING pilot and an unmanaged tenant preserve existing recovery behavior. A provider/status/guard error must not become an unapproved replacement order. This only protects the guarded recovery path, **not** merchant subscription billing, an already-sent request, provider-side processing, other non-pilot tenants, or an in-flight request that has passed the check. Never infer universal STOP from this code or from a zero backlog.
+
+**Verify absence of new external effects and monitor in-flight work before debugging or reactivating.** If the control's scope is unknown, treat STOP as **unverified** and record the gap.
 
 ## P0 incidents
 
@@ -100,7 +107,7 @@ Rollback means returning the pilot to a known safe state, not blindly reversing 
 Preferred order:
 
 1. PAUSE tenant.
-2. Disable global external effects if scope is uncertain.
+2. Disable the **pilot-managed** external-effect flag via the approved operator procedure when needed; do **not** treat it as a universal kill switch. Verify the status of each affected tenant (including `NOT_PILOT_MANAGED`), route and pending job.
 3. Stop pending outbound/durable work using supported domain controls.
 4. Correct configuration through supported APIs/admin flows.
 5. Reverse business mutations through their domain operation when reversal is supported.
@@ -113,7 +120,7 @@ Preferred order:
 ## Reactivation checklist
 
 - [ ] root cause identified;
-- [ ] unsafe external effects remain blocked during verification;
+- [ ] all affected tenant/route/provider paths and previously queued/in-flight external effects have independently verified STOP or safe terminal outcomes, including `NOT_PILOT_MANAGED` where applicable;
 - [ ] regression test added when the defect is reproducible in code;
 - [ ] Fast Gate green;
 - [ ] Full Gate green;
@@ -123,6 +130,14 @@ Preferred order:
 - [ ] pilot owner approves reactivation;
 - [ ] tenant is moved from PAUSED only after the checks above;
 - [ ] global switch is enabled only for an explicitly authorized pilot window.
+
+## C6-A: incidente de privacidad, solicitud de datos y consentimiento
+
+Esta guía no sustituye la evaluación legal. Si existe acceso cruzado entre empresas, exposición de transcripciones o contactos, uso de datos sin fundamento verificado, o una comunicación/llamada no autorizada, tratarlo como **P0 por defecto** hasta que el responsable designado descarte riesgo. Bloquear y **comprobar** los efectos externos del tenant piloto gestionado; cuando el alcance sea incierto, usar el flag global del piloto solo para rutas gestionadas y confirmar además la contención independiente de rutas `NOT_PILOT_MANAGED`, proveedores y trabajos en vuelo. El flag no garantiza un STOP universal. Preservar solo metadatos mínimos y la evidencia privada necesaria, sin difundir contenido personal en GitHub.
+
+Para una solicitud de acceso, rectificación o supresión, **no realizar una eliminación SQL manual** ni asumir que la política `docs/DATA_RETENTION_POLICY.md` es una purga desplegada. Canalizar al responsable de privacidad verificado, comprobar identidad y tenant por procedimiento autorizado, evaluar obligaciones de conservación/documentación y registrar decisión/fecha de cierre de forma segura. La ruta pública `/data-deletion.html` es informativa, no prueba que un ticket esté atendido.
+
+Antes de reactivar el piloto después de un incidente de privacidad, requerir además aprobación registrada del responsable contractual/privacidad y, cuando corresponda, revisión jurídica, notificaciones exigibles y confirmación de que la causa ya no puede reproducirse. Los contactos, plazos de respuesta, escalaciones y avisos exigibles **deben acordarse y verificarse para el negocio y normativa aplicable**, no inventarse en este runbook.
 
 ## Support intake template
 
@@ -137,7 +152,9 @@ Record:
 - Call/operation/correlation id:
 - Severity: P0 / P1 / P2
 - Tenant paused: yes/no
-- Global switch disabled: yes/no
+- Pilot-managed switch disabled (verified effective): yes/no/not applicable
+- Unmanaged tenant / independent provider STOP verified: yes/no/not applicable
+- In-flight and queued effects terminal/contained: yes/no/not applicable
 - Journey Trace checked: yes/no
 - Root cause:
 - Corrective action:

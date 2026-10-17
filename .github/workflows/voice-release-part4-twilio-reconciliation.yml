@@ -1,0 +1,67 @@
+name: Helvoca Part 4 Safe Existing Twilio Number Reconciliation (offline)
+
+on:
+  push:
+    branches:
+      - 'test/voice-release-part4-twilio-reconciliation-*'
+  pull_request:
+    paths:
+      - '.github/workflows/voice-release-part4-twilio-reconciliation.yml'
+      - 'src/main/java/cl/helvoca/phone/TwilioLegacyBindingInspector.java'
+      - 'src/test/java/cl/helvoca/phone/TwilioLegacyBindingInspectorTest.java'
+      - 'src/test/java/cl/helvoca/phone/TwilioExistingReconciliationReadinessPostgresIntegrationTest.java'
+      - 'docs/telephony/2026-10-13-voice-release-part4-twilio-reconciliation-no-go.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  existing-number-enrollment-offline-pg18:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      OPENAI_LIVE_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify end-to-end mocked carrier GET, two-human approvals and PG18 persisted evidence
+        run: |
+          mvn --batch-mode --no-transfer-progress \
+            -Dtest=TwilioExistingReconciliationReadinessPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioLegacyBindingInspectorTest,TwilioExistingEnrollmentPlannerTest,TwilioExistingNumberOwnershipVerifierTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest \
+            test
+
+  source-integrity-and-release-denial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate V100-V103 immutable and no implicit phone write
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part2_migration_contract.py' -v
+          python3 scripts/ci/voice_part2_migration_contract.py
+      - name: Require exact offline feature gate and no production enrollment code in this PR
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          contents = Path("src/test/java/cl/helvoca/phone/TwilioExistingReconciliationReadinessPostgresIntegrationTest.java").read_text()
+          assert 'postgres:18-alpine' in contents
+          assert '@MockitoBean TwilioExistingNumberOwnershipVerifier carrier' in contents
+          assert 'TwilioExistingEnrollmentAdminService service' in contents
+          assert 'no calls' not in contents.lower() or 'never contacts' in contents.lower()
+          inspector = Path("src/main/java/cl/helvoca/phone/TwilioLegacyBindingInspector.java").read_text()
+          assert '"VERIFIED_EXISTING".equals(source)' in inspector
+          print("PART4_NO_PRODUCTION_MUTATIONS=true; PROD_DEPLOY=NO-GO")
+          PY

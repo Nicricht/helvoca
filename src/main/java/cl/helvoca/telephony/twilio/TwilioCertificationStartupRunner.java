@@ -263,25 +263,29 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 && target.trim().equals(forbiddenTarget.trim());
     }
 
-    private static String form(String key, String value) {
+    // Package-visible to verify Twilio form encoding without triggering provider calls.
+    static String form(String key, String value) {
         return URLEncoder.encode(key, StandardCharsets.UTF_8)
                 + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    private static String trimTrailingSlash(String value) {
+    // Package-visible for exact branch-boundary and URL integrity tests.
+    static String trimTrailingSlash(String value) {
         String out = value;
         while (out.endsWith("/")) out = out.substring(0, out.length() - 1);
         return out;
     }
 
-    private static String mask(String phone) {
+    // Package-visible for explicit privacy/short-input regression coverage.
+    static String mask(String phone) {
         if (phone == null || phone.length() < 5) return "***";
         return "***" + phone.substring(phone.length() - 4);
     }
 
-    private static String truncate(String value) {
-        if (value == null) return "";
-        return value.length() <= 400 ? value : value.substring(0, 400);
+    // The Twilio API may include customer or credential data in error bodies.
+    // Even a truncated body is unsafe in shared provider/production logs.
+    static String truncate(String ignoredProviderBody) {
+        return "[provider response omitted]";
     }
 
     private static String rootMessage(Throwable error) {

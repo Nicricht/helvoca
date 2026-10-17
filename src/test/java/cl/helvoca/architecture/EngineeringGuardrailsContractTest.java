@@ -27,6 +27,69 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void freshChatCannotSilentlyDropEvidenceFirstAntiDuplicationContract() throws Exception {
+        String agents = read("AGENTS.md");
+        String fastGateContract = read("scripts/ci/check-qa-governance.py");
+        assertTrue(agents.contains("MANDATORY ANTI-REDUNDANCY AUDIT BEFORE STATUS OR NEXT WORK"));
+        assertTrue(agents.contains("docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md"));
+        assertTrue(agents.contains("Issue #823"));
+        assertTrue(agents.contains("DELIVERED_AND_VERIFIED"));
+        assertTrue(agents.contains("DONE_OFFLINE_NOT_DEPLOYED"));
+        assertTrue(agents.contains("EXTERNAL_ACCEPTANCE_PENDING"));
+        assertTrue(agents.contains("NOT_VERIFIED"));
+        assertTrue(agents.contains("verifiable evidence-delta"));
+        assertTrue(agents.contains("Do not re-run historical success"));
+        assertTrue(agents.contains("Do not promote optional improvements to mandatory V1 blockers"));
+        assertTrue(agents.contains("PILOTO_ASISTIDO_VENDIBLE"));
+        assertTrue(agents.contains("ÚNICAS BRECHAS REALES DE ACEPTACIÓN"));
+        assertTrue(agents.contains("what remains"));
+        assertTrue(fastGateContract.contains("mandatory anti-redundancy audit before status or next work"));
+        assertTrue(fastGateContract.contains("do not promote optional improvements to mandatory v1 blockers"));
+    }
+
+    @Test
+    void newChatMustEvidenceFreshRemoteHeadAndPriorCompletedWorkBeforeWrites() throws Exception {
+        String agents = read("AGENTS.md");
+        String template = read(".github/pull_request_template.md");
+        String completion = read("docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md");
+        String guard = read("scripts/ci/check-qa-governance.py");
+
+        assertTrue(agents.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(agents.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(agents.contains("latest remote HEAD"));
+        assertTrue(agents.contains("changed since the last checkpoint"));
+        assertTrue(agents.contains("Do not edit if the gap is already closed"));
+        assertTrue(agents.contains("docs/engineering/QA_POLICY.md"));
+        assertTrue(agents.contains("docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md"));
+
+        assertTrue(template.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(template.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(template.contains("changes since the last checkpoint"));
+        assertTrue(completion.contains("PRE-CHANGE FRESH-CONTEXT WRITE GATE"));
+        assertTrue(completion.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT"));
+        assertTrue(guard.contains("pre-change fresh-context write gate"));
+        assertTrue(guard.contains("fresh_context_evidence_receipt"));
+    }
+
+    @Test
+    void freshContextHasLiveGitHubApiGateNotOnlyMarkdownWordChecks() throws Exception {
+        String workflow = read(".github/workflows/ci.yml");
+        String script = read("scripts/ci/verify_prechange_receipt.py");
+        String unitTests = read("scripts/ci/test_verify_prechange_receipt.py");
+        assertTrue(workflow.contains("Verify pre-change evidence receipt against GitHub"));
+        assertTrue(workflow.contains("python3 scripts/ci/verify_prechange_receipt.py"));
+        assertTrue(workflow.contains("coverage report --fail-under=100"));
+        assertTrue(workflow.contains("issues: read"));
+        assertTrue(workflow.contains("pull-requests: read"));
+        assertTrue(script.contains("FRESH_CONTEXT_EVIDENCE_RECEIPT_V2"));
+        assertTrue(script.contains("author_association"));
+        assertTrue(script.contains("No trusted pre-change receipt"));
+        assertTrue(unitTests.contains("test_comment_after_commit_is_invalid"));
+        assertTrue(unitTests.contains("test_overlong_pagination_fails_closed"));
+        assertTrue(unitTests.contains("test_changed_head_fails_closed"));
+    }
+
+    @Test
     void fastGateRunsSoftwareFactoryContractTestsWhenFactoryChanges() throws Exception {
         String fastGate = read("scripts/ci/fast-gate.sh");
         assertTrue(fastGate.contains("python3 -m unittest discover -s software-factory/tests -p 'test_*.py' -v"));

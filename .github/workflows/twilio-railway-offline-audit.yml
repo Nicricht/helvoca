@@ -1,0 +1,45 @@
+name: Twilio Railway Offline Audit Contracts
+
+# Deliberately independent of the normal production-facing smoke workflow.
+# No Twilio/Google/Railway credentials, carrier requests, real calls or deployed-domain checks.
+on:
+  push:
+    branches:
+      - 'audit/twilio-railway-offline-*'
+      - 'feat/twilio-verified-existing-voice-route-phase4-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline-twilio-railway-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      TWILIO_CERTIFICATION_INGRESS_ENABLED: 'false'
+      TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+    steps:
+      - name: Checkout audited commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Verify synthetic Twilio, tenant RLS, pilot and audit contracts
+        # The carrier uses MockRestServiceServer; PostgreSQL is a throwaway Testcontainers
+        # postgres:16-alpine instance. Production is not contacted or modified.
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=TwilioProductionAuditPreparationContractTest,TwilioLegacyBindingInspectorTest,TwilioExistingNumberOwnershipVerifierTest,TwilioCallBindingGuardTest,ControlledPilotExternalEffectGuardTest,TwilioSignatureValidationFilterTest,TwilioMediaStreamEventBindingTest,TwilioTenantBindingIntegrationTest,TwilioVerifiedExistingMigrationPostgresIntegrationTest,TwilioExistingEnrollmentReconcilerPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioVerifiedExistingVoiceRouteGateTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,TwilioExistingReleaseCandidateContractTest
+          test

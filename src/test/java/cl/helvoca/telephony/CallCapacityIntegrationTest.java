@@ -92,6 +92,36 @@ class CallCapacityIntegrationTest extends ExplicitSystemDatabaseScopeSupport {
         }
     }
 
+    @Test
+    void concurrentDuplicateCallSidReturnsOnePersistedSessionWithRealPostgresLock() throws Exception {
+        TenantFixture tenant = tenant("Idempotent Call Tenant", "+14355550103");
+        String callSid = "CA-concurrent-same-sid";
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch fire = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<UUID> launch = () -> {
+                ready.countDown();
+                fire.await(5, TimeUnit.SECONDS);
+                return databaseContext.callAsTenant(tenant.businessId(), () ->
+                        lifecycle.startInboundCall("twilio", callSid, "+56910000003", tenant.phone()));
+            };
+            Future<UUID> first = executor.submit(launch);
+            Future<UUID> duplicate = executor.submit(launch);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            fire.countDown();
+
+            UUID one = first.get(15, TimeUnit.SECONDS);
+            UUID two = duplicate.get(15, TimeUnit.SECONDS);
+            assertEquals(one, two);
+            assertEquals(1L, calls.countByBusinessIdAndStatusIn(
+                    tenant.businessId(),
+                    List.of(CallStatus.RINGING, CallStatus.IN_PROGRESS, CallStatus.QUEUED)));
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
     private boolean attempt(UUID businessId,
                             String callSid,
                             String destination,

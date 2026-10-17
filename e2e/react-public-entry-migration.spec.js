@@ -9,6 +9,58 @@ const json = (body, status = 200) => ({
 });
 
 test.describe('React public entry and authentication migration', () => {
+  test('a chosen public plan survives registration, but never triggers checkout or changes entitlements', async ({ page }) => {
+    let checkoutCalls = 0;
+    await page.route('**/api/v1/billing/checkout', async route => {
+      checkoutCalls++;
+      await route.fulfill(json({ message: 'must never execute' }, 409));
+    });
+    await page.route('**/api/v1/auth/register', route => route.fulfill(json({
+      accessToken: 'intent-register-token',
+      user: { email: 'owner@nuevo.cl', roles: ['BUSINESS_OWNER', 'BUSINESS_ADMIN'] }
+    })));
+    await page.goto('/app/auth?plan=NEGOCIO');
+    await page.getByLabel('Nombre del negocio').fill('Negocio Nuevo');
+    await page.getByLabel('Correo').fill('owner@nuevo.cl');
+    await page.getByLabel('Contraseña').fill('clave-segura-123');
+    await page.getByRole('button', { name: 'Crear cuenta' }).click();
+    await expect(page).toHaveURL(/\/app\/plan\/?\?plan=NEGOCIO$/);
+    expect(checkoutCalls).toBe(0);
+  });
+
+  test('existing sessions and fresh logins preserve only allowlisted plan intents', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', route => route.fulfill(json({
+      accessToken: 'intent-login-token',
+      user: { email: 'owner@negocio.cl', roles: ['BUSINESS_ADMIN'] }
+    })));
+    await page.goto('/app/auth?plan=PRO');
+    await page.getByRole('tab', { name: 'Ingresar' }).click();
+    await page.getByLabel('Correo').fill('owner@negocio.cl');
+    await page.getByLabel('Contraseña').fill('clave-segura-123');
+    await page.getByRole('button', { name: 'Ingresar a RecepVoz' }).click();
+    await expect(page).toHaveURL(/\/app\/plan\/?\?plan=PRO$/);
+
+    // Unknown/enterprise values must not force an unauthorized checkout or plan.
+    await page.route('**/api/v1/auth/me', route => route.fulfill(json({
+      email: 'owner@negocio.cl', roles: ['BUSINESS_ADMIN']
+    })));
+    await page.goto('/app/auth?plan=ENTERPRISE');
+    await expect(page).toHaveURL(/\/app\/?$/);
+  });
+
+  test('platform admin cannot be redirected into business billing by a public plan URL', async ({ page }) => {
+    await page.route('**/api/v1/auth/login', route => route.fulfill(json({
+      accessToken: 'intent-platform-token',
+      user: { email: 'platform@example.test', roles: ['PLATFORM_ADMIN'] }
+    })));
+    await page.goto('/app/auth?plan=NEGOCIO');
+    await page.getByRole('tab', { name: 'Ingresar' }).click();
+    await page.getByLabel('Correo').fill('platform@example.test');
+    await page.getByLabel('Contraseña').fill('clave-segura-123');
+    await page.getByRole('button', { name: 'Ingresar a RecepVoz' }).click();
+    await expect(page).toHaveURL(/\/app\/platform\/?$/);
+  });
+
   test('root is compatibility-only and opens the canonical React auth route', async ({ page }) => {
     const requests = [];
     page.on('request', request => requests.push(new URL(request.url()).pathname));

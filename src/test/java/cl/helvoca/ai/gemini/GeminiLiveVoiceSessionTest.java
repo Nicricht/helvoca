@@ -973,7 +973,7 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
-    void repeatedIdenticalReadToolCallIsDeduplicatedWithinShortWindow() {
+    void repeatedAvailabilityQueriesAlwaysReadFreshBackendState() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
         RealtimeToolService tools = mock(RealtimeToolService.class);
@@ -1013,7 +1013,7 @@ class GeminiLiveVoiceSessionTest {
         session.onText(socket, toolCall("slot-duplicate-1", "list_available_slots", firstArgs), true);
         session.onText(socket, toolCall("slot-duplicate-2", "list_available_slots", sameSemanticArgsDifferentOrder), true);
 
-        verify(tools, times(1)).execute(eq(context), eq("list_available_slots"), anyString());
+        verify(tools, times(2)).execute(eq(context), eq("list_available_slots"), anyString());
     }
 
     @Test

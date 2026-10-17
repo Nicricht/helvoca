@@ -1,0 +1,98 @@
+name: Helvoca C2 commercial V1 integration preflight (offline)
+on:
+  push:
+    branches:
+      - 'feat/c2-commercial-v1-integration-preflight-*'
+  pull_request:
+    branches:
+      - 'feat/c1-offsite-pg18-encrypted-restore-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  single-plan-and-no-rework:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical C0-C7 plan and historical Agenda fix retained
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          plan=Path('docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md').read_text()
+          agents=Path('AGENTS.md').read_text()
+          readme=Path('README.md').read_text()
+          agenda=Path('e2e/react-agenda.spec.js').read_text()
+          fields=re.findall(r'^### C([0-7]) ·',plan,re.M)
+          assert fields==list("01234567"), fields
+          assert "HELVOCA_V1_COMERCIAL=TERMINADA" in plan
+          assert "issues/823" in plan and "issues/823" in agents and "issues/823" in readme
+          assert "docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md" in agents
+          assert "docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md" in readme
+          assert "page.clock.setFixedTime(new Date('2026-10-07T12:00:00-03:00'))" in agenda
+          assert "startAt: '2026-10-05T15:00:00Z'" in agenda
+          assert Path('scripts/ops/c1_offsite_pg18_encrypted_restore.py').is_file()
+          assert Path('src/main/resources/db/migration/V103__twilio_existing_enrollment_admin_approval.sql').is_file()
+          print("C2_INTEGRATION_PLAN_AND_AGENDA_PROVENANCE=PASS")
+          PY
+      - name: 'Static safety check: no production migration or paid provider effects'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for path in ['docs/PLAN_MAESTRO_CIERRE_COMERCIAL.md','README.md','AGENTS.md']:
+              assert Path(path).is_file()
+          print("C2_NO_PRODUCTION_ACTION=PASS")
+          PY
+
+  agenda-fixed-time-real-chromium:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Install existing frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Set up real Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build real React app
+        run: npm run frontend:build
+      - name: Exercise all existing React Agenda E2E cases with pinned fixture week
+        run: npx playwright test e2e/react-agenda.spec.js
+      - name: Upload failure diagnostics only
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2-agenda-diagnostics
+          path: test-results/**
+          if-no-files-found: ignore
+
+  flyway-postgres18-exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify existing V99 to V103 forward-only migration on temporary PostgreSQL18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=TwilioV99ToV103FlywayUpgradePostgresIntegrationTest,TwilioExistingReconciliationReadinessPostgresIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest
+          test
+
+  c1-encrypted-backup-contract-reused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reuse existing C1/Stage A offline fail-closed tests
+        run: |
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c1_offsite_pg18_encrypted_restore.py'
+          python3 -m unittest discover -v -s scripts/ops -p 'test_railway_pg18_snapshot_drill.py'

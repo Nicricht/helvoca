@@ -71,7 +71,7 @@ export function SettingsExpressIntro({
           <span className={styles.checks}>
             <i data-ready={profileReady} /> Perfil {profileReady ? "configurado" : "por verificar"}
             <i data-ready={contentReady} /> Operación {contentReady ? "configurada" : "por verificar"}
-            <i data-ready={phoneReady} /> Teléfono {phoneReady ? "configurado" : "por verificar"}
+            <i data-ready={phoneReady} /> Teléfono {phoneReady ? "registrado · verificar voz" : "por verificar"}
           </span>
         </div>
         <button className={styles.advanced} type="button" onClick={onAdvanced}>
