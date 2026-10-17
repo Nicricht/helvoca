@@ -24,7 +24,7 @@ public interface BusinessSubscriptionRepository extends JpaRepository<BusinessSu
                and s.externalSubscriptionId is not null
                and trim(s.externalSubscriptionId) <> ''
                and s.status in :statuses
-             order by s.updatedAt asc
+             order by s.updatedAt asc, s.id asc
             """)
     List<BusinessSubscription> findInvoiceRecoveryCandidates(
             @Param("provider") String provider,

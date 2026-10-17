@@ -5,7 +5,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -44,6 +43,8 @@ public class SaasBillingInvoiceRecoveryWorker {
     private final TenantDatabaseContext databaseContext;
     private final TransactionOperations readTransactions;
     private final TransactionOperations writeTransactions;
+    // Per-worker cursor; advisory locks still prevent cross-replica duplicate reconciliation.
+    private int nextCandidatePage;
 
     @Autowired
     public SaasBillingInvoiceRecoveryWorker(MercadoPagoProperties properties,
@@ -78,17 +79,17 @@ public class SaasBillingInvoiceRecoveryWorker {
     @Scheduled(
             initialDelayString = "${HELVOCA_SAAS_BILLING_INVOICE_RECOVERY_INITIAL_DELAY_MS:60000}",
             fixedDelayString = "${HELVOCA_SAAS_BILLING_INVOICE_RECOVERY_DELAY_MS:300000}")
-    public void poll() {
+    public synchronized void poll() {
         if (!properties.isInvoiceRecoveryEnabled()) return;
 
         List<BusinessSubscription> candidates;
+        int pageLimit = properties.getInvoiceRecoveryPageLimit();
         try {
             candidates = databaseContext.callAsSystem(() -> readTransactions.execute(status -> {
                 List<BusinessSubscription> found = subscriptions.findInvoiceRecoveryCandidates(
                         PROVIDER,
                         ELIGIBLE_STATUSES,
-                        PageRequest.of(0, properties.getInvoiceRecoveryPageLimit(),
-                                Sort.by(Sort.Direction.ASC, "updatedAt")));
+                        PageRequest.of(nextCandidatePage, pageLimit));
                 return found == null ? List.of() : List.copyOf(found);
             }));
         } catch (RuntimeException error) {
@@ -96,6 +97,11 @@ public class SaasBillingInvoiceRecoveryWorker {
                     error.getClass().getSimpleName());
             return;
         }
+
+        // A fixed first page can starve every subscription after the page limit.
+        // Scan succeeding pages across polls, resetting after a short/empty page.
+        nextCandidatePage = candidates.size() < pageLimit
+                ? 0 : (nextCandidatePage + 1) & Integer.MAX_VALUE;
 
         for (BusinessSubscription candidate : candidates) {
             recoverCandidate(candidate);

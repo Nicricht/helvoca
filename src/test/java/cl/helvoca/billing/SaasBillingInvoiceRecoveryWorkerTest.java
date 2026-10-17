@@ -2,6 +2,7 @@ package cl.helvoca.billing;
 
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -19,6 +20,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import org.mockito.InOrder;
@@ -42,6 +44,68 @@ class SaasBillingInvoiceRecoveryWorkerTest {
 
         verifyNoInteractions(scenario.subscriptions, scenario.gateway, scenario.billing,
                 scenario.jdbc);
+    }
+
+
+    @Test
+    void scanAdvancesBeyondTwentyCandidatesAndResetsAfterShortPage() {
+        Scenario scenario = new Scenario();
+        scenario.properties.setInvoiceRecoveryEnabled(true);
+        List<BusinessSubscription> firstTwenty = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            firstTwenty.add(subscription(null, SubscriptionStatus.TRIALING));
+        }
+        BusinessSubscription twentyFirst = subscription("pre-twenty-first", SubscriptionStatus.ACTIVE);
+        when(scenario.subscriptions.findInvoiceRecoveryCandidates(
+                eq("mercadopago"), anyCollection(), any(Pageable.class)))
+                .thenAnswer(invocation -> {
+                    Pageable page = invocation.getArgument(2);
+                    return page.getPageNumber() == 0 ? firstTwenty : List.of(twentyFirst);
+                });
+        when(scenario.jdbc.queryForObject(anyString(), eq(Boolean.class), eq("pre-twenty-first")))
+                .thenReturn(true);
+        when(scenario.subscriptions.findByExternalSubscriptionId("pre-twenty-first"))
+                .thenReturn(Optional.of(twentyFirst));
+        when(scenario.gateway.searchInvoices("pre-twenty-first", 0, 20))
+                .thenReturn(new SubscriptionPaymentGateway.InvoicePage(0, 0, 20, List.of()));
+
+        scenario.worker.poll();
+        scenario.worker.poll();
+        scenario.worker.poll();
+
+        ArgumentCaptor<Pageable> pages = ArgumentCaptor.forClass(Pageable.class);
+        verify(scenario.subscriptions, times(3)).findInvoiceRecoveryCandidates(
+                eq("mercadopago"), anyCollection(), pages.capture());
+        assertEquals(List.of(0, 1, 0),
+                pages.getAllValues().stream().map(Pageable::getPageNumber).toList());
+        verify(scenario.gateway, times(1)).searchInvoices("pre-twenty-first", 0, 20);
+        verifyNoInteractions(scenario.billing);
+    }
+
+    @Test
+    void scanAdvancesPastTwoFullPagesThenWrapsOnEmptyPage() {
+        Scenario scenario = new Scenario();
+        scenario.properties.setInvoiceRecoveryEnabled(true);
+        List<BusinessSubscription> fullPage = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            fullPage.add(subscription(null, SubscriptionStatus.TRIALING));
+        }
+        when(scenario.subscriptions.findInvoiceRecoveryCandidates(
+                eq("mercadopago"), anyCollection(), any(Pageable.class)))
+                .thenAnswer(invocation -> ((Pageable) invocation.getArgument(2)).getPageNumber() < 2
+                        ? fullPage : List.of());
+
+        scenario.worker.poll();
+        scenario.worker.poll();
+        scenario.worker.poll();
+        scenario.worker.poll();
+
+        ArgumentCaptor<Pageable> pages = ArgumentCaptor.forClass(Pageable.class);
+        verify(scenario.subscriptions, times(4)).findInvoiceRecoveryCandidates(
+                eq("mercadopago"), anyCollection(), pages.capture());
+        assertEquals(List.of(0, 1, 2, 0),
+                pages.getAllValues().stream().map(Pageable::getPageNumber).toList());
+        verifyNoInteractions(scenario.gateway, scenario.billing, scenario.jdbc);
     }
 
     @Test

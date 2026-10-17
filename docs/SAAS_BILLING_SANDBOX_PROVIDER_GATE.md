@@ -81,6 +81,11 @@ payments or subscriptions. When explicitly enabled with
 
 - selects only Mercado Pago SaaS subscriptions in `TRIALING`, `ACTIVE` or `PAST_DUE`
   with a real external subscription ID, using a bounded page of at most 20 rows;
+- rotates the candidate page across scheduled polls, ordered by `(updatedAt, id)` so a
+  population larger than 20 cannot be indefinitely starved by a fixed page zero;
+  a short or empty page restarts the scan, and a failed discovery retains its cursor.
+  Cursor lives per worker process (not shared across replicas or durable after restart);
+  advisory subscription locks still guard concurrent application of invoices;
 - takes a PostgreSQL transaction-scoped advisory lease per external subscription,
   re-reads the row under the SYSTEM database scope, and re-validates provider,
   subscription identity and eligibility before any provider call;
