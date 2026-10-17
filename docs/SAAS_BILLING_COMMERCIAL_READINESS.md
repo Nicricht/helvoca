@@ -43,6 +43,7 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 8. The current plan remains active. A browser return or an `authorized` preapproval alone does **not** activate the new plan.
 9. Mercado Pago sends signed Webhooks to `POST /webhooks/v1/mercadopago`.
 10. The controller validates `x-signature` with the official Mercado Pago Java SDK and the configured webhook secret.
+   - **Provider acknowledgment contract (2026-10-16, PR #846):** after valid signature and successful reconciliation, return HTTP **200 OK**, not 204 No Content; also return 200 for authenticated but unsupported topics without applying billing effects. Preserve 401 for invalid signature, 503 if signing is not configured, and 500 if reconciliation fails (provider retry). Mercado Pago's official Webhook documentation specifically calls for HTTP 200 or 201 to acknowledge delivery. This is a code-contract correction, **not** proof of an authentic Mercado Pago notification to Java/PostgreSQL. Source: https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod
 11. `subscription_preapproval` reconciles subscription state.
 12. `subscription_authorized_payment` fetches the provider invoice and only a provider payment with `payment.status=approved` activates or renews service; invoice lifecycle status such as `processed` is not payment proof.
 13. On the first approved invoice for a pending plan, `pending_plan_code` becomes `plan_code`.

@@ -55,9 +55,9 @@ public class MercadoPagoWebhookController {
             switch (data.topic()) {
                 case "subscription_preapproval" -> billing.reconcileSubscription(data.id());
                 case "subscription_authorized_payment" -> billing.reconcileAuthorizedPayment(data.id());
-                default -> { return ResponseEntity.noContent().build(); }
+                default -> { return ResponseEntity.ok().build(); }
             }
-            return ResponseEntity.noContent().build();
+            return ResponseEntity.ok().build();
         } catch (Exception e) {
             log.error("Mercado Pago reconciliation failed request={} topic={} type={}",
                     requestId, data.topic(), e.getClass().getSimpleName());
