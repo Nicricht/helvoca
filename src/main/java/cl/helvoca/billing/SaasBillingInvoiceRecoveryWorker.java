@@ -1,6 +1,7 @@
 package cl.helvoca.billing;
 
 import cl.helvoca.security.TenantDatabaseContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.PageRequest;
@@ -44,6 +45,7 @@ public class SaasBillingInvoiceRecoveryWorker {
     private final TransactionOperations readTransactions;
     private final TransactionOperations writeTransactions;
 
+    @Autowired
     public SaasBillingInvoiceRecoveryWorker(MercadoPagoProperties properties,
                                              BusinessSubscriptionRepository subscriptions,
                                              SubscriptionPaymentGateway gateway,
