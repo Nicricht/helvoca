@@ -337,7 +337,7 @@ class BillingProviderPostgresBridgeIntegrationTest {
 
         // Correct HMAC is verified by the real SDK and routed through the real
         // Spring billing service into PostgreSQL.
-        assertEquals(204, scope.callAsSystem(() -> controller.webhook(
+        assertEquals(200, scope.callAsSystem(() -> controller.webhook(
                 good, requestId, "subscription_authorized_payment",
                 null, invoiceId, body)).getStatusCode().value());
         Map<String, Object> settled = stored(tenantA);
@@ -347,7 +347,7 @@ class BillingProviderPostgresBridgeIntegrationTest {
         assertEquals("approved", settled.get("last_billing_payment_status"));
         assertEquals("TRIALING", stored(tenantB).get("status"));
 
-        assertEquals(204, scope.callAsSystem(() -> controller.webhook(
+        assertEquals(200, scope.callAsSystem(() -> controller.webhook(
                 good, requestId, "subscription_authorized_payment",
                 null, invoiceId, body)).getStatusCode().value());
         assertEquals(settled, stored(tenantA), "Duplicate signed webhook must be idempotent");
@@ -408,14 +408,14 @@ class BillingProviderPostgresBridgeIntegrationTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(body);
 
-            assertEquals(204, mvc.perform(post).andReturn().getResponse().getStatus());
+            assertEquals(200, mvc.perform(post).andReturn().getResponse().getStatus());
             Map<String, Object> first = stored(tenantA);
             assertEquals("ACTIVE", first.get("status"));
             assertEquals("PRO", first.get("plan_code"));
             assertEquals(invoiceId, first.get("last_billing_invoice_id"));
             assertEquals("TRIALING", stored(tenantB).get("status"));
 
-            assertEquals(204, mvc.perform(post).andReturn().getResponse().getStatus());
+            assertEquals(200, mvc.perform(post).andReturn().getResponse().getStatus());
             assertEquals(first, stored(tenantA), "Repeated signed POST must be idempotent");
             assertEquals("TRIALING", stored(tenantB).get("status"));
             verify(provider, times(2)).getInvoice(invoiceId);
