@@ -244,7 +244,7 @@ class BillingSubscriptionServiceTest {
         local.setPendingPlanCode("PRO");
         local.setExternalSubscriptionId("pre-dup");
         local.setBillingCheckoutUrl("https://checkout.example.test/pre-dup");
-        OffsetDateTime debitDate = OffsetDateTime.of(2026, 9, 27, 18, 0, 0, 0, ZoneOffset.UTC);
+        OffsetDateTime debitDate = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
 
         when(subscriptions.findByExternalSubscriptionId("pre-dup")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-dup"))
@@ -367,7 +367,7 @@ class BillingSubscriptionServiceTest {
         local.setBillingProvider("mercadopago");
         local.setPendingPlanCode("PRO");
         local.setExternalSubscriptionId("pre-recover");
-        OffsetDateTime debitDate = OffsetDateTime.of(2026, 9, 27, 18, 30, 0, 0, ZoneOffset.UTC);
+        OffsetDateTime debitDate = OffsetDateTime.now(ZoneOffset.UTC).plusHours(1);
 
         when(subscriptions.findByExternalSubscriptionId("pre-recover")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-recover"))
@@ -477,6 +477,40 @@ class BillingSubscriptionServiceTest {
         service.reconcileAuthorizedPayment("invoice-stale");
 
         assertEquals(currentStart, local.getCurrentPeriodStart());
+        assertNull(local.getLastBillingInvoiceId());
+        verify(subscriptions, never()).saveAndFlush(local);
+    }
+
+    @Test
+    void staleApprovedInvoiceIsIgnoredEvenWhenAPlanChangeIsPending() {
+        BusinessSubscriptionRepository subscriptions = mock(BusinessSubscriptionRepository.class);
+        SubscriptionPaymentGateway gateway = mock(SubscriptionPaymentGateway.class);
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        CommercialPlanCatalogService catalog = mock(CommercialPlanCatalogService.class);
+        UUID businessId = UUID.randomUUID();
+        BusinessSubscription local = activeBasic(businessId);
+        local.setBillingProvider("mercadopago");
+        local.setPendingPlanCode("PRO");
+        local.setExternalSubscriptionId("pre-stale-pending");
+        Instant currentStart = Instant.parse("2026-09-27T18:00:00Z");
+        local.setCurrentPeriodStart(currentStart);
+        local.setCurrentPeriodEnd(Instant.parse("2026-10-27T18:00:00Z"));
+
+        when(subscriptions.findByExternalSubscriptionId("pre-stale-pending"))
+                .thenReturn(Optional.of(local));
+        when(gateway.getInvoice("invoice-stale-pending"))
+                .thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                        "invoice-stale-pending", "pre-stale-pending", "processed", "approved", "",
+                        OffsetDateTime.parse("2026-08-27T18:00:00Z")));
+
+        BillingSubscriptionService service = new BillingSubscriptionService(
+                subscriptions, gateway, configuredProperties(), jdbc, catalog);
+
+        service.reconcileAuthorizedPayment("invoice-stale-pending");
+
+        assertEquals(currentStart, local.getCurrentPeriodStart());
+        assertEquals("BASIC", local.getPlanCode());
+        assertEquals("PRO", local.getPendingPlanCode());
         assertNull(local.getLastBillingInvoiceId());
         verify(subscriptions, never()).saveAndFlush(local);
     }

@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
@@ -15,6 +16,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -77,6 +79,9 @@ class BillingProviderPostgresBridgeIntegrationTest {
     MercadoPagoProperties webhookProperties;
 
     @Autowired
+    SaasBillingInvoiceRecoveryWorker recoveryWorker;
+
+    @Autowired
     @Qualifier("migrationDataSource")
     DataSource migrationDataSource;
 
@@ -86,6 +91,7 @@ class BillingProviderPostgresBridgeIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        webhookProperties.setInvoiceRecoveryEnabled(false);
         owner = new JdbcTemplate(migrationDataSource);
         tenantA = UUID.randomUUID();
         tenantB = UUID.randomUUID();
@@ -110,6 +116,7 @@ class BillingProviderPostgresBridgeIntegrationTest {
 
     @AfterEach
     void tearDown() {
+        webhookProperties.setInvoiceRecoveryEnabled(false);
         if (owner != null && tenantA != null && tenantB != null) {
             owner.update("DELETE FROM public.business WHERE id IN (?, ?)", tenantA, tenantB);
         }
@@ -211,6 +218,80 @@ class BillingProviderPostgresBridgeIntegrationTest {
         assertNull(recovered.get("grace_until"));
         assertEquals("approved", recovered.get("last_billing_payment_status"));
         assertEquals("TRIALING", stored(tenantB).get("status"));
+    }
+
+    @Test
+    void automaticRecoveryProcessesRejectedThenApprovedInvoicesOutOfOrderAndIsIdempotent() {
+        owner.update("UPDATE public.business_subscription SET billing_provider = NULL WHERE business_id = ?", tenantB);
+        webhookProperties.setInvoiceRecoveryEnabled(true);
+        String oldInvoiceId = "test-invoice-recovery-old";
+        String newInvoiceId = "test-invoice-recovery-new";
+        OffsetDateTime oldDebit = OffsetDateTime.parse("2026-10-15T19:00:00Z");
+        OffsetDateTime newDebit = OffsetDateTime.parse("2026-11-01T19:00:00Z");
+        when(provider.searchInvoices(subscriptionId(tenantA), 0, 20))
+                .thenReturn(new SubscriptionPaymentGateway.InvoicePage(
+                        3, 0, 20, java.util.List.of(newInvoiceId, oldInvoiceId, newInvoiceId)));
+        when(provider.getInvoice(oldInvoiceId)).thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                oldInvoiceId, subscriptionId(tenantA), "processed", "rejected", "rejected", oldDebit));
+        when(provider.getInvoice(newInvoiceId)).thenReturn(new SubscriptionPaymentGateway.RemoteInvoice(
+                newInvoiceId, subscriptionId(tenantA), "processed", "approved", "paid", newDebit));
+
+        recoveryWorker.poll();
+
+        Map<String, Object> recovered = stored(tenantA);
+        assertEquals("PRO", recovered.get("plan_code"));
+        assertEquals("ACTIVE", recovered.get("status"));
+        assertNull(recovered.get("pending_plan_code"));
+        assertNull(recovered.get("grace_until"));
+        assertEquals(newInvoiceId, recovered.get("last_billing_invoice_id"));
+        assertEquals("approved", recovered.get("last_billing_payment_status"));
+        assertEquals("TRIALING", stored(tenantB).get("status"));
+        assertNull(stored(tenantB).get("last_billing_invoice_id"));
+
+        Map<String, Object> first = recovered;
+        recoveryWorker.poll();
+        assertEquals(first, stored(tenantA), "Repeated discovery must remain durable-idempotent");
+        verify(provider, times(2)).searchInvoices(subscriptionId(tenantA), 0, 20);
+        verify(provider, times(4)).getInvoice(oldInvoiceId);
+        verify(provider, times(4)).getInvoice(newInvoiceId);
+    }
+
+    @Test
+    void automaticRecoverySkipsSubscriptionHeldByAnotherReplicaLease() throws Exception {
+        owner.update("UPDATE public.business_subscription SET billing_provider = NULL WHERE business_id = ?", tenantB);
+        webhookProperties.setInvoiceRecoveryEnabled(true);
+        String externalId = subscriptionId(tenantA);
+        CountDownLatch leaseAcquired = new CountDownLatch(1);
+        CountDownLatch releaseLease = new CountDownLatch(1);
+        ExecutorService holder = Executors.newSingleThreadExecutor();
+        TransactionTemplate holderTransaction = new TransactionTemplate(
+                new DataSourceTransactionManager(migrationDataSource));
+        Future<Void> lease = holder.submit(() -> {
+            holderTransaction.execute(status -> {
+                owner.queryForObject(
+                        "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+                        Object.class, externalId);
+                leaseAcquired.countDown();
+                try {
+                    assertTrue(releaseLease.await(15, TimeUnit.SECONDS));
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(interrupted);
+                }
+                return null;
+            });
+            return null;
+        });
+        try {
+            assertTrue(leaseAcquired.await(15, TimeUnit.SECONDS));
+            recoveryWorker.poll();
+            verify(provider, never()).searchInvoices(anyString(), anyInt(), anyInt());
+        } finally {
+            releaseLease.countDown();
+            lease.get(30, TimeUnit.SECONDS);
+            holder.shutdownNow();
+            assertTrue(holder.awaitTermination(10, TimeUnit.SECONDS));
+        }
     }
 
     @Test

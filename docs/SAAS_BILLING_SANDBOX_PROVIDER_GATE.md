@@ -69,14 +69,60 @@ missing invoice IDs and mismatched preapproval IDs fail closed.
 
 This is an internal gateway method, **not an active scheduler or public HTTP endpoint**.
 Nothing is automatically polled, and no real provider search is executed by unit tests.
-A future, separately verified and disabled-by-default recovery worker must safely select
-only SaaS-owned subscriptions, query bounded pages, re-fetch each invoice with
-`getInvoice(invoiceId)`, and invoke existing billing reconciliation only after
-validating tenant/subscription identity and payment truth. That future work requires
-RED->GREEN, PostgreSQL/Testcontainers, duplicate/out-of-order and concurrency evidence,
-and fresh exact-HEAD QA. No recovered invoice may bypass the original paid-invoice gate.
-Never confuse this recovery method with the still-unverified *authentic signed webhook*
-delivery to isolated Java plus real PostgreSQL.
+The automatic recovery worker below is separately verified and remains
+disabled-by-default. No recovered invoice may bypass the original paid-invoice gate.
+
+## 2026-10-17: disabled automatic SaaS invoice recovery (C5, PR #846)
+
+`SaasBillingInvoiceRecoveryWorker` reuses the existing `searchInvoices`, `getInvoice`
+and `BillingSubscriptionService.reconcileAuthorizedPayment` paths. It does not create
+payments or subscriptions. When explicitly enabled with
+`HELVOCA_SAAS_BILLING_INVOICE_RECOVERY_ENABLED=true`, it:
+
+- selects only Mercado Pago SaaS subscriptions in `TRIALING`, `ACTIVE` or `PAST_DUE`
+  with a real external subscription ID, using a bounded page of at most 20 rows;
+- takes a PostgreSQL transaction-scoped advisory lease per external subscription,
+  re-reads the row under the SYSTEM database scope, and re-validates provider,
+  subscription identity and eligibility before any provider call;
+- searches one bounded invoice page, deduplicates IDs, re-fetches each invoice, and
+  fails closed on malformed pages, mismatched subscriptions, unknown payment states
+  or provider errors;
+- orders valid invoices by debit date and invokes only the existing reconciler. That
+  reconciler activates or promotes a plan only for `payment.status=approved`, keeps
+  rejected payments in grace/`PAST_DUE`, and rejects stale invoices that arrive after
+  a newer period has already been established.
+
+Repeated polls are durable-idempotent through the existing locked subscription row and
+invoice/status markers. Errors are contained per candidate/invoice; no entitlement
+change is attempted for another business. Synthetic invoice IDs were used for the new
+tests; the already-recovered TEST invoice was not queried or replayed.
+
+The unit suite is green locally. The PostgreSQL/Testcontainers suite is part of the
+required exact-HEAD CI gate; this workstation currently cannot start it because no
+Docker environment is available. The implementation must not be called C5-complete
+until that gate passes.
+
+## 2026-10-17: official organic notification path and remaining blocker
+
+Mercado Pago's official documentation for subscriptions without an associated plan
+states that authorized payments are generated recurrently and that rejected invoices
+may enter `recycling` while the provider retries them. For notification topics, the
+official additional-notifications page says to enable `subscription_authorized_payment`
+for authorized-payment updates and also enable the associated `payments` topic; it
+mentions `subscription_preapproval` for pending-subscription updates:
+
+- [Authorized payments for subscriptions without an associated plan](https://www.mercadopago.com/developers/es/docs/subscriptions/integration-configuration/subscription-no-associated-plan/authorized-payments)
+- [Additional information about notifications](https://www.mercadopago.com/developers/es/docs/your-integrations/notifications/additional-info)
+
+This documents the provider-side mechanism, but it does not certify Helvoca's organic
+delivery. The TEST evidence in Issue #823 / PR #846 still shows no organic
+`subscription_authorized_payment` in provider history or the configured receiver, and
+the current SDK checkout builder does not expose an equivalent notification-topic
+configuration field. The remaining blocker is therefore unchanged: establish the
+sanctioned configuration path for this SDK/account and capture one authentic signed
+organic event at the real Java + PostgreSQL backend, with tenant isolation and durable
+idempotency. The recovery worker is only a bounded resilience mechanism; it is not a
+substitute for that webhook certification.
 
 Provider reference:
 https://www.mercadopago.cl/developers/es/reference/online-payments/subscriptions/authorized-payment-search/get
