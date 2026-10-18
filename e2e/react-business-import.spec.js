@@ -80,7 +80,7 @@ async function boot(page, options = {}) {
       previewCalls += 1;
       return route.fulfill(json({
         businessName: 'Veterinaria Norte',
-        products: [
+        products: options.products ?? [
           {
             name: 'Consulta veterinaria',
             description: 'Evaluación general',
@@ -159,6 +159,31 @@ async function boot(page, options = {}) {
 }
 
 test.describe('React business import migration', () => {
+
+  test('metadata-only PDF can be reviewed and approved with no catalog services', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [],
+      businessFacts: { publicPhone: null, publicEmail: null, websiteUrl: null,
+        addressLine: null, commune: "Providencia", city: "Santiago",
+        region: null, countryCode: null, publicDescription: null,
+        sourceName: "centro.pdf", hours: [] }
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'centro.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%test')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('business-import-facts')).toBeVisible();
+    await expect(page.getByText('No hay productos o servicios listos para aplicar.')).toBeVisible();
+    expect(calls.savedProfile()).toBeNull();
+    expect(calls.applyCalls()).toBe(0);
+    await page.getByRole('button', { name: 'Confirmar y guardar perfil' }).click();
+    await expect(page.getByRole('button', { name: 'Perfil guardado' })).toBeVisible();
+    expect(calls.savedProfile().commune).toBe('Providencia');
+    expect(calls.applyCalls()).toBe(0);
+  });
+
+
 
   test('Aurora document fields are suggestions until independently confirmed, preserving unrelated profile facts', async ({ page }) => {
     const calls = await boot(page, {

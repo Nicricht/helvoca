@@ -713,4 +713,29 @@ class BusinessImportPreviewServiceTest {
         assertTrue(result.warnings().stream().anyMatch(w -> w.contains("ilegible")));
     }
 
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void metadataOnlyPdfStillProducesActionablePreviewWithoutInventedCatalogue() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output_text", """
+                    {"products":[],"businessFacts":{"commune":"Providencia","city":"Santiago",
+                    "hours":[{"dayOfWeek":1,"openTime":"08:00","closeTime":"20:00"}]}}
+                    """).toString());
+        when(http.send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
+        var preview = meteredPreview(http, ledger).preview("Aurora Sur", List.of(meteredImage()));
+        assertTrue(preview.aiUsed());
+        assertTrue(preview.products().isEmpty());
+        assertEquals("Providencia", preview.businessFacts().commune());
+        assertEquals(1, preview.businessFacts().hours().size());
+        assertFalse(preview.warnings().stream().anyMatch(w -> w.contains("No encontré productos")));
+        verify(ledger).started(any(UUID.class), eq("gpt-4.1-mini"));
+        verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
+    }
+
 }
