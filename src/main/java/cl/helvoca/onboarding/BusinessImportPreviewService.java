@@ -466,7 +466,7 @@ public class BusinessImportPreviewService {
         String commune = clean(root.optString("commune", null), 120);
         String city = clean(root.optString("city", null), 120);
         String region = clean(root.optString("region", null), 120);
-        String country = clean(root.optString("countryCode", null), 2);
+        String country = clean(root.optString("countryCode", null), 16);
         if (country != null && !country.matches("[A-Za-z]{2}")) country = null;
         String description = clean(root.optString("publicDescription", null), 4000);
 

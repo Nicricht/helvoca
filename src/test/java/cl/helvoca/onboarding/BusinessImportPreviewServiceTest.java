@@ -662,4 +662,55 @@ class BusinessImportPreviewServiceTest {
         assertEquals("18:00", facts.hours().getFirst().closeTime());
     }
 
+
+    @Test
+    void standaloneBusinessFactsAreNotLostAndEmptyHoursRequireNoInventedTime() {
+        String[][] facts = {
+            {"publicPhone","+56912345678"},
+            {"publicEmail","contacto@ejemplo.cl"},
+            {"websiteUrl","http://ejemplo.cl"},
+            {"addressLine","Calle de prueba 1"},
+            {"commune","Providencia"},
+            {"city","Santiago"},
+            {"region","Metropolitana"},
+            {"countryCode","CL"},
+            {"publicDescription","Centro de atención"}
+        };
+        for (String[] field : facts) {
+            var json = new JSONObject().put("businessFacts",
+                    new JSONObject().put(field[0],field[1])).toString();
+            var result = BusinessImportPreviewService.parseSemanticResult(json, "fuente.pdf");
+            assertNotNull(result.businessFacts(), "Field was lost: " + field[0]);
+            assertTrue(result.businessFacts().hours().isEmpty());
+            assertEquals("fuente.pdf", result.businessFacts().sourceName());
+        }
+    }
+
+    @Test
+    void limitsHoursToTwentyAndRejectsIncompleteOrOvernightIntervals() {
+        var hour = new JSONObject().put("dayOfWeek",1)
+                .put("openTime","08:00").put("closeTime","20:00");
+        var hours = new org.json.JSONArray();
+        for (int i=0;i<22;i++) hours.put(hour);
+        var proposal = new JSONObject().put("businessFacts",
+                new JSONObject().put("hours", hours));
+        var parsed = BusinessImportPreviewService.parseSemanticResult(proposal.toString(), "horarios.pdf");
+        assertNotNull(parsed.businessFacts());
+        assertEquals(20, parsed.businessFacts().hours().size());
+
+        var invalid = new org.json.JSONArray()
+                .put(new JSONObject().put("dayOfWeek", 8).put("openTime","08:00").put("closeTime","20:00"))
+                .put(new JSONObject().put("dayOfWeek", 1).put("openTime","08:00"))
+                .put(new JSONObject().put("dayOfWeek", 2).put("closeTime","20:00"))
+                .put(new JSONObject().put("dayOfWeek", 4).put("openTime","20:00").put("closeTime","08:00"))
+                .put(new JSONObject().put("dayOfWeek", 6).put("openTime","08:xx").put("closeTime","13:00"));
+        var result = BusinessImportPreviewService.parseSemanticResult(
+                new JSONObject().put("businessFacts",new JSONObject().put("hours",invalid)).toString(),
+                "horarios.pdf");
+        assertNull(result.businessFacts());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("cierre")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("ilegible")));
+    }
+
 }
