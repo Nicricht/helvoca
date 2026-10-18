@@ -2,6 +2,14 @@
 
 This gate is intentionally isolated from Railway production.
 
+## Newer C5 checkpoint: authentic TEST persistence versus organic provider delivery (2026-10-18)
+
+**The original mock bridge described later in this runbook is historical, not the current TEST persistence state.** A genuine provider TEST invoice with nested payment.status=approved/accredited was reconciled exactly once via an explicitly named **OPERATOR_GENERATED_TEST_RECOVERY** HMAC request to the deployed Helvoca **Java controller and real Railway TEST PostgreSQL18**. Business/subscription became **ACTIVE**, BASIC/EMPRENDE CLP 24,990, **four entitlements PASS** ([authentic PostgreSQL recovery act](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6240000990)). The signed simulated payment topic returned HTTP 200, **transport-only**, and did not trigger SaaS reconciliation ([simulation act](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6233839072)).
+
+The bounded SaaS invoice recovery worker, rotation past 20 tenants, locks, idempotency and rejected→PAST_DUE / approved→ACTIVE logic already exist and are QA-certified **offline**. The previously deployed TEST worker remained **OFF**; a newer TEST commit/flag patch was still **STAGED**. The candidate **1671d9c** had [14/14 workflows SUCCESS](https://github.com/Nicricht/helvoca/actions/runs/39108350614), with 2,349 Java, 620 Playwright, and JaCoCo **100% differential** 1,308/1,308 lines, 1,003/1,003 branches, 315/315 methods (**not global**). This is historical exact-HEAD evidence; after this documentary commit verify the new SHA's own CI.
+
+**Only the different provider boundary remains unverified:** an **organic signed subscription_authorized_payment** from Mercado Pago itself arriving at Helvoca Java and reconciling real isolated PostgreSQL18, with authentic provider subscription notification/replay where applicable. The [official delivery/registration ambiguity and support draft](https://github.com/Nicricht/helvoca/pull/846#issuecomment-6241952771) are already documented; no repeated checkout, invoice, manual HMAC recovery or new worker is justified. This provider gate does not prevent a separate scoped **web/simulator-assisted pilot** that excludes automated billing. No LIVE charge, TEST change or merge is authorized by this note.
+
 ## What it proves
 
 The manual GitHub Actions workflow:
@@ -47,7 +55,7 @@ The historical branch `cert/saas-billing-sandbox-provider-run-1` already execute
 
 On October 14, 2026, [workflow #38563207070](https://github.com/Nicricht/helvoca/actions/runs/38563207070) tried a **new** `/preapproval` with the undocumented/unverified example email `test@testuser.com` and received HTTP 400. Without provider error details we cannot assert that the email was the sole cause; the fix in PR #839 adds a safe, categorical 400 diagnostic and preflight rejection of example buyer input. That failed attempt **does not revoke the earlier successful TEST creation and approved payment evidence**.
 
-**Current gap (C5 NO-GO):** a provider-authenticated real `subscription_authorized_payment` reaching the **actual billing backend** with real PostgreSQL persistence, tenant binding, idempotent replay, subscription activation/entitlement and rejection/recovery, verified under a permitted isolated deployment. The Render C5 simulator-only receiver is **not** the billing backend: its HTTP 200 does not write invoices or entitlements. Production charge, release and automated SaaS billing are not approved.
+**Historical gap text, superseded by the newer checkpoint above:** the Render C5 simulator-only receiver still cannot prove real billing persistence, but TEST Helvoca Java+PostgreSQL18 **was later verified** with operator-generated signed recovery and actual ACTIVE entitlement state. **Organic provider-sent subscription webhook remains NOT_VERIFIED**; production charge, release and automated SaaS LIVE billing remain unauthorized.
 
 For V1, record the current gate and required approvals in Issue #823 before any new external call. C1/C2 production safeguards stay in force.
 
@@ -102,10 +110,7 @@ invoice/status markers. Errors are contained per candidate/invoice; no entitleme
 change is attempted for another business. Synthetic invoice IDs were used for the new
 tests; the already-recovered TEST invoice was not queried or replayed.
 
-The unit suite is green locally. The PostgreSQL/Testcontainers suite is part of the
-required exact-HEAD CI gate; this workstation currently cannot start it because no
-Docker environment is available. The implementation must not be called C5-complete
-until that gate passes.
+**Historical local-only note superseded:** offline worker QA, PostgreSQL/Testcontainers, backend, Playwright and Fast/Full Gates were subsequently certified on exact candidate HEAD 1671d9c ([14/14 workflows PASS](https://github.com/Nicricht/helvoca/actions/runs/39108350614)). This does **not** certify organic provider notification or authorize worker enablement. Do not rebuild/retest successful invoice recovery merely because an older paragraph mentioned incomplete CI.
 
 ## 2026-10-17: official organic notification path and remaining blocker
 
