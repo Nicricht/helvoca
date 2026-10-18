@@ -4,9 +4,9 @@
 **Technical V1 baseline:** `fd8b718d2861e44e200a6401103673e533bda3e9`  
 **Objective:** obtain the first real **PILOT** using the already-certified V1 without reopening product development.
 
-## Current commercial checkpoint (2026-10-18; no external messages sent here)
+## Current commercial checkpoint (2026-10-18; Gmail SENT verified, no new outbound action in this repository update)
 
-The existing tracker has **26 prospects: 4 CONTACTED, 22 NEW, 0 QUALIFIED/DEMO/PILOT/CUSTOMER**. All four Wave 1 contacts already received an initial email (2026-09-28) and follow-up (2026-10-01), and each has one additional **unsent DRAFT** in the original thread; no incoming reply was observed in the read original threads ([commercial evidence](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246532054)). **Do not repeat an already sent contact or create/send duplicate follow-ups.** In Wave 2, existing drafts for GO Providencia and CVI Los Leones were updated in place, with corrected /app/sales CTA; ConsigueTuCasa has an older draft. All remain unsent ([CTA evidence](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246614478)). A draft does not make a prospect CONTACTED; sending needs specific authorization.
+The existing tracker has **26 prospects: 6 CONTACTED, 20 NEW, 0 QUALIFIED/DEMO/PILOT/CUSTOMER**. All four Wave 1 contacts already received an initial email (2026-09-28) and follow-up (2026-10-01), and each has one additional **unsent DRAFT** in the original thread; no incoming reply was observed in the read original threads ([commercial evidence](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246532054)). **Do not repeat an already sent contact or create/send duplicate follow-ups.** In Wave 2, the existing personalized drafts for **GO Providencia** and **CVI Los Leones** were later **SENT on 2026-10-18**, independently verified in Gmail; the earlier [draft-only checkpoint](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246614478) is superseded **only for those two messages**. There is no verified reply, qualified need, demo or pilot. ConsigueTuCasa has a separate older unsent draft. Do not send GO/CVI again, and do not treat `SENT` as proof of delivery or interest.
 
 **Narrow sellable offer:** web/simulator-assisted FAQ/BOOKING pilot with voice, WhatsApp, LIVE merchant payment and automated SaaS collection explicitly excluded until approved for the tenant. Presenting this existing offer is **not** proof of a qualified lead, live customer, signed pilot or receipt of money; consult the master Issue #823 and PR #846 for subsequent evidence.
 
@@ -67,12 +67,11 @@ Prioritize simple appointment businesses whose proposed scope maps directly to t
 1. Guapisima Spa
 2. Clínica Dental Los Leones Providencia
 3. Clínica Dental Carmona y Asociados
-4. GO Providencia
-5. Clinica Dent Smile
-6. Peluqueria Ricciarelli
-7. Barbería Eleven
+4. Clinica Dent Smile
+5. Peluqueria Ricciarelli
+6. Barbería Eleven
 
-The purpose of Wave 2 is contact + qualification, not mass outreach.
+GO Providencia and CVI Los Leones have already moved to CONTACTED because their specific emails were sent on 2026-10-18. This list only contains remaining NEW examples; sending further messages needs separate authorization. The purpose of Wave 2 is contact + qualification, not mass outreach.
 
 Avoid leading with WhatsApp, telephony or integrations. Lead with the business outcome and show the web/simulator flow first.
 
@@ -154,7 +153,7 @@ The tenant gets GO only after:
 
 The critical path is now human/commercial:
 
-1. reuse prior Wave 1 threads and existing Wave 2 drafts, requesting specific approval before **any** further outreach;
+1. monitor authentic replies from all six already CONTACTED prospects, including GO Providencia and CVI Los Leones; reuse only remaining unsent drafts for NEW prospects after specific outreach approval;
 2. record only genuine replies and progress the tracker only after demonstrated qualification;
 3. show the existing safe web demo once a prospect agrees;
 4. complete onboarding only after a real acceptance;
