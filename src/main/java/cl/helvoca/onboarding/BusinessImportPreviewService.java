@@ -695,7 +695,12 @@ public class BusinessImportPreviewService {
             List<String> warnings,
             boolean aiUsed,
             BusinessFactProposal businessFacts
-    ) {}
+    ) {
+        public Preview(String businessName, List<ProductProposal> products,
+                       List<SourcePreview> sources, List<String> warnings, boolean aiUsed) {
+            this(businessName, products, sources, warnings, aiUsed, null);
+        }
+    }
 
     public record BusinessHourFact(int dayOfWeek, String openTime, String closeTime) {}
 
