@@ -49,7 +49,7 @@ This lets Helvoca close a pilot without waiting for provider certification that 
 
 ## Wave 1 — initial contact and follow-up already sent; no automatic repeat
 
-These four rows already have real contact recorded and therefore outrank every NEW lead.
+These four rows already received initial contact and follow-up; prioritize authentic replies, not automatic additional outreach, before considering new leads.
 
 | Priority | Prospect | Current state | Demo angle | Next factual transition |
 | ---: | --- | --- | --- | --- |
