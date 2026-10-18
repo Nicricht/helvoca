@@ -597,4 +597,69 @@ class BusinessImportPreviewServiceTest {
         verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
     }
 
+    @Test
+    void semanticAuroraFactsAreReviewedWithoutInventingPhoneSaturdayStartOrDurations() {
+        String json = """
+            {"products":[{"name":"Dermatología","kind":"SERVICE","durationMinutes":null,"price":null}],
+            "businessFacts":{"commune":"Providencia","city":"Santiago","publicPhone":null,
+            "hours":[{"dayOfWeek":1,"openTime":"08:00","closeTime":"20:00"},
+                     {"dayOfWeek":6,"openTime":null,"closeTime":"14:00"}],"sourceName":"aurora.pdf"}}
+            """;
+        var proposal = BusinessImportPreviewService.parseSemanticResult(json, "aurora.pdf");
+        assertEquals("Dermatología", proposal.products().getFirst().name());
+        assertNull(proposal.products().getFirst().durationMinutes());
+        assertEquals("Providencia", proposal.businessFacts().commune());
+        assertEquals("Santiago", proposal.businessFacts().city());
+        assertNull(proposal.businessFacts().publicPhone());
+        assertEquals(1, proposal.businessFacts().hours().size());
+        assertEquals(1, proposal.businessFacts().hours().getFirst().dayOfWeek());
+        assertTrue(proposal.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+    }
+
+    @Test
+    void businessFactsRejectMalformedContactsAndHoursAndNeverFabricateFallbackData() {
+        String bad = """
+            {"products":[],"businessFacts":{
+            "publicPhone":"09 123","publicEmail":"invalid email","websiteUrl":"javascript:alert(1)",
+            "countryCode":"XYZ",
+            "hours":[null,{"dayOfWeek":0,"openTime":"08:00","closeTime":"09:00"},
+                     {"dayOfWeek":2,"openTime":"18:00","closeTime":"17:00"},
+                     {"dayOfWeek":3,"openTime":"abc","closeTime":"19:00"}]}}
+            """;
+        var result = BusinessImportPreviewService.parseSemanticResult(bad, "ad.pdf");
+        assertNull(result.businessFacts());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("E.164")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("correo")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("web")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("cierre")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("ilegible")));
+
+        var none = BusinessImportPreviewService.parseSemanticResult("{\"products\":[]}", "ad.pdf");
+        assertNull(none.businessFacts());
+    }
+
+    @Test
+    void completeBusinessFactsKeepValidFieldsAndIsoWeekIntervals() {
+        String good = """
+           {"businessFacts":{
+            "publicPhone":"+56912345678","publicEmail":"info@aurora.example",
+            "websiteUrl":"https://aurora.example","addressLine":"Avenida de prueba 123",
+            "commune":"Providencia","city":"Santiago","region":"Metropolitana",
+            "countryCode":"cl","publicDescription":"Centro médico ambulatorio",
+            "hours":[{"dayOfWeek":5,"openTime":"09:00","closeTime":"18:00"}]}}
+           """;
+        var result = BusinessImportPreviewService.parseSemanticResult(good, "foto.png");
+        var facts = result.businessFacts();
+        assertEquals("+56912345678", facts.publicPhone());
+        assertEquals("info@aurora.example", facts.publicEmail());
+        assertEquals("https://aurora.example", facts.websiteUrl());
+        assertEquals("Avenida de prueba 123", facts.addressLine());
+        assertEquals("Metropolitana", facts.region());
+        assertEquals("CL", facts.countryCode());
+        assertEquals("Centro médico ambulatorio", facts.publicDescription());
+        assertEquals("foto.png", facts.sourceName());
+        assertEquals("18:00", facts.hours().getFirst().closeTime());
+    }
+
 }

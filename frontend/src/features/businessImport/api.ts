@@ -25,12 +25,33 @@ export interface BusinessImportSource {
   warnings?: string[];
 }
 
+export interface BusinessHourFact {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+}
+
+export interface BusinessImportBusinessFacts {
+  publicPhone: string | null;
+  publicEmail: string | null;
+  websiteUrl: string | null;
+  addressLine: string | null;
+  commune: string | null;
+  city: string | null;
+  region: string | null;
+  countryCode: string | null;
+  publicDescription: string | null;
+  hours: BusinessHourFact[];
+  sourceName: string | null;
+}
+
 export interface BusinessImportPreview {
   businessName: string;
   products: BusinessImportProposal[];
   sources: BusinessImportSource[];
   warnings: string[];
   aiUsed: boolean;
+  businessFacts?: BusinessImportBusinessFacts | null;
 }
 
 export interface BusinessImportApplyItem {
