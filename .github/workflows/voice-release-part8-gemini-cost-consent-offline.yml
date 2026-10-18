@@ -1,0 +1,125 @@
+name: Helvoca Part 8 Gemini Identity Cost Consent Offline NO-GO
+
+on:
+  push:
+    branches:
+      - 'test/voice-release-part8-gemini-cost-consent-offline-*'
+  pull_request:
+    branches:
+      - 'test/voice-release-part7-predeployment-no-go-*'
+
+permissions:
+  contents: read
+
+env:
+  HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+  HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+  HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+  HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+  TWILIO_PROVISIONING_ENABLED: 'false'
+  TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+  TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+  GEMINI_LIVE_ENABLED: 'false'
+  GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+  OPENAI_LIVE_ENABLED: 'false'
+  HELVOCA_OUTBOUND_PROVIDER: NONE
+  APP_JOBS_ENABLED: 'false'
+
+jobs:
+  gemini-financial-consent-stop-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Adversarial no-call, cost and consent checks
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part8_model_cost_consent_gate.py' -v
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part8_workflow_contract.py' -v
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-blocked
+          python3 scripts/ci/voice_part8_model_cost_consent_gate.py --simulate-review
+      - name: Preserve safe Part 7 decision and immutable database contract
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part7_predeployment_gate.py' -v
+          python3 scripts/ci/voice_part7_predeployment_gate.py --demo-blocked
+          python3 scripts/ci/voice_part2_migration_contract.py
+
+  gemini-twilio-audio-redaction-unit:
+    needs: [gemini-financial-consent-stop-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Test Gemini identity, local readiness, audio codec, barge-in and callback safety
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=GeminiLiveModelPolicyTest,GeminiLiveRuntimeReadinessTest,GeminiLiveModelBaselineTest,GeminiLivePropertiesLatencyTest,GeminiLiveVoiceSessionTest,GeminiLiveAudioInterruptionContractTest,GeminiLiveLowLatencySetupTest,GeminiTwilioAudioFramerTest,PcmuAudioCodecTest,LocalBargeInDetectorTest,TwilioMediaStreamStartupRecoveryPhase7Test,TwilioVoiceCallbackRedactionPhase7Test,TwilioLiveCallAdmissionReadinessTest,CallCommercialPropertiesTest
+          test
+
+  pg18-carrier-tenant-rls-regression:
+    needs: [gemini-financial-consent-stop-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Test carrier tenant bindings and administration on disposable PostgreSQL 18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dhelvoca.test.postgres.image=postgres:18-alpine
+          -Dtest=TwilioExistingEnrollmentAdminPostgresIntegrationTest,TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest
+          test
+
+  react-spring-pg18-local-integration:
+    needs: [gemini-financial-consent-stop-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: helvoca
+          POSTGRES_USER: helvoca
+          POSTGRES_PASSWORD: helvoca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helvoca -d helvoca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+      - name: Browser and backend smoke only against isolated synthetic PG18
+        env:
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/helvoca
+          DB_USERNAME: helvoca
+          DB_PASSWORD: helvoca
+          SYSTEM_E2E_BASE_URL: http://127.0.0.1:8080
+        run: bash scripts/ci/system-e2e.sh

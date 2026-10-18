@@ -46,6 +46,25 @@ const plans = [
 ];
 
 test.describe('React public pricing migration', () => {
+  test('each fixed-price CTA preserves its catalog plan without issuing a checkout, while Enterprise remains quote-only', async ({ page }) => {
+    const writes = [];
+    await page.route('**/api/v1/**', async route => {
+      if (route.request().method() !== 'GET') writes.push(route.request().url());
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(plans) });
+    });
+    await page.goto('/app/pricing');
+    const start = page.getByRole('link', { name: /^Empezar/ });
+    await expect(start).toHaveCount(3);
+    await expect(start.nth(0)).toHaveAttribute('href', '/app/auth?plan=EMPRENDE');
+    await expect(start.nth(1)).toHaveAttribute('href', '/app/auth?plan=NEGOCIO');
+    await expect(start.nth(2)).toHaveAttribute('href', '/app/auth?plan=PRO');
+    await expect(page.getByRole('link', { name: /^Cotizar/ })).toHaveAttribute('href', '/app/sales');
+    expect(writes).toEqual([]);
+    await start.nth(1).click();
+    await expect(page).toHaveURL(/\/app\/auth\/?\?plan=NEGOCIO$/);
+    expect(writes).toEqual([]);
+  });
+
   test('canonical pricing route is public, API-backed and read-only', async ({ page }) => {
     const writes = [];
     let pricingReads = 0;

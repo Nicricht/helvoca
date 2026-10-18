@@ -26,6 +26,8 @@ async function boot(page, options = {}) {
   let previewCalls = 0;
   let applyCalls = 0;
   let applyPayload = null;
+  let savedProfile = null;
+  let savedHours = null;
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request();
@@ -59,11 +61,26 @@ async function boot(page, options = {}) {
       }));
     }
 
+    if (pathname === '/api/v1/business/profile' && request.method() === 'GET') {
+      return route.fulfill(json(options.currentProfile || {}));
+    }
+    if (pathname === '/api/v1/business/profile' && request.method() === 'PUT') {
+      savedProfile = request.postDataJSON();
+      return route.fulfill(json(savedProfile));
+    }
+    if (pathname === '/api/v1/business/hours' && request.method() === 'GET') {
+      return route.fulfill(json(options.existingHours || []));
+    }
+    if (pathname === '/api/v1/business/hours' && request.method() === 'PUT') {
+      savedHours = request.postDataJSON();
+      return route.fulfill(json(savedHours.hours));
+    }
+
     if (pathname === '/api/v1/onboarding/import/preview' && request.method() === 'POST') {
       previewCalls += 1;
       return route.fulfill(json({
         businessName: 'Veterinaria Norte',
-        products: [
+        products: options.products ?? [
           {
             name: 'Consulta veterinaria',
             description: 'Evaluación general',
@@ -100,7 +117,8 @@ async function boot(page, options = {}) {
           warnings: []
         }],
         warnings: [],
-        aiUsed: false
+        aiUsed: false,
+        businessFacts: options.businessFacts || null
       }));
     }
 
@@ -134,11 +152,93 @@ async function boot(page, options = {}) {
   return {
     previewCalls: () => previewCalls,
     applyCalls: () => applyCalls,
-    applyPayload: () => applyPayload
+    applyPayload: () => applyPayload,
+    savedProfile: () => savedProfile,
+    savedHours: () => savedHours
   };
 }
 
 test.describe('React business import migration', () => {
+
+  test('metadata-only PDF can be reviewed and approved with no catalog services', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [],
+      businessFacts: { publicPhone: null, publicEmail: null, websiteUrl: null,
+        addressLine: null, commune: "Providencia", city: "Santiago",
+        region: null, countryCode: null, publicDescription: null,
+        sourceName: "centro.pdf", hours: [] }
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'centro.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%test')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('business-import-facts')).toBeVisible();
+    await expect(page.getByText('No hay productos o servicios listos para aplicar.')).toBeVisible();
+    expect(calls.savedProfile()).toBeNull();
+    expect(calls.applyCalls()).toBe(0);
+    await page.getByRole('button', { name: 'Confirmar y guardar perfil' }).click();
+    await expect(page.getByRole('button', { name: 'Perfil guardado' })).toBeVisible();
+    expect(calls.savedProfile().commune).toBe('Providencia');
+    expect(calls.applyCalls()).toBe(0);
+  });
+
+
+
+  test('Aurora document fields are suggestions until independently confirmed, preserving unrelated profile facts', async ({ page }) => {
+    const calls = await boot(page, {
+      currentProfile: { presetKey: "medical", publicEmail: "actual@example.test", defaultCurrency: "CLP",
+        sellsServices: true, usesReservations: true },
+      businessFacts: {
+        publicPhone: null, publicEmail: null, websiteUrl: null, addressLine: null,
+        commune: "Providencia", city: "Santiago", region: null, countryCode: null,
+        publicDescription: "Centro médico ambulatorio", sourceName: "aurora.pdf",
+        hours: [{ dayOfWeek: 1, openTime: "08:00", closeTime: "20:00" }]
+      }
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'aurora.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%test')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('business-import-facts')).toBeVisible();
+    await expect(page.getByLabel('Comuna')).toHaveValue('Providencia');
+    await expect(page.getByLabel('Teléfono público')).toHaveValue('');
+    expect(calls.savedProfile()).toBeNull();
+    expect(calls.savedHours()).toBeNull();
+    await page.getByLabel('Comuna').fill('Providencia Norte');
+    await page.getByRole('button', { name: 'Confirmar y guardar perfil' }).click();
+    await expect(page.getByRole('button', { name: 'Perfil guardado' })).toBeVisible();
+    expect(calls.savedProfile().commune).toBe('Providencia Norte');
+    expect(calls.savedProfile().publicEmail).toBe('actual@example.test');
+    expect(calls.savedProfile().presetKey).toBe('medical');
+    expect(calls.savedProfile().publicPhone).toBeNull();
+    expect(calls.savedProfile().usesReservations).toBe(true);
+    expect(calls.savedHours()).toBeNull();
+    await page.getByRole('button', { name: 'Confirmar y guardar horarios' }).click();
+    await expect(page.getByRole('button', { name: 'Horarios guardados' })).toBeVisible();
+    expect(calls.savedHours().hours).toEqual([{ dayOfWeek: 1, openTime: '08:00', closeTime: '20:00' }]);
+    expect(calls.applyCalls()).toBe(0);
+  });
+
+  test('file-import schedule never overwrites an existing weekly calendar', async ({ page }) => {
+    const calls = await boot(page, {
+      existingHours: [{ dayOfWeek: 2, openTime: '10:00', closeTime: '19:00' }],
+      businessFacts: { publicPhone: null, publicEmail: null, websiteUrl: null, addressLine: null,
+        commune: 'Providencia', city: null, region: null, countryCode: null, publicDescription: null,
+        sourceName: 'aurora.pdf', hours: [{ dayOfWeek: 1, openTime: '08:00', closeTime: '20:00' }] }
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'aurora.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%test')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByRole('button', { name: 'Confirmar y guardar horarios' }).click();
+    await expect(page.getByText(/Ya existen horarios configurados/)).toBeVisible();
+    expect(calls.savedHours()).toBeNull();
+  });
+
+
   test('admin previews, reviews and explicitly applies without inventing service inventory', async ({ page }) => {
     const calls = await boot(page);
 

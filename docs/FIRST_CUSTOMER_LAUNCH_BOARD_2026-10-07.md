@@ -4,6 +4,12 @@
 **Technical V1 baseline:** `fd8b718d2861e44e200a6401103673e533bda3e9`  
 **Objective:** obtain the first real **PILOT** using the already-certified V1 without reopening product development.
 
+## Current commercial checkpoint (2026-10-18; Gmail SENT verified, no new outbound action in this repository update)
+
+The existing tracker has **26 prospects: 6 CONTACTED, 20 NEW, 0 QUALIFIED/DEMO/PILOT/CUSTOMER**. All four Wave 1 contacts already received an initial email (2026-09-28) and follow-up (2026-10-01), and each has one additional **unsent DRAFT** in the original thread; no incoming reply was observed in the read original threads ([commercial evidence](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246532054)). **Do not repeat an already sent contact or create/send duplicate follow-ups.** In Wave 2, the existing personalized drafts for **GO Providencia** and **CVI Los Leones** were later **SENT on 2026-10-18**, independently verified in Gmail; the earlier [draft-only checkpoint](https://github.com/Nicricht/helvoca/issues/823#issuecomment-6246614478) is superseded **only for those two messages**. There is no verified reply, qualified need, demo or pilot. ConsigueTuCasa has a separate older unsent draft. Do not send GO/CVI again, and do not treat `SENT` as proof of delivery or interest.
+
+**Narrow sellable offer:** web/simulator-assisted FAQ/BOOKING pilot with voice, WhatsApp, LIVE merchant payment and automated SaaS collection explicitly excluded until approved for the tenant. Presenting this existing offer is **not** proof of a qualified lead, live customer, signed pilot or receipt of money; consult the master Issue #823 and PR #846 for subsequent evidence.
+
 ## Operating rule
 
 The next milestone is **not another feature**.
@@ -41,9 +47,9 @@ Keep these outside the first commitment unless the customer explicitly needs the
 
 This lets Helvoca close a pilot without waiting for provider certification that the customer may not even need on day one.
 
-## Wave 1 — follow up existing CONTACTED prospects first
+## Wave 1 — initial contact and follow-up already sent; no automatic repeat
 
-These four rows already have real contact recorded and therefore outrank every NEW lead.
+These four rows already received initial contact and follow-up; prioritize authentic replies, not automatic additional outreach, before considering new leads.
 
 | Priority | Prospect | Current state | Demo angle | Next factual transition |
 | ---: | --- | --- | --- | --- |
@@ -52,7 +58,7 @@ These four rows already have real contact recorded and therefore outrank every N
 | 3 | Albert Moreno Style | CONTACTED | BOOKING + FAQ around schedule coordination | response -> qualify -> demo |
 | 4 | Eterna Juventud | CONTACTED | treatment FAQ + appointment flow | response -> qualify -> demo |
 
-All four follow-up dates in the tracker are already past. Do **not** change their status merely because the follow-up is overdue.
+**Already completed:** initial and follow-up emails for these four prospects. Third drafts remain unsent. Do **not** send them, recreate the previous follow-up or change CONTACTED merely because the tracker date is overdue. The next transition requires a real response or a separately authorized close.
 
 ## Wave 2 — easiest NEW fits if Wave 1 does not answer
 
@@ -61,12 +67,11 @@ Prioritize simple appointment businesses whose proposed scope maps directly to t
 1. Guapisima Spa
 2. Clínica Dental Los Leones Providencia
 3. Clínica Dental Carmona y Asociados
-4. GO Providencia
-5. Clinica Dent Smile
-6. Peluqueria Ricciarelli
-7. Barbería Eleven
+4. Clinica Dent Smile
+5. Peluqueria Ricciarelli
+6. Barbería Eleven
 
-The purpose of Wave 2 is contact + qualification, not mass outreach.
+GO Providencia and CVI Los Leones have already moved to CONTACTED because their specific emails were sent on 2026-10-18. This list only contains remaining NEW examples; sending further messages needs separate authorization. The purpose of Wave 2 is contact + qualification, not mass outreach.
 
 Avoid leading with WhatsApp, telephony or integrations. Lead with the business outcome and show the web/simulator flow first.
 
@@ -148,12 +153,12 @@ The tenant gets GO only after:
 
 The critical path is now human/commercial:
 
-1. follow up the four CONTACTED prospects;
-2. record only real replies;
-3. run one safe web demo for the first qualified prospect;
-4. complete onboarding when one accepts;
-5. certify only the channels included in that exact pilot;
-6. obtain Launch Cage GO;
-7. start measuring the agreed success metric.
+1. monitor authentic replies from all six already CONTACTED prospects, including GO Providencia and CVI Los Leones; reuse only remaining unsent drafts for NEW prospects after specific outreach approval;
+2. record only genuine replies and progress the tracker only after demonstrated qualification;
+3. show the existing safe web demo once a prospect agrees;
+4. complete onboarding only after a real acceptance;
+5. certify only the channels included in the exact pilot;
+6. obtain authorized Launch Cage GO for that tenant;
+7. start measuring its agreed success metric.
 
 **Do not reopen V1 feature development unless a real qualified/pilot customer exposes a P0/P1 gap in the sold scope.**

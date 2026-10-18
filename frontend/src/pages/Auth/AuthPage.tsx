@@ -49,7 +49,13 @@ function detectedLanguage(): string {
 }
 
 function destinationForRoles(roles?: string[]): string {
-  return Array.isArray(roles) && roles.includes("PLATFORM_ADMIN") ? "/app/platform" : "/app";
+  if (Array.isArray(roles) && roles.includes("PLATFORM_ADMIN")) return "/app/platform";
+  // Public pricing intent is navigation only: never charge or activate from a URL.
+  const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+  if (requestedPlan && /^(EMPRENDE|NEGOCIO|PRO)$/.test(requestedPlan)) {
+    return `/app/plan?plan=${encodeURIComponent(requestedPlan)}`;
+  }
+  return "/app";
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -200,7 +206,7 @@ export function AuthPage() {
         })
       }, false);
       setAccessToken(result.accessToken);
-      window.location.assign("/app");
+      window.location.assign(destinationForRoles(result.user?.roles));
     } catch (error) {
       setMessage(errorMessage(error, "No fue posible crear la empresa."));
       setBusy(false);

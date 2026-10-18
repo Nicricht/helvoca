@@ -163,6 +163,10 @@ export function PlanConsumptionPage() {
   const planName = subscription.planName || subscription.publicPlanCode || subscription.plan || "Plan";
   const status = statusLabels[String(subscription.status ?? "").toUpperCase()] || "Sin estado";
   const billing = model.billingStatus.data;
+  const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+  const selectedPlan = model.canManageBilling && requestedPlan
+    ? model.publicPlans.data?.find(plan => plan.code === requestedPlan && !plan.customPricing)
+    : undefined;
   const billingText = model.canManageBilling && model.billingStatus.isError
     ? "No pudimos cargar el estado de facturación."
     : billing?.awaitingProviderVerification && billing.pendingPlanName
@@ -321,6 +325,11 @@ export function PlanConsumptionPage() {
                 <span className={styles.cardEyebrow}>FACTURACIÓN SEGURA</span>
                 <h2 id="managePlanTitle" className={styles.sectionHeading}>Gestionar plan</h2>
                 <p>El cambio solo se hace efectivo después de que el backend verifica un cobro aprobado.</p>
+                {selectedPlan && (
+                  <p role="status" data-testid="selected-plan-notice">
+                    Elegiste {selectedPlan.name}. Revisa el precio y confirma la compra manualmente; no hay cobro ni cambio de plan automático.
+                  </p>
+                )}
               </div>
               <ShieldCheck size={24} aria-hidden="true" />
             </div>
@@ -379,7 +388,8 @@ export function PlanConsumptionPage() {
                       const isCurrent = plan.code === billing.currentPlanCode;
                       const price = formatClp(plan.monthlyPriceClp);
                       return (
-                        <article className={styles.planChoice} key={plan.code}>
+                        <article className={styles.planChoice} key={plan.code}
+                          data-selected-plan={selectedPlan?.code === plan.code ? "true" : undefined}>
                           <div>
                             <div className={styles.choiceTitle}>
                               <strong>{plan.name}</strong>

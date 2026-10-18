@@ -146,6 +146,24 @@ async function bootAuthenticated(page, options = {}) {
 }
 
 test.describe('React Plan y consumo pilot', () => {
+  test('a public plan intent highlights the correct choice but does not issue an automatic charge', async ({ page }) => {
+    const calls = await bootAuthenticated(page, {
+      billingStatus: { billingEnabled: true, checkoutConfigured: true }
+    });
+    await page.goto('/app/plan?plan=NEGOCIO');
+    await expect(page.getByTestId('selected-plan-notice')).toContainText('Elegiste Negocio');
+    await expect(page.getByTestId('selected-plan-notice')).toContainText('no hay cobro');
+    await expect(page.locator('[data-selected-plan="true"]')).toContainText('Negocio');
+    expect(calls.checkoutCalls()).toBe(0);
+
+    await page.goto('/app/plan?plan=ENTERPRISE');
+    await expect(page.getByTestId('selected-plan-notice')).toHaveCount(0);
+    expect(calls.checkoutCalls()).toBe(0);
+    await page.goto('/app/plan?plan=not-a-plan');
+    await expect(page.getByTestId('selected-plan-notice')).toHaveCount(0);
+    expect(calls.checkoutCalls()).toBe(0);
+  });
+
   test('renders the simplified real-data plan experience', async ({ page }) => {
     await bootAuthenticated(page);
     await page.goto('/app/index.html');

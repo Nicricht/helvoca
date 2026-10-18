@@ -597,4 +597,145 @@ class BusinessImportPreviewServiceTest {
         verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
     }
 
+    @Test
+    void semanticAuroraFactsAreReviewedWithoutInventingPhoneSaturdayStartOrDurations() {
+        String json = """
+            {"products":[{"name":"Dermatología","kind":"SERVICE","durationMinutes":null,"price":null}],
+            "businessFacts":{"commune":"Providencia","city":"Santiago","publicPhone":null,
+            "hours":[{"dayOfWeek":1,"openTime":"08:00","closeTime":"20:00"},
+                     {"dayOfWeek":6,"openTime":null,"closeTime":"14:00"}],"sourceName":"aurora.pdf"}}
+            """;
+        var proposal = BusinessImportPreviewService.parseSemanticResult(json, "aurora.pdf");
+        assertEquals("Dermatología", proposal.products().getFirst().name());
+        assertNull(proposal.products().getFirst().durationMinutes());
+        assertEquals("Providencia", proposal.businessFacts().commune());
+        assertEquals("Santiago", proposal.businessFacts().city());
+        assertNull(proposal.businessFacts().publicPhone());
+        assertEquals(1, proposal.businessFacts().hours().size());
+        assertEquals(1, proposal.businessFacts().hours().getFirst().dayOfWeek());
+        assertTrue(proposal.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+    }
+
+    @Test
+    void businessFactsRejectMalformedContactsAndHoursAndNeverFabricateFallbackData() {
+        String bad = """
+            {"products":[],"businessFacts":{
+            "publicPhone":"09 123","publicEmail":"invalid email","websiteUrl":"javascript:alert(1)",
+            "countryCode":"XYZ",
+            "hours":[null,{"dayOfWeek":0,"openTime":"08:00","closeTime":"09:00"},
+                     {"dayOfWeek":2,"openTime":"18:00","closeTime":"17:00"},
+                     {"dayOfWeek":3,"openTime":"abc","closeTime":"19:00"}]}}
+            """;
+        var result = BusinessImportPreviewService.parseSemanticResult(bad, "ad.pdf");
+        assertNull(result.businessFacts());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("E.164")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("correo")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("web")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("cierre")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("ilegible")));
+
+        var none = BusinessImportPreviewService.parseSemanticResult("{\"products\":[]}", "ad.pdf");
+        assertNull(none.businessFacts());
+    }
+
+    @Test
+    void completeBusinessFactsKeepValidFieldsAndIsoWeekIntervals() {
+        String good = """
+           {"businessFacts":{
+            "publicPhone":"+56912345678","publicEmail":"info@aurora.example",
+            "websiteUrl":"https://aurora.example","addressLine":"Avenida de prueba 123",
+            "commune":"Providencia","city":"Santiago","region":"Metropolitana",
+            "countryCode":"cl","publicDescription":"Centro médico ambulatorio",
+            "hours":[{"dayOfWeek":5,"openTime":"09:00","closeTime":"18:00"}]}}
+           """;
+        var result = BusinessImportPreviewService.parseSemanticResult(good, "foto.png");
+        var facts = result.businessFacts();
+        assertEquals("+56912345678", facts.publicPhone());
+        assertEquals("info@aurora.example", facts.publicEmail());
+        assertEquals("https://aurora.example", facts.websiteUrl());
+        assertEquals("Avenida de prueba 123", facts.addressLine());
+        assertEquals("Metropolitana", facts.region());
+        assertEquals("CL", facts.countryCode());
+        assertEquals("Centro médico ambulatorio", facts.publicDescription());
+        assertEquals("foto.png", facts.sourceName());
+        assertEquals("18:00", facts.hours().getFirst().closeTime());
+    }
+
+
+    @Test
+    void standaloneBusinessFactsAreNotLostAndEmptyHoursRequireNoInventedTime() {
+        String[][] facts = {
+            {"publicPhone","+56912345678"},
+            {"publicEmail","contacto@ejemplo.cl"},
+            {"websiteUrl","http://ejemplo.cl"},
+            {"addressLine","Calle de prueba 1"},
+            {"commune","Providencia"},
+            {"city","Santiago"},
+            {"region","Metropolitana"},
+            {"countryCode","CL"},
+            {"publicDescription","Centro de atención"}
+        };
+        for (String[] field : facts) {
+            var json = new JSONObject().put("businessFacts",
+                    new JSONObject().put(field[0],field[1])).toString();
+            var result = BusinessImportPreviewService.parseSemanticResult(json, "fuente.pdf");
+            assertNotNull(result.businessFacts(), "Field was lost: " + field[0]);
+            assertTrue(result.businessFacts().hours().isEmpty());
+            assertEquals("fuente.pdf", result.businessFacts().sourceName());
+        }
+    }
+
+    @Test
+    void limitsHoursToTwentyAndRejectsIncompleteOrOvernightIntervals() {
+        var hour = new JSONObject().put("dayOfWeek",1)
+                .put("openTime","08:00").put("closeTime","20:00");
+        var hours = new org.json.JSONArray();
+        for (int i=0;i<22;i++) hours.put(hour);
+        var proposal = new JSONObject().put("businessFacts",
+                new JSONObject().put("hours", hours));
+        var parsed = BusinessImportPreviewService.parseSemanticResult(proposal.toString(), "horarios.pdf");
+        assertNotNull(parsed.businessFacts());
+        assertEquals(20, parsed.businessFacts().hours().size());
+
+        var invalid = new org.json.JSONArray()
+                .put(new JSONObject().put("dayOfWeek", 8).put("openTime","08:00").put("closeTime","20:00"))
+                .put(new JSONObject().put("dayOfWeek", 1).put("openTime","08:00"))
+                .put(new JSONObject().put("dayOfWeek", 2).put("closeTime","20:00"))
+                .put(new JSONObject().put("dayOfWeek", 4).put("openTime","20:00").put("closeTime","08:00"))
+                .put(new JSONObject().put("dayOfWeek", 6).put("openTime","08:xx").put("closeTime","13:00"));
+        var result = BusinessImportPreviewService.parseSemanticResult(
+                new JSONObject().put("businessFacts",new JSONObject().put("hours",invalid)).toString(),
+                "horarios.pdf");
+        assertNull(result.businessFacts());
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("incompleto")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("cierre")));
+        assertTrue(result.warnings().stream().anyMatch(w -> w.contains("ilegible")));
+    }
+
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void metadataOnlyPdfStillProducesActionablePreviewWithoutInventedCatalogue() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        BusinessImportAiUsageLedger ledger = mock(BusinessImportAiUsageLedger.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(new JSONObject()
+                .put("output_text", """
+                    {"products":[],"businessFacts":{"commune":"Providencia","city":"Santiago",
+                    "hours":[{"dayOfWeek":1,"openTime":"08:00","closeTime":"20:00"}]}}
+                    """).toString());
+        when(http.send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any())).thenReturn(response);
+        var preview = meteredPreview(http, ledger).preview("Aurora Sur", List.of(meteredImage()));
+        assertTrue(preview.aiUsed());
+        assertTrue(preview.products().isEmpty());
+        assertEquals("Providencia", preview.businessFacts().commune());
+        assertEquals(1, preview.businessFacts().hours().size());
+        assertFalse(preview.warnings().stream().anyMatch(w -> w.contains("No encontré productos")));
+        verify(ledger).started(any(UUID.class), eq("gpt-4.1-mini"));
+        verify(ledger).received(any(UUID.class), eq("gpt-4.1-mini"), same(response));
+    }
+
 }

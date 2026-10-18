@@ -14,5 +14,6 @@ class LegalPublicAssetsContractTest {
 
         assertTrue(publicAssets.contains("/privacy.html"));
         assertTrue(publicAssets.contains("/terms.html"));
+        assertTrue(publicAssets.contains("/data-deletion.html"));
     }
 }

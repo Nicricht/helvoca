@@ -71,6 +71,27 @@ class PilotGoNoGoServiceTest {
     }
 
     @Test
+    void unmanagedTenantWithPilotSwitchOffNeverReportsUniversalExternalEffectStop() {
+        stubGreenInputs("READY", false, false);
+        for (ControlledPilotExternalEffectGuard.Effect effect
+                : ControlledPilotExternalEffectGuard.Effect.values()) {
+            when(externalEffects.evaluate(businessId, effect)).thenReturn(
+                    decision(true, false, "NOT_PILOT_MANAGED", null, effect));
+        }
+
+        PilotGoNoGoService.View result = service.evaluate();
+
+        assertEquals("NO_GO", result.decision());
+        assertEquals("NOT_ENROLLED", result.trafficMode());
+        assertFalse(result.globalExternalEffectsEnabled());
+        assertTrue(result.externalEffectsArmed());
+        PilotGoNoGoService.Check switchCheck = result.checks().stream()
+                .filter(check -> "GLOBAL_KILL_SWITCH".equals(check.code()))
+                .findFirst().orElseThrow();
+        assertEquals("Switch del piloto apagado: bloquea efectos para negocios inscritos; no detiene otros negocios.", switchCheck.detail());
+    }
+
+    @Test
     void reconciliationAnomalyAndMissingInventoryForceNoGo() {
         stubGreenInputs("READY", false, false);
         when(inventory.list()).thenReturn(List.of());

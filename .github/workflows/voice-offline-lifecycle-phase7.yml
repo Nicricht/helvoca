@@ -1,0 +1,35 @@
+name: Phase 7 Offline Voice Session Failure Recovery
+
+# No carrier requests, Gemini Live sessions, real phone calls or production services.
+on:
+  push:
+    branches:
+      - 'test/voice-offline-lifecycle-phase7-*'
+
+permissions:
+  contents: read
+
+jobs:
+  voice-failure-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TWILIO_PROVISIONING_ENABLED: 'false'
+      HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+      GEMINI_LIVE_ENABLED: 'false'
+      GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+      HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+    steps:
+      - name: Checkout candidate SHA
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Test Twilio offline media lifecycle, session recovery and RLS on PostgreSQL 16
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dtest=TwilioMediaStreamStartupRecoveryPhase7Test,TwilioVoiceCallbackRedactionPhase7Test,TwilioMediaStreamHandlerTest,TwilioMediaStreamEventBindingTest,TwilioVoiceControllerTest,TwilioVoiceTransportSessionTest,TwilioCallBindingGuardTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest,GeminiLiveVoiceSessionTest,GeminiLiveAudioInterruptionContractTest,GeminiLiveToolReplayContractTest
+          test

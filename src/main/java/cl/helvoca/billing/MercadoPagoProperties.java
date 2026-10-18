@@ -11,6 +11,7 @@ public class MercadoPagoProperties {
     private String webhookSecret = "";
     private String backUrl = "";
     private long webhookToleranceSeconds = 300;
+    private boolean invoiceRecoveryEnabled;
 
     public boolean isEnabled() { return envBoolean("MERCADOPAGO_ENABLED", enabled); }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }
@@ -37,8 +38,20 @@ public class MercadoPagoProperties {
         this.webhookToleranceSeconds = webhookToleranceSeconds;
     }
 
+    public boolean isInvoiceRecoveryEnabled() {
+        return envBoolean("HELVOCA_SAAS_BILLING_INVOICE_RECOVERY_ENABLED", invoiceRecoveryEnabled);
+    }
+
+    public void setInvoiceRecoveryEnabled(boolean invoiceRecoveryEnabled) {
+        this.invoiceRecoveryEnabled = invoiceRecoveryEnabled;
+    }
+
+    public int getInvoiceRecoveryPageLimit() {
+        return 20;
+    }
+
     public boolean checkoutConfigured() {
-        return isEnabled() && !getAccessToken().isBlank() && getBackUrl().startsWith("https://");
+        return webhookConfigured() && getBackUrl().startsWith("https://");
     }
 
     public boolean webhookConfigured() {
@@ -54,4 +67,5 @@ public class MercadoPagoProperties {
         String value = System.getenv(name);
         return value == null ? fallback : Boolean.parseBoolean(value);
     }
+
 }

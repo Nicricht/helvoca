@@ -105,3 +105,14 @@ Keep `business-import.html` only as a minimal compatibility redirect.
 10. Settings and Inventory links point directly to the canonical React route.
 11. Direct route build/controller support works for both slash variants.
 12. Normal primary navigation remains unchanged.
+
+
+## Approved-file profile and weekly-hours proposals · 2026-10-18
+
+- New `businessFacts` is a **preview-only** optional payload from the already quota-guarded PDF/image semantic provider. Only directly documented public phone, email, URL, address, city/commune/region, public description and complete ISO-week opening/closing intervals may be suggested. Unknown fields remain null. Existing CSV/XLSX local import and its cost-free catalog behavior remain unchanged.
+- A scanned document never mutates business profile, schedule or catalog until the authenticated `BUSINESS_ADMIN` independently clicks **Confirmar y guardar perfil**, **Confirmar y guardar horarios**, and/or the existing **Importar al negocio**. All are separate controlled writes through existing endpoints. General profile writes first read the current profile, preserve omitted fields and stop on failed read; hours cannot overwrite a previously configured weekly calendar. No phone purchase, schedule by specialist, provider/live connection, medical record or patient data is inferred.
+- Service durations absent from the documents remain **unknown** and must be supplied by the owner before service apply. A phrase such as “sábado hasta las 14:00” never justifies inventing Saturday opening time. The model must treat attachments as untrusted data and never obey embedded instructions. A provider API key alone does not grant permission to spend: quota, provider usage evidence, plan entitlement and global AI import opt-in stay fail-closed by default.
+- Acceptance fixture: Centro Médico Aurora Sur synthetic example in the project conversation: four service names; Santiago/Providencia; weekdays 08:00–20:00; Saturday closing 14:00 with unconfirmed opening; prices, physician schedules, phone and durations unknown. This text is not verified customer identity, real clinic connection or real appointment. Test harnesses must mock provider; live PDF analysis requires a separately approved isolated tenant and spending quota.
+- QA on final commit required: existing importer Java & browser gates + added parse/sanitization and user approval/overwrite regressions, exact SHA Full Gate, no production/real provider operation. Any unverified coverage is BLOCKED and may not be reported as certified.
+
+- A document containing only valid public profile fields or complete opening hours, without any recognizable catalog service, still yields a useful `businessFacts` preview. This is independent of catalog import; it must not save automatically or require inventing an item to proceed. Browser and mocked-provider tests cover that case.

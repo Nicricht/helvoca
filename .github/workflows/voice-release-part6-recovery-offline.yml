@@ -1,0 +1,74 @@
+name: Helvoca Part 6 Offline Recovery Preparation (NO-GO)
+
+# No production secrets, service access, outbound calls, deploys, or merges.
+on:
+  push:
+    branches:
+      - 'test/voice-release-part6-recovery-offline-*'
+  pull_request:
+    branches:
+      - 'test/voice-release-part5-integrated-offline-*'
+
+permissions:
+  contents: read
+
+env:
+  HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+  HELVOCA_TWILIO_EXISTING_VOICE_ROUTE_ENABLED: 'false'
+  HELVOCA_TWILIO_SUBACCOUNT_VOICE_CONFIGURE_ON_STARTUP: 'false'
+  HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+  TWILIO_PROVISIONING_ENABLED: 'false'
+  TWILIO_CERTIFICATION_CALL_ON_STARTUP: 'false'
+  TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED: 'false'
+  GEMINI_LIVE_ENABLED: 'false'
+  GEMINI_LIVE_PROBE_ON_STARTUP: 'false'
+  OPENAI_LIVE_ENABLED: 'false'
+  HELVOCA_OUTBOUND_PROVIDER: NONE
+  APP_JOBS_ENABLED: 'false'
+
+jobs:
+  offline-safety-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Test fail-closed recovery workflow with adversarial mutations
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part6_recovery_contract.py' -v
+          python3 scripts/ci/voice_part6_recovery_contract.py
+      - name: Check immutable Flyway migrations V100 to V103 without SQL execution
+        run: |
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part2_migration_contract.py' -v
+          python3 scripts/ci/voice_part2_migration_contract.py
+
+  synthetic-pg18-restore-and-encryption:
+    needs: [offline-safety-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Verify local PostgreSQL 18 disconnected restore and ephemeral encrypted copies
+        shell: bash
+        run: bash scripts/ci/voice_part6_synthetic_pg18_recovery.sh
+
+  pg18-flyway-rls-regression:
+    needs: [offline-safety-contract]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Repeat real Flyway incremental and tenant RLS regressions on disposable PG18
+        run: >-
+          mvn --batch-mode --no-transfer-progress
+          -Dhelvoca.test.postgres.image=postgres:18-alpine
+          -Dtest=TwilioV99ToV103FlywayUpgradePostgresIntegrationTest,PostgresRowLevelSecurityIntegrationTest,TwilioExistingEnrollmentAdminPostgresIntegrationTest
+          test

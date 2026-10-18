@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "../../components/AppShell/AppShell";
 import { getCurrentUser } from "../../features/dashboard/api";
-import { getBusiness, getOnboardingStatus } from "../../features/settings/api";
+import { getBusiness, getOnboardingStatus, getBusinessProfile, getBusinessHours, saveBusinessProfile, replaceBusinessHours, type BusinessHour } from "../../features/settings/api";
 import {
   applyBusinessImport,
   getBusinessImportAiQuota,
@@ -25,9 +25,25 @@ import {
   type BusinessImportApplyItem,
   type BusinessImportApplyResult,
   type BusinessImportPreview,
+  type BusinessImportBusinessFacts,
   type ImportItemKind
 } from "../../features/businessImport/api";
 import styles from "./BusinessImportPage.module.css";
+
+type BusinessFactField = "publicPhone" | "publicEmail" | "websiteUrl" | "addressLine" | "commune" | "city" | "region" | "countryCode" | "publicDescription";
+
+const BUSINESS_FACT_FIELDS: Array<{ key: BusinessFactField; label: string }> = [
+  { key: "publicPhone", label: "Teléfono público" },
+  { key: "publicEmail", label: "Correo público" },
+  { key: "websiteUrl", label: "Sitio web" },
+  { key: "addressLine", label: "Dirección" },
+  { key: "commune", label: "Comuna" },
+  { key: "city", label: "Ciudad" },
+  { key: "region", label: "Región" },
+  { key: "countryCode", label: "Código de país" },
+  { key: "publicDescription", label: "Descripción pública" }
+];
+const DAYS = ["", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 type EditableRow = {
   selected: boolean;
@@ -164,6 +180,12 @@ export function BusinessImportPage() {
   const [result, setResult] = useState<BusinessImportApplyResult | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
   const [applyPending, setApplyPending] = useState(false);
+  const [facts, setFacts] = useState<BusinessImportBusinessFacts | null>(null);
+  const [proposedHours, setProposedHours] = useState<BusinessHour[]>([]);
+  const [profilePending, setProfilePending] = useState(false);
+  const [hoursPending, setHoursPending] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [hoursSaved, setHoursSaved] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -226,6 +248,10 @@ export function BusinessImportPage() {
     setFiles(accepted);
     setPreview(null);
     setRows([]);
+    setFacts(null);
+    setProposedHours([]);
+    setProfileSaved(false);
+    setHoursSaved(false);
     setResult(null);
     setMessage("");
     setError(issues.join(" "));
@@ -272,12 +298,85 @@ export function BusinessImportPage() {
       setPreview(next);
       void queryClient.invalidateQueries({ queryKey: ["business-import", "ai-quota"] });
       setRows(rowsFromPreview(next));
+      setFacts(next.businessFacts ?? null);
+      setProposedHours(next.businessFacts?.hours ?? []);
+      setProfileSaved(false);
+      setHoursSaved(false);
       setMessage("Borrador creado. Revisa cada dato antes de aplicar.");
     } catch (value) {
       setError(value instanceof Error ? value.message : "No pudimos crear el borrador.");
     } finally {
       mutationLock.current = false;
       setPreviewPending(false);
+    }
+  }
+
+  async function saveProposedProfile() {
+    if (mutationLock.current || profilePending || !facts) return;
+    const hasNewFact = BUSINESS_FACT_FIELDS.some(field => Boolean(facts[field.key]?.trim()));
+    if (!hasNewFact) { setError("No hay datos públicos nuevos para guardar."); return; }
+    mutationLock.current = true;
+    setProfilePending(true);
+    setError("");
+    try {
+      // A failed current-profile read must never turn existing fields into null.
+      const current = await getBusinessProfile();
+      const approved = (key: BusinessFactField): string | null =>
+        facts[key]?.trim() || current[key] || null;
+      await saveBusinessProfile({
+        presetKey: current.presetKey ?? null,
+        publicDescription: approved("publicDescription"),
+        publicPhone: approved("publicPhone"),
+        publicEmail: approved("publicEmail"),
+        websiteUrl: approved("websiteUrl"),
+        addressLine: approved("addressLine"),
+        commune: approved("commune"),
+        city: approved("city"),
+        region: approved("region"),
+        countryCode: approved("countryCode"),
+        defaultCurrency: current.defaultCurrency || "CLP",
+        sellsProducts: current.sellsProducts ?? null,
+        sellsServices: current.sellsServices ?? null,
+        usesReservations: current.usesReservations ?? null
+      });
+      setProfileSaved(true);
+      setMessage("Datos públicos aprobados guardados. No se ha conectado ningún teléfono.");
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "No se pudo guardar el perfil.");
+    } finally {
+      mutationLock.current = false;
+      setProfilePending(false);
+    }
+  }
+
+  async function saveProposedHours() {
+    if (mutationLock.current || hoursPending || proposedHours.length === 0) return;
+    if (proposedHours.some(hour => !Number.isInteger(hour.dayOfWeek)
+      || hour.dayOfWeek < 1 || hour.dayOfWeek > 7
+      || !/^\d{2}:\d{2}$/.test(hour.openTime) || !/^\d{2}:\d{2}$/.test(hour.closeTime)
+      || hour.openTime >= hour.closeTime)) {
+      setError("Corrige los horarios antes de confirmar.");
+      return;
+    }
+    mutationLock.current = true;
+    setHoursPending(true);
+    setError("");
+    try {
+      const current = await getBusinessHours();
+      // The PUT endpoint replaces the whole weekly calendar; never silently overwrite.
+      if (current.length > 0) {
+        throw new Error("Ya existen horarios configurados. Revísalos en Configuración antes de reemplazarlos.");
+      }
+      await replaceBusinessHours(proposedHours);
+      setHoursSaved(true);
+      setMessage("Horarios aprobados guardados. No representan disponibilidad médica por profesional.");
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+    } catch (value) {
+      setError(value instanceof Error ? value.message : "No se pudieron guardar los horarios.");
+    } finally {
+      mutationLock.current = false;
+      setHoursPending(false);
     }
   }
 
@@ -316,6 +415,10 @@ export function BusinessImportPage() {
     setFiles([]);
     setPreview(null);
     setRows([]);
+    setFacts(null);
+    setProposedHours([]);
+    setProfileSaved(false);
+    setHoursSaved(false);
     setResult(null);
     setMessage("");
     setError("");
@@ -513,6 +616,71 @@ export function BusinessImportPage() {
                   <div key={warning + "-" + index}><AlertTriangle size={15} aria-hidden="true" /><span>{warning}</span></div>
                 ))}
               </div>
+            )}
+
+
+            {facts && (
+              <section className={styles.card} aria-label="Datos del negocio detectados" data-testid="business-import-facts">
+                <h2>Información detectada en los archivos</h2>
+                <p>Confirma los datos públicos antes de guardarlos. Los campos vacíos no reemplazan datos existentes. No se crean teléfonos ni citas reales.</p>
+                <p>Fuente: {facts.sourceName || "archivo adjunto"}</p>
+                <div className={styles.rowGrid}>
+                  {BUSINESS_FACT_FIELDS.map(field => (
+                    <label key={field.key} className={styles.field}>
+                      <span>{field.label}</span>
+                      <input
+                        aria-label={field.label}
+                        value={facts[field.key] ?? ""}
+                        maxLength={field.key === "publicDescription" ? 4000 : 500}
+                        placeholder="No indicado en el documento"
+                        onChange={event => {
+                          setFacts(current => current ? { ...current, [field.key]: event.target.value } : null);
+                          setProfileSaved(false);
+                        }}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <div className={styles.applyBar}>
+                  <span>Revisar teléfono en formato +56912345678; solo datos públicos, no línea Twilio.</span>
+                  <button type="button" className="button secondary" disabled={profilePending || profileSaved}
+                          onClick={saveProposedProfile}>
+                    {profileSaved ? "Perfil guardado" : profilePending ? "Guardando perfil…" : "Confirmar y guardar perfil"}
+                  </button>
+                </div>
+                {proposedHours.length > 0 && (
+                  <section aria-label="Horarios detectados">
+                    <h3>Horarios semanales propuestos</h3>
+                    <p>Solo se proponen intervalos completos. Si ya hay horarios, no se sobrescriben automáticamente.</p>
+                    <div className={styles.rowGrid}>
+                      {proposedHours.map((hour, index) => (
+                        <div key={index} className={styles.field}>
+                          <span>{DAYS[hour.dayOfWeek] || "Día por verificar"}</span>
+                          <input aria-label={"Apertura " + index} type="time" value={hour.openTime}
+                                 onChange={event => {
+                                   setProposedHours(current => current.map((h, i) =>
+                                     i === index ? { ...h, openTime: event.target.value } : h));
+                                   setHoursSaved(false);
+                                 }} />
+                          <input aria-label={"Cierre " + index} type="time" value={hour.closeTime}
+                                 onChange={event => {
+                                   setProposedHours(current => current.map((h, i) =>
+                                     i === index ? { ...h, closeTime: event.target.value } : h));
+                                   setHoursSaved(false);
+                                 }} />
+                        </div>
+                      ))}
+                    </div>
+                    <div className={styles.applyBar}>
+                      <span>No altera citas ni horarios individuales de especialistas.</span>
+                      <button type="button" className="button secondary" disabled={hoursPending || hoursSaved}
+                              onClick={saveProposedHours}>
+                        {hoursSaved ? "Horarios guardados" : hoursPending ? "Guardando…" : "Confirmar y guardar horarios"}
+                      </button>
+                    </div>
+                  </section>
+                )}
+              </section>
             )}
 
             {rows.length === 0 ? (

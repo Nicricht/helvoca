@@ -13,6 +13,8 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -499,6 +501,60 @@ class PaymentWorkflowServiceTest {
     }
 
     @Test
+    void pausedPilotDoesNotRecreateMissingProviderOrderDuringReconciliation() {
+        UUID businessId = UUID.randomUUID();
+        BusinessPayment payment = recoverablePayment(businessId);
+        when(payments.findByIdAndBusinessId(payment.getId(), businessId))
+                .thenReturn(Optional.of(payment));
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.getStatus(any())).thenThrow(new IllegalStateException("order_not_found"));
+
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        false, true, "PILOT_NOT_RUNNING", "PAUSED",
+                        ControlledPilotExternalEffectGuard.Effect.PAYMENT));
+        ReflectionTestUtils.setField(service, "pilotExternalEffects", guard);
+
+        assertSame(payment, service.reconcileOne(businessId, payment.getId()));
+        assertEquals("ORDTST-MISSING", payment.getExternalId());
+        assertEquals(BusinessPayment.Status.REQUIRES_ACTION, payment.getStatus());
+        verify(provider).getStatus(any());
+        verify(guard).evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT);
+        verify(provider, never()).create(any());
+        verify(payments, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void runningOrUnmanagedTenantCanRecoverMissingProviderOrder(boolean managed) {
+        UUID businessId = UUID.randomUUID();
+        BusinessPayment payment = recoverablePayment(businessId);
+        when(payments.findByIdAndBusinessId(payment.getId(), businessId))
+                .thenReturn(Optional.of(payment));
+        when(providers.byCode(businessId, "mercadopago")).thenReturn(Optional.of(provider));
+        when(provider.getStatus(any())).thenThrow(new IllegalStateException("order_not_found"));
+        when(provider.create(any())).thenReturn(new PaymentProviderAdapter.CreateResult(
+                "ORDTST-RECOVERED", "https://checkout.example.test/recovered",
+                BusinessPayment.Status.REQUIRES_ACTION, Map.of()));
+        when(provider.providerCode()).thenReturn("mercadopago");
+
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true, managed, managed ? "ALLOWED" : "NOT_PILOT_MANAGED",
+                        managed ? "RUNNING" : null,
+                        ControlledPilotExternalEffectGuard.Effect.PAYMENT));
+        ReflectionTestUtils.setField(service, "pilotExternalEffects", guard);
+
+        assertSame(payment, service.reconcileOne(businessId, payment.getId()));
+        assertEquals("ORDTST-RECOVERED", payment.getExternalId());
+        verify(provider).create(any());
+        verify(guard).evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT);
+        verify(payments).saveAndFlush(same(payment));
+    }
+
+    @Test
     void unrelatedProviderStatusFailureDoesNotCreateReplacementOrder() {
         UUID businessId = UUID.randomUUID();
         UUID customerId = UUID.randomUUID();
@@ -844,6 +900,22 @@ class PaymentWorkflowServiceTest {
                 "confirmationPending", true,
                 "paymentPending", true));
         return operation;
+    }
+
+    private static BusinessPayment recoverablePayment(UUID businessId) {
+        BusinessPayment payment = new BusinessPayment();
+        payment.setId(UUID.randomUUID());
+        payment.setOperationId(UUID.randomUUID());
+        payment.setBusinessId(businessId);
+        payment.setTargetOperationId(UUID.randomUUID());
+        payment.setProvider("mercadopago");
+        payment.setExternalId("ORDTST-MISSING");
+        payment.setIdempotencyKey("old-key");
+        payment.setAmount(new BigDecimal("1000"));
+        payment.setCurrency("CLP");
+        payment.setStatus(BusinessPayment.Status.REQUIRES_ACTION);
+        payment.setSource(BusinessOrder.Source.WHATSAPP);
+        return payment;
     }
 
     private static BusinessPayment paymentWithExternalId(UUID paymentId, String externalId) {

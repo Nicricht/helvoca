@@ -1,0 +1,29 @@
+name: Pilot Voice Phase 6 External Evidence NO-GO Contract
+
+on:
+  push:
+    branches:
+      - 'test/voice-real-pilot-6of6-*'
+
+permissions:
+  contents: read
+
+jobs:
+  live-evidence-is-not-ci-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Test fail-closed real carrier and human evidence contracts offline
+        run: python3 -m unittest discover -s scripts/ci -p 'test_voice_pilot_phase6_live_evidence.py' -v
+      - name: Assert current production evidence does not authorize calling, deployment or commercialization
+        run: >-
+          python3 scripts/ci/voice_pilot_phase6_live_evidence.py
+          --evidence docs/telephony/evidence/2026-10-12-phase6-no-live-call.json
+          --expect-blocked
+      - name: Assert Part 5 production restore gate remains blocked
+        run: >-
+          python3 scripts/ci/voice_pilot_phase5_gate.py
+          --evidence docs/telephony/evidence/2026-10-12-phase5-production-no-go.json
+          --expect-blocked

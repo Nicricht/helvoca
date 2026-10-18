@@ -1,0 +1,56 @@
+name: Helvoca C1 encrypted offsite PG18 recovery contract (offline)
+on:
+  push:
+    branches:
+      - 'feat/c1-offsite-pg18-encrypted-restore-*'
+  pull_request:
+    branches:
+      - 'fix/voice-v99-schema-ambiguity-*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  c1-archive-security-contract:
+    name: c1-archive-security-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exact Python source compiles
+        run: |
+          python3 -m py_compile scripts/ops/c1_offsite_pg18_encrypted_restore.py
+          python3 -m py_compile scripts/ops/test_c1_offsite_pg18_encrypted_restore.py
+      - name: Verify 20 fail-closed backup tests and re-used Stage A restoration contract
+        run: |
+          python3 -m unittest discover -v -s scripts/ops -p 'test_c1_offsite_pg18_encrypted_restore.py'
+          python3 -m unittest discover -v -s scripts/ops -p 'test_railway_pg18_snapshot_drill.py'
+      - name: Verify genuine age X25519 cipher roundtrip on SYNTHETIC bytes only
+        run: |
+          set -eu
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq age >/dev/null
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          python3 -c "from pathlib import Path; import sys; Path(sys.argv[1]).write_bytes(b'PGDMP' + bytes(range(256))*16)" "$tmp/synthetic.dump"
+          age-keygen -o "$tmp/private-test-key.txt" >/dev/null 2>&1
+          recipient="$(sed -n 's/^# public key: //p' "$tmp/private-test-key.txt")"
+          test -n "$recipient"
+          age --recipient "$recipient" --output "$tmp/synthetic.dump.age" "$tmp/synthetic.dump"
+          head -c 22 "$tmp/synthetic.dump.age" | grep -q 'age-encryption.org/v1'
+          age --decrypt --identity "$tmp/private-test-key.txt" --output "$tmp/decrypted.dump" "$tmp/synthetic.dump.age"
+          cmp "$tmp/synthetic.dump" "$tmp/decrypted.dump"
+          echo "C1_SYNTHETIC_AGE_ENCRYPTION_ROUNDTRIP=PASS"
+      - name: No contact to production or provider
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          code = Path("scripts/ops/c1_offsite_pg18_encrypted_restore.py").read_text()
+          assert "dump_from_railway" not in code
+          assert "railway ssh" not in code
+          assert "POSTGRES_PASSWORD" not in code
+          assert "HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED" not in code
+          assert "restore_to_disposable_docker" in code
+          print("C1_PRODUCTION_SIDE_EFFECT_FREE=PASS")
+          PY

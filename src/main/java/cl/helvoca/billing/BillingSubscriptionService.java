@@ -132,7 +132,6 @@ public class BillingSubscriptionService {
         }
 
         if (invoice.debitDate() != null
-                && local.getPendingPlanCode() == null
                 && local.getCurrentPeriodStart() != null
                 && invoice.debitDate().toInstant().isBefore(local.getCurrentPeriodStart())) {
             return;

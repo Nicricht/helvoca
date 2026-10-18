@@ -147,6 +147,23 @@ export interface PhoneProvisioningStatus {
   message?: string | null;
 }
 
+export interface VoiceSetupStep {
+  code: string;
+  label: string;
+  complete: boolean;
+  guidance: string;
+  href: string | null;
+}
+
+export interface VoiceSetupReadiness {
+  status: "CONFIGURATION_INCOMPLETE" | "AWAITING_LIVE_CERTIFICATION";
+  configurationReady: boolean;
+  liveCertified: boolean;
+  readyForCommercialCalls: boolean;
+  activePhoneNumber: string | null;
+  steps: VoiceSetupStep[];
+}
+
 export interface AvailablePhoneNumber {
   phoneNumber: string;
   friendlyName?: string | null;
@@ -449,6 +466,10 @@ export function deleteScheduleException(date: string) {
   );
 }
 
+
+export function getVoiceSetupReadiness() {
+  return apiRequest<VoiceSetupReadiness>("/api/v1/onboarding/voice-readiness");
+}
 
 export function getPhoneProvisioningStatus() {
   return apiRequest<PhoneProvisioningStatus>("/api/v1/phone-numbers/provisioning/status");

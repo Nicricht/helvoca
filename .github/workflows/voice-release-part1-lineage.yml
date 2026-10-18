@@ -1,0 +1,32 @@
+name: Voice Part 1 Stacked PR Lineage and NO-GO (offline)
+
+on:
+  push:
+    branches:
+      - 'audit/voice-release-part1-lineage-*'
+  pull_request:
+    paths:
+      - '.github/workflows/voice-release-part1-lineage.yml'
+      - 'scripts/ci/voice_part1_stacked_pr_lineage_audit.py'
+      - 'scripts/ci/test_voice_part1_stacked_pr_lineage_audit.py'
+      - 'docs/telephony/evidence/2026-10-13-part1-pr-lineage-readonly-snapshot.json'
+      - 'docs/telephony/2026-10-13-voice-release-part1-pr-lineage-no-go.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-offline-lineage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Python compile and offline regression tests
+        run: |
+          python3 -m py_compile scripts/ci/voice_part1_stacked_pr_lineage_audit.py scripts/ci/test_voice_part1_stacked_pr_lineage_audit.py
+          python3 -m unittest discover -s scripts/ci -p 'test_voice_part1_stacked_pr_lineage_audit.py' -v
+      - name: Verify actual sanitized snapshot, always NO-GO
+        run: |
+          python3 scripts/ci/voice_part1_stacked_pr_lineage_audit.py --snapshot docs/telephony/evidence/2026-10-13-part1-pr-lineage-readonly-snapshot.json | tee /tmp/helvoca-part1-no-go.json
+          python3 -c 'import json; d=json.load(open("/tmp/helvoca-part1-no-go.json")); assert d["integrity"]=="PASS_OFFLINE_SNAPSHOT"; assert d["release"]=="NO_GO"; assert d["may_merge"] is False; assert d["may_deploy"] is False; assert d["may_run_live_call"] is False; assert d["commercial_go"] is False'

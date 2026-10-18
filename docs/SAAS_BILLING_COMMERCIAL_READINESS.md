@@ -43,6 +43,7 @@ Important: Enterprise is marked `custom_pricing = true`. `BillingSubscriptionSer
 8. The current plan remains active. A browser return or an `authorized` preapproval alone does **not** activate the new plan.
 9. Mercado Pago sends signed Webhooks to `POST /webhooks/v1/mercadopago`.
 10. The controller validates `x-signature` with the official Mercado Pago Java SDK and the configured webhook secret.
+   - **Provider acknowledgment contract (2026-10-16, PR #846):** after valid signature and successful reconciliation, return HTTP **200 OK**, not 204 No Content; also return 200 for authenticated but unsupported topics without applying billing effects. Preserve 401 for invalid signature, 503 if signing is not configured, and 500 if reconciliation fails (provider retry). Mercado Pago's official Webhook documentation specifically calls for HTTP 200 or 201 to acknowledge delivery. This is a code-contract correction, **not** proof of an authentic Mercado Pago notification to Java/PostgreSQL. Source: https://www.mercadopago.cl/developers/es/docs/links-and-debts/additional-content/your-integrations/notifications/webhooks?scope=prod
 11. `subscription_preapproval` reconciles subscription state.
 12. `subscription_authorized_payment` fetches the provider invoice and only a provider payment with `payment.status=approved` activates or renews service; invoice lifecycle status such as `processed` is not payment proof.
 13. On the first approved invoice for a pending plan, `pending_plan_code` becomes `plan_code`.
@@ -133,6 +134,42 @@ Primary certification tests:
   - `CallLifecycleServiceTest` / call-capacity integration coverage.
 
 The draft PR CI is the executable certification gate for these tests. The branch is synchronized with the current `main` baseline above; certification is not complete unless the integrated HEAD is green.
+
+## 2026-10-15 C5 · fail-closed readiness for SaaS checkout
+
+**Release branch only, not deployed to main.** A focused Java RED regression reproduced that
+`MercadoPagoProperties.checkoutConfigured()` could return true even while
+`webhookConfigured()` was false (no SaaS subscription webhook signing secret).
+The backend could then ask Mercado Pago to create a subscription while its
+webhook receiver would reject the event with HTTP 503. That is unsafe for
+commercial onboarding. The fix requires **both** a configured signed-webhook
+receiver and an HTTPS return URL before the standard customer checkout or
+self-service readiness can report checkout configured.
+
+The standalone, explicitly opted-in, **real TEST provider** integration exercise
+`MercadoPagoSaasSandboxProviderIT` now requires the independent environment
+variable `MERCADOPAGO_TEST_WEBHOOK_SECRET` before any test preapproval POST.
+This value must be entered only in the approved private TEST execution context;
+it must **not** be committed or used as the production secret. Its presence is
+merely a local prerequisite: the exercise does **not** validate registration,
+delivery, signature or persistence of a real provider webhook. Successful
+sandbox diagnostics are now fixed, redacted markers, never subscription IDs,
+buyer details, provider response content or checkout URLs.
+
+Observed Railway production environment (OAuth **variable names only**) lacks
+`MERCADOPAGO_WEBHOOK_SECRET` and `MERCADOPAGO_BACK_URL` for SaaS billing.
+The `HELVOCA_PAYMENT_RECEPVOZ_MP_SANDBOX_WEBHOOK_SECRET` variable is for a
+**different payment context** and must not be silently substituted. Existing
+`MERCADOPAGO_ENABLED` and `MERCADOPAGO_ACCESS_TOKEN` *names* do not prove
+valid enabled values or true provider delivery. No secret values were accessed.
+With the new fail-closed guard, this partial configuration cannot allow
+customer SaaS checkout even if a return URL is later added alone.
+
+**C5 remains NO-GO** until operator-approved safe deployment, exact TEST
+webhook delivered to deployed Java + PG with signature/idempotency proof and
+a separate LIVE business-payment authorization. No app deployment,
+provider registration, money movement or configuration write was authorized
+by this change.
 
 ## Production configuration required
 
@@ -247,3 +284,9 @@ Run exactly one provider test before enabling a real customer:
 10. confirm a subsequent approved invoice returns the subscription to `ACTIVE`.
 
 Only after those ten checks should `MERCADOPAGO_ENABLED` be enabled with live credentials for real SaaS collection.
+
+## 2026-10-14 C5-A public-plan-intent repair (PR stacked on #842)
+
+Public Pricing fixed-price CTAs previously all linked to `/`, losing the chosen plan during registration. This is a **UI navigation defect**, not a provider failure. Now each fixed-price CTA passes the catalog public code as an encoded `plan` query to `/app/auth`. Auth redirects the authenticated BUSINESS_ADMIN to `/app/plan?plan=...` (valid only for EMPRENDE, NEGOCIO, PRO) and preserves the PLATFORM_ADMIN platform destination. `/app/plan` acknowledges/highlights the corresponding catalog plan; it **does not call** `/api/v1/billing/checkout` on navigation or authentication. A further explicit user confirmation is required before the billing mutation; provider-approved payment remains necessary for entitlement activation. Unknown values and ENTERPRISE are never treated as fixed-price intent; the Enterprise CTA goes to the existing Sales route, **not to self-service checkout**. A working individualized enterprise quote intake is not certified by this change and remains a C6/C7 business-process gap.
+
+Playwright regression cases cover three distinct public prices, registered and logged-in business admins, platform-admin isolation, no automatic checkout, unknown/enterprise inputs and in-app selected-plan feedback. The backend payment contract is unchanged, and the earlier authentic TEST invoice + real PostgreSQL-with-mocked-provider tests retain their original evidence boundaries. Exact new SHA, CI result, and any limitations must be recorded in this change's PR and Issue #823; never infer provider delivery or a production deploy from a browser E2E green result.

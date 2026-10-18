@@ -510,6 +510,15 @@ public class PaymentWorkflowService {
         String previousExternalId = payment.getExternalId();
         String recoveryKey = providerRecoveryIdempotencyKey(payment);
         try {
+            // Recovery also creates a new external payment. Recheck the pilot just
+            // before this effect: the pilot may have paused since initial checkout.
+            if (pilotExternalEffects != null
+                    && !pilotExternalEffects.evaluate(
+                            businessId, ControlledPilotExternalEffectGuard.Effect.PAYMENT).allowed()) {
+                log.warn("PAYMENT_PROVIDER_RECOVERY_BLOCKED businessId={} paymentId={} reason=PILOT_EXTERNAL_EFFECTS_BLOCKED",
+                        businessId, payment.getId());
+                return;
+            }
             PaymentProviderAdapter.CreateResult recovered = provider.create(
                     new PaymentProviderAdapter.CreateCommand(
                             businessId,

@@ -16,7 +16,8 @@ public record PhoneNumberResponse(
 ) {
     static PhoneNumberResponse from(PhoneNumber phone) {
         return new PhoneNumberResponse(
-                phone.getId(), phone.getProvider(), phone.getExternalId(), phone.getPhoneNumber(),
+                // Never send provider-owned SIDs/IDs to a tenant browser.
+                phone.getId(), phone.getProvider(), null, phone.getPhoneNumber(),
                 phone.isActive(), phone.isWhatsappEnabled(), phone.getWhatsappCertifiedAt(),
                 phone.getCreatedAt(), phone.getUpdatedAt());
     }

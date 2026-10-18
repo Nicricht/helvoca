@@ -31,7 +31,7 @@ public class SecurityConfig {
             "/invite.html",
             "/platform.html", "/operations.html",
             "/sales.html",
-            "/privacy.html", "/terms.html",
+            "/privacy.html", "/terms.html", "/data-deletion.html",
             "/pricing.html",
             "/app/**", "/reservar/**",
             "/account.html",

@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
   statuses: write
+  issues: read
+  pull-requests: read
+
+# Enforce exact-head CI; outdated PR runs cancel before spending more time.
+concurrency:
+  group: helvoca-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   production-gate:
@@ -128,6 +135,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify pre-change evidence receipt against GitHub
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HELVOCA_PR_NUMBER: ${{ github.event.pull_request.number }}
+          HELVOCA_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 -m pip install --disable-pip-version-check --quiet coverage==7.13.3
+          python3 -m coverage run --branch --source=verify_prechange_receipt -m unittest discover -s scripts/ci -p 'test_verify_prechange_receipt.py' -v
+          python3 -m coverage report --fail-under=100
+          python3 scripts/ci/verify_prechange_receipt.py
+
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
@@ -146,11 +165,40 @@ jobs:
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
-    needs: [fast-gate, golden-journey-release-contract]
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    # This context is required by the active main ruleset; it must fail closed
+    # when any applicable independent Full Gate job fails or is skipped.
+    needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, legacy-v99-runtime-on-v103]
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
+    timeout-minutes: 55
 
     steps:
+      - name: Enforce applicable upstream Full Gate results
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FAST_GATE_RESULT: ${{ needs['fast-gate'].result }}
+          GOLDEN_JOURNEY_RESULT: ${{ needs['golden-journey-release-contract'].result }}
+          SYSTEM_E2E_RESULT: ${{ needs['system-integration-e2e'].result }}
+          HOME_COVERAGE_RESULT: ${{ needs['home-frontend-coverage'].result }}
+          INVENTORY_COVERAGE_RESULT: ${{ needs['inventory-frontend-coverage'].result }}
+          LEGACY_ROLLBACK_RESULT: ${{ needs['legacy-v99-runtime-on-v103'].result }}
+        run: |
+          set -euo pipefail
+          required_gate() {
+            if [ "$2" != "success" ]; then
+              echo "Required upstream QA job $1 returned $2 (expected success)."
+              exit 1
+            fi
+          }
+          required_gate fast-gate "$FAST_GATE_RESULT"
+          required_gate golden-journey-release-contract "$GOLDEN_JOURNEY_RESULT"
+          required_gate system-integration-e2e "$SYSTEM_E2E_RESULT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            required_gate home-frontend-coverage "$HOME_COVERAGE_RESULT"
+            required_gate inventory-frontend-coverage "$INVENTORY_COVERAGE_RESULT"
+            required_gate legacy-v99-runtime-on-v103 "$LEGACY_ROLLBACK_RESULT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -412,6 +460,154 @@ jobs:
             test-results/system-e2e/**
           if-no-files-found: warn
 
+
+
+  # C2-B: test the actual, pinned production binary, not just legacy Flyway validate.
+  # Both JARs run only against one ephemeral PostgreSQL18 CI service. Providers OFF.
+  legacy-v99-runtime-on-v103:
+    needs: [fast-gate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: helvoca
+          POSTGRES_USER: helvoca
+          POSTGRES_PASSWORD: helvoca
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helvoca -d helvoca"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Checkout exact candidate PR HEAD
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Checkout exact existing production baseline
+        uses: actions/checkout@v7
+        with:
+          ref: ca58693e167752bd6eab8ff4e9be770391fe4293
+          path: rollback-baseline
+          persist-credentials: false
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Build both backend binaries and verify V99 binary against V103 database
+        env:
+          PG_CONTAINER_ID: ${{ job.services.postgres.id }}
+          DB_URL: jdbc:postgresql://127.0.0.1:5432/helvoca
+          DB_USERNAME: helvoca
+          DB_PASSWORD: helvoca
+          JWT_ISSUER: helvoca-c2b-isolated-rollback
+          JWT_SECRET: Y2FsbGFpLXN5c3RlbS1lMmUtc2VjcmV0LWtleS0zMi1ieXRlcyEhIQ==
+          SEED_ENABLED: 'false'
+          APP_JOBS_ENABLED: 'false'
+          HELVOCA_CONTROLLED_PILOT_EXTERNAL_EFFECTS_ENABLED: 'false'
+          HELVOCA_OUTBOUND_DELIVERY_ENABLED: 'false'
+          HELVOCA_OUTBOUND_PROVIDER: NONE
+          TWILIO_WHATSAPP_ENABLED: 'false'
+          TWILIO_PROVISIONING_ENABLED: 'false'
+          META_WHATSAPP_ENABLED: 'false'
+          META_WHATSAPP_EMBEDDED_SIGNUP_ENABLED: 'false'
+          MERCADOPAGO_ENABLED: 'false'
+          OPENAI_LIVE_ENABLED: 'false'
+          GEMINI_LIVE_ENABLED: 'false'
+          HELVOCA_BUSINESS_IMPORT_AI_ENABLED: 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_PID=''
+          cleanup() {
+            if [ -n "$APP_PID" ] && kill -0 "$APP_PID" 2>/dev/null; then
+              kill "$APP_PID" || true
+              wait "$APP_PID" 2>/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+          fail() {
+            echo "C2B_LEGACY_RUNTIME_ON_V103_FAIL: $1"
+            tail -n 100 c2b-candidate-app.log 2>/dev/null || true
+            tail -n 100 c2b-legacy-app.log 2>/dev/null || true
+            exit 1
+          }
+          ready() {
+            local url="$1"
+            local logfile="$2"
+            for attempt in $(seq 1 75); do
+              if ! kill -0 "$APP_PID" 2>/dev/null; then
+                fail "JAR exited before healthy: $logfile"
+              fi
+              if curl --connect-timeout 2 --max-time 4 --silent --fail "$url/actuator/health" | grep -Fq '"status":"UP"'; then
+                return 0
+              fi
+              sleep 2
+            done
+            fail "JAR did not become healthy: $logfile"
+          }
+          stop_app() {
+            if [ -n "$APP_PID" ] && kill -0 "$APP_PID" 2>/dev/null; then
+              kill "$APP_PID" || true
+              wait "$APP_PID" 2>/dev/null || true
+            fi
+            APP_PID=''
+          }
+          psql_query() {
+            docker exec "$PG_CONTAINER_ID" psql -U helvoca -d helvoca -Atqc "$1"
+          }
+          # The rollback source is the exact running main baseline, not a guessed latest tag.
+          if find rollback-baseline/src/main/resources/db/migration -maxdepth 1 -name 'V100__*' | grep -q .; then
+            fail "Pinned baseline contains unexpected V100+ migration"
+          fi
+          test -f src/main/resources/db/migration/V103__twilio_existing_enrollment_admin_approval.sql ||
+            fail "Candidate V103 migration missing"
+          mvn --batch-mode --no-transfer-progress -DskipTests clean package
+          candidate_jar="$(find target -maxdepth 1 -name 'helvoca-*.jar' ! -name '*.original' | head -1)"
+          test -n "$candidate_jar" || fail "Candidate JAR absent"
+          SEED_ENABLED=true SERVER_PORT=18080 java -jar "$candidate_jar" > c2b-candidate-app.log 2>&1 &
+          APP_PID=$!
+          ready http://127.0.0.1:18080 c2b-candidate-app.log
+          test "$(psql_query "SELECT MAX(version::integer) FROM public.flyway_schema_history WHERE success")" = 103 ||
+            fail "Candidate did not migrate PostgreSQL to V103"
+          curl --silent --fail http://127.0.0.1:18080/api/v1/public/pricing | grep -Fq '"EMPRENDE"' ||
+            fail "Candidate pricing endpoint failed"
+          business_before="$(psql_query 'SELECT count(*) FROM public.business')"
+          phones_before="$(psql_query 'SELECT count(*) FROM public.phone_number')"
+          test "$business_before" -gt 0 || fail "No seeded business available for retention check"
+          stop_app
+
+          mvn --batch-mode --no-transfer-progress -f rollback-baseline/pom.xml -DskipTests clean package
+          legacy_jar="$(find rollback-baseline/target -maxdepth 1 -name 'helvoca-*.jar' ! -name '*.original' | head -1)"
+          test -n "$legacy_jar" || fail "Legacy baseline JAR absent"
+          SEED_ENABLED=false SERVER_PORT=18081 java -jar "$legacy_jar" > c2b-legacy-app.log 2>&1 &
+          APP_PID=$!
+          ready http://127.0.0.1:18081 c2b-legacy-app.log
+          curl --silent --fail http://127.0.0.1:18081/api/v1/public/pricing | grep -Fq '"EMPRENDE"' ||
+            fail "Legacy binary public pricing failed against V103"
+          test "$(psql_query "SELECT MAX(version::integer) FROM public.flyway_schema_history WHERE success")" = 103 ||
+            fail "Legacy binary changed Flyway schema history"
+          test "$(psql_query 'SELECT count(*) FROM public.business')" = "$business_before" ||
+            fail "Legacy startup changed business count"
+          test "$(psql_query 'SELECT count(*) FROM public.phone_number')" = "$phones_before" ||
+            fail "Legacy startup changed phone number count"
+          echo 'C2B_V99_BINARY_ON_V103_PASS: pinned production JAR starts on V103 and preserves seeded row counts.'
+      - name: Upload isolated startup logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: c2b-legacy-runtime-v103-diagnostics
+          path: |
+            c2b-candidate-app.log
+            c2b-legacy-app.log
+          if-no-files-found: warn
 
 
   frontend-qa:
