@@ -71,6 +71,24 @@ efectos en vuelo o compatibilidad de negocio.** Por eso, aunque el CI pase, un r
 del binario a V99 contra la V103 real sigue `NOT_VERIFIED`, nunca `GO` por esta prueba
 aislada. Ante problemas productivos no hacer DROP/DOWN migrations improvisadas.
 
+
+## C2-B · Arranque real del binario legado sobre V103 (nuevo CI aislado, 2026-10-18)
+
+**Criterio nuevo, distinto de la validación del catálogo Flyway anterior:** antes del cambio siguiente, `TwilioV99ToV103FlywayUpgradePostgresIntegrationTest` ya verificaba scripts V1–V99 sobre esquema V103 en PostgreSQL18, pero **no iniciaba** la versión real de la API que corre en `main`. Esta limitación histórica sigue registrada arriba y no se borra.
+
+El job nuevo de `.github/workflows/ci.yml`, **`legacy-v99-runtime-on-v103`**, automatiza exclusivamente en runner GitHub efímero y servicio `postgres:18-alpine` lo siguiente:
+
+1. Descargar en el runner **dos checkouts exactos**, el PR candidato y el baseline productivo **`main@ca58693e167752bd6eab8ff4e9be770391fe4293`**; fallar si el baseline contiene V100.
+2. Construir binario candidato Java 21 y arrancarlo con `SEED_ENABLED=true` sobre la base **vacía y desechable**. Verificar `/actuator/health`, catálogo de precios público y último Flyway exactamente V103.
+3. Tomar los conteos de `business` y `phone_number` en esa misma base y detener el proceso candidato.
+4. Construir el **binario antiguo real del SHA de producción**, arrancarlo con `SEED_ENABLED=false` sobre el esquema **ya migrado a V103**, y verificar salud, catálogo público, persistencia de Flyway V103 y conteos intactos. El resultado falla cerrado si el binario no inicia, no es saludable o altera esos conteos.
+5. Mantener explícitamente **OFF** jobs, Twilio/Meta WhatsApp, Gemini/OpenAI LIVE, Mercado Pago, IA de importación y demás entregas externas; sin Railway, credenciales reales, nuevos números, mensajes ni pagos. Subir diagnósticos de ambos arranques solo si falla.
+
+**Resultado:** `PENDING_EXACT_HEAD_CI` hasta ejecución terminal del último commit del PR. No reclamar `PASS` por existencia del workflow. Si pasa, acreditar únicamente `LEGACY_BINARY_STARTS_ON_SYNTHETIC_V103=PASS_OFFLINE`, no `ROLLBACK_PRODUCTION_CERTIFIED`.
+
+**Límites permanentes:** los conteos no garantizan compatibilidad de todos los repositorios, endpoints, roles, permisos o transacciones reales; este runner no utiliza una copia recuperada de producción ni simula una interrupción del carrier. No demuestra latencia de transición, RPO <=24h/RTO <=4h ni que `NOT_PILOT_MANAGED`/trabajos en vuelo hayan cesado. El snapshot nativo reciente, data-compatible rollback y autorización de ventana C2-B siguen como pruebas distintas y `NO-GO` hasta verificación.
+
+**QA y trazabilidad:** cambio de CI + documentación, Java/React fuente ejecutable intacta (cobertura diferencial nueva Java/React N/A). Contratos de nuevo job medidos mediante ejecución real sobre PG18 temporal; Fast Gate, Full CI y logs exact-HEAD obligatorios. Esta es una extensión focalizada del ensayo previo, no una nueva etapa V1 ni justificación para repetir DR histórico, checkout Mercado Pago o pruebas de llamadas.
 ## 6. Límite de responsabilidad de esta etapa
 
 La autorización general para desarrollar **no** hace verificable un backup que esta conexión no puede inspeccionar. Por tanto **no se realizó deploy, merge, migración, compra, transferencia, llamada ni cambio de variables**.
