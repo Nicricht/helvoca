@@ -31,7 +31,7 @@ Do not place another real call merely to satisfy CI. Tenant-specific real-carrie
 
 ## Gate B — Mercado Pago SaaS sandbox provider round-trip
 
-Status: **GENUINE TEST APPROVED INVOICE + REAL JAVA/POSTGRESQL18 RECOVERY VERIFIED; ORGANIC SIGNED PROVIDER NOTIFICATION NOT VERIFIED**
+Status: **GENUINE TEST APPROVED INVOICE + REAL JAVA/POSTGRESQL18 RECOVERY VERIFIED; PROVIDER ROUND-TRIP PENDING (ORGANIC SIGNED SUBSCRIPTION WEBHOOK ONLY)**
 
 **Already completed, not to be recreated:**
 
