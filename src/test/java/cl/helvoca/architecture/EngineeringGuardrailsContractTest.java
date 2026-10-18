@@ -96,6 +96,22 @@ class EngineeringGuardrailsContractTest {
     }
 
     @Test
+    void protectedTestCheckAggregatesSpecializedFullGateAndRejectsSkippedPrerequisites() throws Exception {
+        String workflow = read(".github/workflows/ci.yml");
+        assertTrue(workflow.contains("needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, legacy-v99-runtime-on-v103]"));
+        assertTrue(workflow.contains("if: always() && (github.event_name == 'pull_request'"));
+        assertTrue(workflow.contains("Enforce applicable upstream Full Gate results"));
+        assertTrue(workflow.contains("if [ \"$2\" != \"success\" ]; then"));
+        assertTrue(workflow.contains("required_gate fast-gate \"$FAST_GATE_RESULT\""));
+        assertTrue(workflow.contains("required_gate golden-journey-release-contract \"$GOLDEN_JOURNEY_RESULT\""));
+        assertTrue(workflow.contains("required_gate system-integration-e2e \"$SYSTEM_E2E_RESULT\""));
+        assertTrue(workflow.contains("if [ \"$EVENT_NAME\" = \"pull_request\" ]; then"));
+        assertTrue(workflow.contains("required_gate home-frontend-coverage \"$HOME_COVERAGE_RESULT\""));
+        assertTrue(workflow.contains("required_gate inventory-frontend-coverage \"$INVENTORY_COVERAGE_RESULT\""));
+        assertTrue(workflow.contains("required_gate legacy-v99-runtime-on-v103 \"$LEGACY_ROLLBACK_RESULT\""));
+    }
+
+    @Test
     void projectInvariantsProtectCriticalCommercialAndTenantTruths() throws Exception {
         String invariants = read("docs/engineering/invariants.md").toLowerCase();
         assertTrue(invariants.contains("tenant"));

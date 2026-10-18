@@ -102,6 +102,10 @@ The repository's Fast Gate runs `scripts/ci/check-qa-governance.py` to protect p
 
 States must be accurate: `IN_PROGRESS`, `BLOCKED`, `NO-GO`, `DONE_OFFLINE_ONLY`, `DONE_VERIFIED`, with `DONE_VERIFIED` limited to the acceptance boundary actually proven. Full V1 commercial readiness remains governed by Issue #823 and C0–C7.
 
+### Effective protected Full Gate (release candidate PR)
+
+The active `main` ruleset requires the `fast-gate` and `test` checks, not each independent `RecepVoz CI` job. The protected `test` job therefore waits for the existing applicable prerequisites and **fails closed** unless they conclude `success`: `fast-gate`, `golden-journey-release-contract`, and `system-integration-e2e` for supported workflow events, plus `home-frontend-coverage`, `inventory-frontend-coverage`, and `legacy-v99-runtime-on-v103` for pull requests. The job uses `always()` and checks the actual prerequisite results so that GitHub's treatment of a skipped job as a passing required check cannot silently bypass the Full Gate. PR-only jobs remain optional for the existing `push`/`workflow_dispatch` event types. This is workflow-scoped branch governance, **not** proof of any provider LIVE event, production migration, RPO/RTO, or commercially approved release. Future changes to job topology or branch ruleset must preserve a genuinely failing protected context when an applicable independent QA job fails, cancels, or skips.
+
 ## Coverage policy
 
 Coverage is a structural signal, not proof that assertions are useful. Helvoca nevertheless uses a **100% quality contract**: no applicable coverage dimension for changed or affected production behavior may be certified below 100%.

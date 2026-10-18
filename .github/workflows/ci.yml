@@ -165,12 +165,40 @@ jobs:
         run: bash scripts/ci/fast-gate.sh "$BASE_SHA"
 
   test:
-    needs: [fast-gate, golden-journey-release-contract]
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+    # This context is required by the active main ruleset; it must fail closed
+    # when any applicable independent Full Gate job fails or is skipped.
+    needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, legacy-v99-runtime-on-v103]
+    if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 55
 
     steps:
+      - name: Enforce applicable upstream Full Gate results
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          FAST_GATE_RESULT: ${{ needs['fast-gate'].result }}
+          GOLDEN_JOURNEY_RESULT: ${{ needs['golden-journey-release-contract'].result }}
+          SYSTEM_E2E_RESULT: ${{ needs['system-integration-e2e'].result }}
+          HOME_COVERAGE_RESULT: ${{ needs['home-frontend-coverage'].result }}
+          INVENTORY_COVERAGE_RESULT: ${{ needs['inventory-frontend-coverage'].result }}
+          LEGACY_ROLLBACK_RESULT: ${{ needs['legacy-v99-runtime-on-v103'].result }}
+        run: |
+          set -euo pipefail
+          required_gate() {
+            if [ "$2" != "success" ]; then
+              echo "Required upstream QA job $1 returned $2 (expected success)."
+              exit 1
+            fi
+          }
+          required_gate fast-gate "$FAST_GATE_RESULT"
+          required_gate golden-journey-release-contract "$GOLDEN_JOURNEY_RESULT"
+          required_gate system-integration-e2e "$SYSTEM_E2E_RESULT"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            required_gate home-frontend-coverage "$HOME_COVERAGE_RESULT"
+            required_gate inventory-frontend-coverage "$INVENTORY_COVERAGE_RESULT"
+            required_gate legacy-v99-runtime-on-v103 "$LEGACY_ROLLBACK_RESULT"
+          fi
+
       - name: Checkout
         uses: actions/checkout@v7
         with:
