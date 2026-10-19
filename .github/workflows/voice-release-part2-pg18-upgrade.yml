@@ -189,6 +189,7 @@ jobs:
               'import json,sys; assert isinstance(json.load(sys.stdin), list)'
           }
           docker run -d --name "$current" --network "$net" \
+            -e SPRING_FLYWAY_TARGET=103 \
             --env-file c2b-legacy-synthetic.env \
             -v "$PWD/${new_jars[0]}:/app/helvoca.jar:ro" \
             eclipse-temurin:21-jre java -jar /app/helvoca.jar >/dev/null
