@@ -132,6 +132,10 @@ public class TwilioCertificationCommandCallLauncher {
                 && !TwilioCertificationStartupRunner.isForbiddenTarget(to, forbiddenTo);
     }
 
+    boolean durationWithinDemoLimit() {
+        return maxSeconds <= 75;
+    }
+
     private void scheduleSafetyHangup(String callSid) {
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
             Thread t = new Thread(r, "twilio-certification-command-hangup");

@@ -143,6 +143,8 @@ class TwilioCertificationCommandCallLauncherTest {
                 properties(), "+14355652512", "+56966939611", "+56966939611",
                 "+56975856664", configuredSeconds, mock(TwilioCallControl.class), http);
 
+        assertEquals(expectedSeconds <= 75, launcher.durationWithinDemoLimit());
+
         assertEquals(CALL_SID, launcher.launch(TOKEN));
         HttpRequest request = observedRequest.get();
         assertNotNull(request);

@@ -30,6 +30,24 @@ class TwilioCertificationCommandWorkerTest {
     }
 
     @Test
+    void durationOverSeventyFiveSecondsFailsBeforeCarrierCall() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(
+                "aurora-demo-20261019-002", "22222222-2222-2222-2222-222222222222", UUID.randomUUID());
+        when(store.claimNext()).thenReturn(Optional.of(command));
+        when(binding.allows(command.businessId())).thenReturn(true);
+        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
+                new TenantDatabaseContext(), binding);
+
+        worker.poll();
+
+        verifyNoMoreInteractions(launcher);
+        verify(store).markFailed(command.runId(), "certification DEMO duration exceeds 75 seconds");
+    }
+
+    @Test
     void disabledWorkerDoesNotTouchQueue() {
         TwilioCertificationCommandStore store = mock(TwilioCertificationCommandStore.class);
         TwilioCertificationCommandCallLauncher launcher = mock(TwilioCertificationCommandCallLauncher.class);

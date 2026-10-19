@@ -26,6 +26,7 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
 - Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
 - The command stores an immutable DEMO `business_id`. The worker checks that the configured caller is an active, carrier-verified number belonging to that active DEMO tenant and that its pinned existing-number route has independent approval evidence. Ingress atomically consumes the token only for the same tenant.
+- A PostgreSQL row lock reserves at most two call attempts per DEMO tenant across concurrent workers. A failed or uncertain provider creation still consumes its slot. The DEMO worker rejects a configured `TimeLimit` above 75 seconds before reaching Twilio. This is not a substitute for verifying the live cumulative USD 5 provider spend before enabling the runner.
 - A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 - `TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED=true` permits Gemini Live only for that exact certified DEMO phone and matching call tenant when the API key/model/endpoint are ready. Customer tenants still follow the independent global Gemini flag. Set the DEMO flag to false for immediate new-session rollback.
 
@@ -46,11 +47,13 @@ The existing voice route must also be pinned and enabled for this exact DEMO pho
 Insert a unique run id into PostgreSQL:
 
 ```sql
+INSERT INTO twilio_certification_demo_call_quota (business_id)
+VALUES ('<certified DEMO business UUID>') ON CONFLICT DO NOTHING;
 INSERT INTO twilio_certification_command (run_id, business_id)
 VALUES ('aurora-demo-20261019-001', '<certified DEMO business UUID>');
 ```
 
-Do not add phone numbers or provider identifiers to the command. A legacy command without `business_id` remains pending and cannot launch. The platform API and one-time bootstrap bind the configured DEMO ID after validating the active route.
+Do not add phone numbers or provider identifiers to the command. A legacy command without `business_id` remains pending and cannot launch. The platform API and one-time bootstrap create the quota row and bind the configured DEMO ID after validating the active route. A direct SQL command without a quota row remains pending.
 
 The worker claims the row and updates its state through:
 

@@ -49,6 +49,9 @@ public class TwilioCertificationCommandWorker {
                 if (demoBinding != null && !demoBinding.allows(command.businessId())) {
                     throw new IllegalStateException("certification DEMO tenant/phone binding unavailable");
                 }
+                if (demoBinding != null && !launcher.durationWithinDemoLimit()) {
+                    throw new IllegalStateException("certification DEMO duration exceeds 75 seconds");
+                }
                 String callSid = launcher.launch(command.callbackToken());
                 databaseContext.runAsSystem(
                         () -> commands.recordProviderCall(command.runId(), command.callbackToken(), callSid));

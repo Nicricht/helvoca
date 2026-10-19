@@ -16,6 +16,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import javax.sql.DataSource;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -75,5 +78,38 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
     void databaseRejectsCommandForNonexistentTenant() {
         assertThrows(DataIntegrityViolationException.class, () -> scope.runAsSystem(() ->
                 commands.enqueue("aurora-" + UUID.randomUUID(), "test", UUID.randomUUID())));
+    }
+
+    @Test
+    void concurrentWorkersCannotReserveMoreThanTwoAttempts() throws Exception {
+        UUID demo = UUID.randomUUID();
+        new JdbcTemplate(migrationDataSource).update(
+                "INSERT INTO business(id,name,mode) VALUES (?,'Synthetic quota demo','DEMO')", demo);
+        for (int i = 0; i < 3; i++) {
+            String runId = "quota-" + UUID.randomUUID();
+            assertTrue(scope.callAsSystem(() -> commands.enqueue(runId, "test", demo)));
+        }
+        var pool = Executors.newFixedThreadPool(3);
+        var start = new CountDownLatch(1);
+        try {
+            var claims = java.util.stream.IntStream.range(0, 3)
+                    .mapToObj(i -> pool.submit(() -> {
+                        start.await();
+                        return scope.callAsSystem(commands::claimNext);
+                    })).toList();
+            start.countDown();
+            for (var claim : claims) claim.get(15, TimeUnit.SECONDS);
+            while (scope.callAsSystem(commands::claimNext).isPresent()) {
+                // Drain any claim skipped while another worker held the quota row.
+            }
+            assertEquals(2, scope.callAsSystem(() -> jdbc.queryForObject(
+                    "SELECT reserved_calls FROM twilio_certification_demo_call_quota WHERE business_id = ?",
+                    Integer.class, demo)));
+            assertEquals(1L, scope.callAsSystem(() -> jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM twilio_certification_command WHERE business_id = ? AND status = 'PENDING'",
+                    Long.class, demo)));
+        } finally {
+            pool.shutdownNow();
+        }
     }
 }
