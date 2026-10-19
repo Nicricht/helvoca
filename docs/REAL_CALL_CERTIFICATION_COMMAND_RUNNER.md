@@ -116,6 +116,43 @@ The response intentionally excludes the callback token. Requests use a dedicated
 For the first controlled deployment smoke only, `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` may contain one unique run id. It is idempotent through the same primary key and should be cleared after the smoke test. Future runs should use the authenticated platform API.
 
 ## Platform administrator onboarding (design gate, not yet activated)
+### Implementation candidate in separate PR #849 (NOT deployed)
+
+The onboarding backend is separate from the Twilio demo binding and is
+disabled unless the operator opts in. For first-time authorized setup,
+configure HELVOCA_PLATFORM_BOOTSTRAP_ENABLED=true plus a human's
+HELVOCA_PLATFORM_BOOTSTRAP_NAME, HELVOCA_PLATFORM_BOOTSTRAP_EMAIL and
+HELVOCA_PLATFORM_BOOTSTRAP_TOKEN (43-character base64url encoding of
+32 cryptographically random bytes). This one-time startup creates only an
+invitation hash in PostgreSQL, not a user or an authenticated session.
+Never paste the raw token into issues, workflow outputs or app logs.
+After acceptance, turn off the bootstrap flag; a restart with an existing
+platform account must never mint a new invitation. Existing business emails
+are never silently transformed into platform accounts.
+
+Only when HELVOCA_PLATFORM_ADMIN_INVITES_ENABLED=true, the holder of the
+private activation token may POST to
+/api/v1/auth/invitations/platform/accept with token + their own
+10..72-character password. The token is consumed in a PostgreSQL
+transaction and cannot be used twice. They must subsequently log in
+via the existing application authentication endpoint.
+
+A first independently authenticated platform admin may then POST
+/api/v1/platform/admin-invitations with a second human's name and
+independent email, receive a one-time invitation token in a no-store
+authenticated HTTPS response, and deliver it privately to that person.
+The second person activates their own account using the same POST
+acceptance route. Admin invites can be revoked with DELETE
+/api/v1/platform/admin-invitations/{invitationId}. Platform actions
+verify the signed JWT against the ACTIVE tenant-less DB role.
+
+These APIs are not an email-delivery service. A two-person reply or
+invitation is not evidence of Twilio approval until each separately
+authenticated platform account has performed the existing enrollment
+request, approve and execute operations. The current API implementation
+and any new V106 migration require exact-HEAD full CI and production
+release approval. Do not enable flags, merge or deploy on this plan alone.
+
 
 The verified-existing number enrollment is a normal two-person PLATFORM_ADMIN
 workflow, including for DEMO. The first PLATFORM_ADMIN cannot be created
