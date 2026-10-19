@@ -191,6 +191,99 @@ class PlatformAdminInvitePostgresIntegrationTest {
         assertEquals(0, users(pendingEmail));
     }
 
+
+    @Test
+    void bootstrapRotationRevokesOldPendingSecretAndCreatesOnlyOneCurrentInvitation() {
+        String oldEmail = newEmail();
+        String oldSecret = newToken();
+        UUID oldId = service.bootstrap("Former Candidate", oldEmail, oldSecret);
+        assertNotNull(oldId);
+        String newEmail = newEmail();
+        String newSecret = newToken();
+        UUID newId = service.bootstrap("Authorized Candidate", newEmail, newSecret);
+        assertNotEquals(oldId, newId);
+        assertEquals(1, owner.queryForObject(
+                "SELECT COUNT(*) FROM platform_admin_invitation WHERE purpose='BOOTSTRAP' AND accepted_at IS NULL AND revoked_at IS NULL",
+                Integer.class));
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(oldSecret, "FormerCandidatePassword123"));
+        UUID user = service.accept(newSecret, "AuthorizedCandidatePassword123");
+        assertEquals(1, platformRoles(user));
+        assertEquals(0, users(oldEmail));
+    }
+
+    @Test
+    void registrationCollisionCannotBootstrapOrReplaceExistingIdentity() {
+        String email = newEmail();
+        UUID preexisting = UUID.randomUUID();
+        owner.update("INSERT INTO app_user (id,name,email,password_hash,active) VALUES (?,?,?,?,TRUE)",
+                preexisting, "Existing Person", email, "already-present-hash");
+        assertThrows(IllegalStateException.class,
+                () -> service.bootstrap("No Privilege Promotion", email, newToken()));
+        assertEquals(0, owner.queryForObject("SELECT COUNT(*) FROM platform_admin_invitation", Integer.class));
+        assertEquals(0, platformRoles(preexisting));
+    }
+
+    @Test
+    void invitationFailsIfTargetAccountWasRegisteredAfterIssue() {
+        String firstEmail = newEmail();
+        String firstSecret = newToken();
+        service.bootstrap("First", firstEmail, firstSecret);
+        UUID first = service.accept(firstSecret, "FirstPrivatePassword123");
+        asPlatform(first, firstEmail);
+        String email = newEmail();
+        var invite = context.callAsSystem(() -> service.invite("Another", email));
+        UUID registered = UUID.randomUUID();
+        owner.update("INSERT INTO app_user (id,name,email,password_hash,active) VALUES (?,?,?,?,TRUE)",
+                registered, "Already Registered", email, "existing-hash");
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(invite.token(), "AProperPersonalPassword123"));
+        assertEquals(0, platformRoles(registered));
+        assertEquals(0, owner.queryForObject(
+                "SELECT COUNT(*) FROM platform_admin_invitation WHERE invitation_id=? AND accepted_at IS NOT NULL",
+                Integer.class, invite.invitationId()));
+    }
+
+    @Test
+    void platformActorMustStillMatchActiveDatabaseIdentityAndRole() {
+        String email = newEmail();
+        String token = newToken();
+        service.bootstrap("First", email, token);
+        UUID first = service.accept(token, "FirstPrivatePassword123");
+        asPlatform(UUID.randomUUID(), email);
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Wrong Subject", newEmail())));
+        asPlatform(first, newEmail());
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Wrong Email", newEmail())));
+        asPlatform(first, email);
+        owner.update("DELETE FROM user_role WHERE user_id = ?", first);
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Removed Role", newEmail())));
+    }
+
+    @Test
+    void authorizedInviterCannotRevokeUnknownInvitationOrIssueMalformedInvites() {
+        String email = newEmail();
+        String token = newToken();
+        service.bootstrap("First", email, token);
+        UUID first = service.accept(token, "FirstPrivatePassword123");
+        asPlatform(first, email);
+        assertThrows(ResponseStatusException.class,
+                () -> context.runAsSystem(() -> service.revoke(null)));
+        assertThrows(ResponseStatusException.class,
+                () -> context.runAsSystem(() -> service.revoke(UUID.randomUUID())));
+        assertThrows(IllegalArgumentException.class,
+                () -> context.callAsSystem(() -> service.invite(null, newEmail())));
+        assertThrows(IllegalArgumentException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", "invalid email")));
+        assertThrows(IllegalArgumentException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", null)));
+        assertEquals(0, owner.queryForObject(
+                "SELECT COUNT(*) FROM platform_admin_invitation WHERE purpose='INVITE'",
+                Integer.class));
+    }
+
     private void asPlatform(UUID id, String email) {
         Instant now = Instant.now();
         Jwt jwt = new Jwt("local-fixture", now, now.plusSeconds(300),

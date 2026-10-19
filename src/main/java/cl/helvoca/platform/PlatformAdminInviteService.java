@@ -77,7 +77,11 @@ public final class PlatformAdminInviteService {
                         && fingerprint(token).equals(pending.fingerprint())
                         && Instant.now().isBefore(pending.expiry())) return pending.id();
                 if (normalizedEmail.equals(pending.email())
-                        && fingerprint(token).equals(pending.fingerprint())) return null; // expired: rotate secret
+                        && fingerprint(token).equals(pending.fingerprint())) {
+                    // A retry using the expired secret is not an active invitation. Fail
+                    // visibly so the operator must rotate the secret before proceeding.
+                    throw new IllegalStateException("Bootstrap invitation expired; rotate secret");
+                }
             }
             jdbc.update("""
                     UPDATE platform_admin_invitation SET revoked_at=clock_timestamp()
