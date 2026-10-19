@@ -284,6 +284,93 @@ class PlatformAdminInvitePostgresIntegrationTest {
                 Integer.class));
     }
 
+
+    @Test
+    void reissuingBootstrapToSameEmailWithRotatedTokenRevokesTheOldOne() {
+        String address = newEmail();
+        String old = newToken();
+        UUID oldId = service.bootstrap("First", address, old);
+        UUID newId = service.bootstrap("First", address, newToken());
+        assertNotEquals(oldId, newId);
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(old, "PrivatePass1234"));
+    }
+
+    @Test
+    void existingAccountIsNeverInvitableToPlatformRole() {
+        String firstEmail = newEmail();
+        String secret = newToken();
+        service.bootstrap("First", firstEmail, secret);
+        UUID first = service.accept(secret, "PrivatePass1234");
+        asPlatform(first, firstEmail);
+        String other = newEmail();
+        owner.update("INSERT INTO app_user(id,name,email,password_hash,active) VALUES (?,?,?,?,TRUE)",
+                UUID.randomUUID(), "Existing", other, "fixture-hash");
+        assertThrows(ResponseStatusException.class,
+                () -> context.callAsSystem(() -> service.invite("Existing", other)));
+    }
+
+    @Test
+    void bootstrapClaimCannotActivateAfterPlatformAdminExists() {
+        String firstEmail = newEmail(), token = newToken();
+        service.bootstrap("First", firstEmail, token);
+        UUID other = UUID.randomUUID();
+        UUID role = owner.queryForObject("SELECT id FROM role WHERE code='PLATFORM_ADMIN'", UUID.class);
+        owner.update("INSERT INTO app_user(id,name,email,password_hash,active) VALUES (?,?,?,?,TRUE)",
+                other, "Separate Admin", newEmail(), "fixture-hash");
+        owner.update("INSERT INTO user_role(user_id,role_id) VALUES (?,?)", other, role);
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(token, "PrivatePass1234"));
+        assertEquals(0, users(firstEmail));
+    }
+
+    @Test
+    void signedPlatformActorRequiresMatchingJwtSubjectRolesAndAuthorities() {
+        String address = newEmail(), secret = newToken();
+        service.bootstrap("First", address, secret);
+        UUID first = service.accept(secret, "PrivatePass1234");
+        Instant now = Instant.now();
+        var authority = new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN");
+
+        Jwt noRoleClaim = new Jwt("test", now, now.plusSeconds(300),
+                Map.of("alg", "HS256"),
+                Map.of("sub", first.toString(), "email", address));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(noRoleClaim, List.of(authority)));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        Jwt wrongRole = new Jwt("test", now, now.plusSeconds(300),
+                Map.of("alg", "HS256"),
+                Map.of("sub", first.toString(), "email", address, "roles", List.of("BUSINESS_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(wrongRole, List.of(authority)));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        Jwt noAuthority = new Jwt("test", now, now.plusSeconds(300),
+                Map.of("alg", "HS256"),
+                Map.of("sub", first.toString(), "email", address, "roles", List.of("PLATFORM_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(noAuthority, List.of()));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        Jwt malformedSubject = new Jwt("test", now, now.plusSeconds(300),
+                Map.of("alg", "HS256"),
+                Map.of("sub", "invalid-uuid", "email", address, "roles", List.of("PLATFORM_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(malformedSubject, List.of(authority)));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        SecurityContextHolder.getContext().setAuthentication(
+                new org.springframework.security.authentication.TestingAuthenticationToken(
+                        "not-a-platform-jwt", "ignored", "ROLE_PLATFORM_ADMIN"));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+    }
+
     private void asPlatform(UUID id, String email) {
         Instant now = Instant.now();
         Jwt jwt = new Jwt("local-fixture", now, now.plusSeconds(300),
