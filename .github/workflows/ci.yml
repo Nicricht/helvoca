@@ -572,7 +572,7 @@ jobs:
           mvn --batch-mode --no-transfer-progress -DskipTests clean package
           candidate_jar="$(find target -maxdepth 1 -name 'helvoca-*.jar' ! -name '*.original' | head -1)"
           test -n "$candidate_jar" || fail "Candidate JAR absent"
-          SEED_ENABLED=true SERVER_PORT=18080 java -jar "$candidate_jar" > c2b-candidate-app.log 2>&1 &
+          SPRING_FLYWAY_TARGET=103 SEED_ENABLED=true SERVER_PORT=18080 java -jar "$candidate_jar" > c2b-candidate-app.log 2>&1 &
           APP_PID=$!
           ready http://127.0.0.1:18080 c2b-candidate-app.log
           test "$(psql_query "SELECT MAX(version::integer) FROM public.flyway_schema_history WHERE success")" = 103 ||

@@ -91,7 +91,7 @@ class TwilioV99ToV103FlywayUpgradePostgresIntegrationTest {
                 WHERE version = '99' AND success
                 """, Integer.class);
 
-        Flyway finalFlyway = migrations(MigrationVersion.LATEST);
+        Flyway finalFlyway = migrations(MigrationVersion.fromVersion("103"));
         MigrateResult upgraded = finalFlyway.migrate();
         assertTrue(upgraded.success, "Flyway incremental migration should succeed");
         assertEquals(4, upgraded.migrationsExecuted,

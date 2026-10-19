@@ -105,8 +105,11 @@ public class GeminiLiveProperties {
     public void setResponseLatencyBudgetMs(int value) { this.responseLatencyBudgetMs = value; }
 
     public boolean ready() {
-        return enabled
-                && notBlank(apiKey)
+        return enabled && configurationReady();
+    }
+
+    public boolean configurationReady() {
+        return notBlank(apiKey)
                 && GeminiLiveModelPolicy.supported(model)
                 && notBlank(voice)
                 && GeminiLiveModelPolicy.approvedEndpoint(websocketUrl);

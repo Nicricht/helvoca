@@ -58,6 +58,21 @@ class TwilioVerifiedExistingVoiceRouteGateTest {
     }
 
     @Test
+    void demoRouteRequiresActiveDemoAndExistingTwoPersonAuditWithoutGlobalPilotSwitch() {
+        var demo = new TwilioVerifiedExistingVoiceRouteGate(jdbc, pilot, scope, true,
+                BUSINESS.toString(), PHONE.toString(), ACCOUNT, true);
+        when(jdbc.queryForObject(contains("FROM business b"), eq(Boolean.class), eq(BUSINESS)))
+                .thenReturn(false, true, true);
+        when(jdbc.queryForObject(contains("twilio_existing_enrollment_claim"), eq(Boolean.class),
+                any(), any(), any(), any(), any())).thenReturn(false, true);
+
+        assertFalse(scope.callAsSystem(() -> demo.allows(number))); // CUSTOMER or suspended
+        assertFalse(scope.callAsSystem(() -> demo.allows(number))); // missing dual audit
+        assertTrue(scope.callAsSystem(() -> demo.allows(number)));
+        verifyNoInteractions(pilot);
+    }
+
+    @Test
     void flagDisabledBlocksEvenCompleteVerifiedCarrierAndPlatformEvidence() {
         assertFalse(scope.callAsSystem(() -> pinned(false).allows(number)));
         verifyNoInteractions(jdbc, pilot);

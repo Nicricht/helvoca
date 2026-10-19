@@ -4,6 +4,7 @@ import cl.helvoca.security.TenantDatabaseContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,16 +16,26 @@ public class TwilioCertificationCommandWorker {
     private final TwilioCertificationCommandStore commands;
     private final TwilioCertificationCommandCallLauncher launcher;
     private final TenantDatabaseContext databaseContext;
+    private final TwilioCertificationDemoBindingGate demoBinding;
 
+    @Autowired
     public TwilioCertificationCommandWorker(
             @Value("${TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED:false}") boolean enabled,
             TwilioCertificationCommandStore commands,
             TwilioCertificationCommandCallLauncher launcher,
-            TenantDatabaseContext databaseContext) {
+            TenantDatabaseContext databaseContext,
+            TwilioCertificationDemoBindingGate demoBinding) {
         this.enabled = enabled;
         this.commands = commands;
         this.launcher = launcher;
         this.databaseContext = databaseContext;
+        this.demoBinding = demoBinding;
+    }
+
+    // Isolated legacy unit tests; Spring always injects the DEMO gate.
+    TwilioCertificationCommandWorker(boolean enabled, TwilioCertificationCommandStore commands,
+            TwilioCertificationCommandCallLauncher launcher, TenantDatabaseContext databaseContext) {
+        this(enabled, commands, launcher, databaseContext, null);
     }
 
     @Scheduled(
@@ -35,6 +46,12 @@ public class TwilioCertificationCommandWorker {
 
         databaseContext.callAsSystem(commands::claimNext).ifPresent(command -> {
             try {
+                if (demoBinding != null && !demoBinding.allows(command.businessId())) {
+                    throw new IllegalStateException("certification DEMO tenant/phone binding unavailable");
+                }
+                if (demoBinding != null && !launcher.durationWithinDemoLimit()) {
+                    throw new IllegalStateException("certification DEMO duration exceeds 75 seconds");
+                }
                 String callSid = launcher.launch(command.callbackToken());
                 databaseContext.runAsSystem(
                         () -> commands.recordProviderCall(command.runId(), command.callbackToken(), callSid));
