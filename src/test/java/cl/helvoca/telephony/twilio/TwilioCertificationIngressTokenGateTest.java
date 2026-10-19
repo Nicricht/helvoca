@@ -24,6 +24,8 @@ class TwilioCertificationIngressTokenGateTest {
         when(store.consumeIngressToken(TOKEN, CALL_SID, tenant)).thenReturn(true);
         assertTrue(gate.authorize(TOKEN, CALL_SID, FROM, ALLOWED_TO));
         verify(store).consumeIngressToken(TOKEN, CALL_SID, tenant);
+        when(store.consumeIngressToken(TOKEN, CALL_SID, tenant)).thenReturn(false);
+        assertFalse(gate.authorize(TOKEN, CALL_SID, FROM, ALLOWED_TO));
     }
     private static final String TOKEN = "11111111-1111-1111-1111-111111111111";
     private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";

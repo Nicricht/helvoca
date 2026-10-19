@@ -216,6 +216,8 @@ class TwilioCertificationCommandStoreTest {
         assertTrue(store.enqueue("aurora-demo-20261019-001", "platform-user", tenant));
         assertTrue(store.consumeIngressToken(token, sid, tenant));
         assertFalse(store.consumeIngressToken(token, sid, null));
+        assertFalse(store.consumeIngressToken("bad", sid, tenant));
+        assertFalse(store.consumeIngressToken(token, "bad", tenant));
         verify(jdbc).update(contains("business_id = ?"), eq(sid), eq(token), eq(tenant), eq(sid));
     }
 

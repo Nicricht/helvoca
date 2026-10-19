@@ -1,6 +1,7 @@
 package cl.helvoca.voice;
 
 import cl.helvoca.ai.live.OpenAiLiveSipService;
+import cl.helvoca.ai.gemini.GeminiLiveVoiceProvider;
 import cl.helvoca.telephony.twilio.TwilioMediaStreamTwimlFactory;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,27 @@ import static org.mockito.Mockito.*;
 
 class VoiceCallRouterTest {
     private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";
+
+    @Test
+    void scopedGeminiRouteIsUsedOnlyForItsCertifiedBusinessNumber() {
+        var properties = new VoiceProviderProperties();
+        properties.setProviderOrder(List.of("gemini"));
+        var providers = mock(VoiceAiProviderRegistry.class);
+        var gemini = mock(GeminiLiveVoiceProvider.class);
+        var media = mock(TwilioMediaStreamTwimlFactory.class);
+        String demo = "+12025550123";
+        when(providers.require("gemini")).thenReturn(gemini);
+        when(gemini.id()).thenReturn("gemini");
+        when(gemini.configuredFor(demo)).thenReturn(true);
+        when(media.twiml(demo, "+56911111111", CALL_SID, "gemini"))
+                .thenReturn("<Response><Connect><Stream/></Connect></Response>");
+        var router = new VoiceCallRouter(properties, providers,
+                new VoiceProviderHealthRegistry(), media, mock(OpenAiLiveSipService.class));
+
+        assertEquals("gemini", router.route(demo, "+56911111111", CALL_SID).orElseThrow().providerId());
+        assertTrue(router.route("+12025550999", "+56911111111", CALL_SID).isEmpty());
+        verify(gemini, never()).configured();
+    }
 
     @Test
     void selectsGeminiFirstWhenHealthy() {

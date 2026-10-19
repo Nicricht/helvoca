@@ -54,6 +54,42 @@ class GeminiLiveDemoIsolationTest {
         assertFalse(provider.sessionProperties(context(UUID.randomUUID(), "+12025550123")).ready());
     }
 
+    @Test
+    void incompleteCredentialsMissingGateAndNullContextCannotEnableDemo() {
+        var properties = new GeminiLiveProperties();
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var provider = provider(properties, binding, true);
+        assertFalse(provider.configuredFor("+12025550123"));
+        properties.setApiKey("synthetic-test-key");
+        assertFalse(provider.configuredFor("+12025550123"));
+        assertFalse(provider(properties, null, true).configuredFor("+12025550123"));
+        assertFalse(provider.sessionProperties(null).ready());
+        assertFalse(provider.sessionProperties(context(null, "+12025550123")).ready());
+        when(binding.pinnedBusinessId()).thenReturn(UUID.randomUUID());
+        assertFalse(provider.sessionProperties(context(UUID.randomUUID(), "+12025550123")).ready());
+        UUID demo = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(demo);
+        assertFalse(provider.sessionProperties(context(demo, "+12025550123")).ready());
+    }
+
+    @Test
+    void ordinaryGlobalGeminiReadinessRemainsAvailable() {
+        var properties = new GeminiLiveProperties();
+        properties.setApiKey("synthetic-test-key");
+        properties.setEnabled(true);
+        var provider = provider(properties, null, false);
+        assertTrue(provider.configuredFor("+12025550999"));
+        assertTrue(provider.sessionProperties(context(UUID.randomUUID(), "+12025550999")).ready());
+    }
+
+    private static GeminiLiveVoiceProvider provider(GeminiLiveProperties properties,
+            TwilioCertificationDemoBindingGate binding, boolean enabled) {
+        return new GeminiLiveVoiceProvider(properties, mock(RealtimeToolService.class),
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                mock(VoiceProviderHealthRegistry.class), binding, enabled);
+    }
+
     private static RealtimeCallContext context(UUID businessId, String destination) {
         return new RealtimeCallContext(UUID.randomUUID(), businessId, null,
                 "+56911111111", destination, "MZsynthetic");

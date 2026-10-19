@@ -3,6 +3,7 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessMode;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.business.BusinessStatus;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantDatabaseContext;
@@ -63,6 +64,66 @@ class TwilioCertificationDemoBindingGateTest {
         assertFalse(gate.allows(DEMO_ID));
         when(route.allows(phone)).thenReturn(true);
         assertTrue(gate.allows(DEMO_ID));
+        assertEquals(DEMO_ID, gate.pinnedBusinessId());
+        assertTrue(gate.allowsNumber(FROM));
+        assertFalse(gate.allowsNumber("+12025550999"));
+    }
+
+    @Test
+    void malformedPinsAndMissingDatabaseFailClosed() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var context = new TenantDatabaseContext();
+        assertFalse(new TwilioCertificationDemoBindingGate(null, FROM, ACCOUNT,
+                phones, businesses, route, context).allows(DEMO_ID));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), null, ACCOUNT,
+                phones, businesses, route, context).allows(DEMO_ID));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), " ", ACCOUNT,
+                phones, businesses, route, context).allows(DEMO_ID));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, null,
+                phones, businesses, route, context).allows(DEMO_ID));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, "bad",
+                phones, businesses, route, context).allows(DEMO_ID));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), null, ACCOUNT,
+                phones, businesses, route, context).allowsNumber(FROM));
+        when(phones.findByPhoneNumberAndActiveTrue(FROM)).thenThrow(new IllegalStateException("db unavailable"));
+        assertFalse(new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, context).allows(DEMO_ID));
+    }
+
+    @Test
+    void missingSuspendedOrMisboundInventoryCannotAdmitDemo() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var context = new TenantDatabaseContext();
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, context);
+        var phone = certifiedPhone(DEMO_ID);
+        var business = new Business();
+        business.setMode(BusinessMode.DEMO);
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        assertFalse(gate.allows(DEMO_ID)); // No carrier record.
+        when(phones.findByPhoneNumberAndActiveTrue(FROM)).thenReturn(Optional.of(phone));
+        when(route.allows(phone)).thenReturn(true);
+        business.setStatus(BusinessStatus.SUSPENDED);
+        assertFalse(gate.allows(DEMO_ID));
+        business.setStatus(BusinessStatus.ACTIVE);
+        assertTrue(gate.allows(DEMO_ID));
+
+        phone.setActive(false); assertFalse(gate.allows(DEMO_ID)); phone.setActive(true);
+        phone.setBusinessId(UUID.randomUUID()); assertFalse(gate.allows(DEMO_ID)); phone.setBusinessId(DEMO_ID);
+        phone.setProvider("OTHER"); assertFalse(gate.allows(DEMO_ID)); phone.setProvider("TWILIO");
+        phone.setTwilioBindingSource(null); assertFalse(gate.allows(DEMO_ID));
+        phone.setTwilioBindingSource("VERIFIED_EXISTING");
+        phone.setVoiceVerifiedAt(null); assertFalse(gate.allows(DEMO_ID));
+        phone.setVoiceVerifiedAt(Instant.now());
+        phone.setTwilioAccountSid("AC" + "c".repeat(32)); assertFalse(gate.allows(DEMO_ID));
+        phone.setTwilioAccountSid(ACCOUNT);
+        phone.setExternalId(null); assertFalse(gate.allows(DEMO_ID));
+        phone.setExternalId("bad"); assertFalse(gate.allows(DEMO_ID));
+        phone.setExternalId("PN" + "b".repeat(32)); assertTrue(gate.allows(DEMO_ID));
     }
 
     private static PhoneNumber certifiedPhone(UUID businessId) {
