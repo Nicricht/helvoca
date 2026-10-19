@@ -131,7 +131,7 @@ class TwilioCertificationCommandCallLauncherTest {
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(201);
-        when(response.body()).thenReturn("{\\"sid\\":\\"" + CALL_SID + "\\"}");
+        when(response.body()).thenReturn("{\"sid\":\"" + CALL_SID + "\"}");
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
                 .thenAnswer(invocation -> {
