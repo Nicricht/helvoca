@@ -114,3 +114,29 @@ GET /api/v1/platform/certification-runs/latency-api-20260927-001
 The response intentionally excludes the callback token. Requests use a dedicated per-identity rate limit of five requests per hour by default.
 
 For the first controlled deployment smoke only, `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` may contain one unique run id. It is idempotent through the same primary key and should be cleared after the smoke test. Future runs should use the authenticated platform API.
+
+## Platform administrator onboarding (design gate, not yet activated)
+
+The verified-existing number enrollment is a normal two-person PLATFORM_ADMIN
+workflow, including for DEMO. The first PLATFORM_ADMIN cannot be created
+through normal registration or tenant invitations. Never elevate a customer
+login, invent a second approver or patch user_role manually to bypass approval.
+
+A future independent platform onboarding mechanism must provide:
+- An operator-controlled, opt-in, one-time bootstrap invitation for the
+  first real human only, with an operator-generated cryptographically strong
+  secret supplied over a private channel; default OFF; no hard-coded accounts.
+- A platform-only second invitation; immutable inviter identity comes from
+  a signed JWT AND a current ACTIVE PLATFORM_ADMIN DB row.
+- Secret token hashes only in PostgreSQL, expiry, revocation, replay rejection
+  and transactional single-use acceptance; each person chooses their password.
+- A tenant-less platform identity: app_user.business_id IS NULL; preserve
+  unrelated customer accounts (same email is rejected, never promoted).
+- Independently signed-in humans before the request/approve/execute lifecycle.
+  Email consent is not an authenticated platform approval.
+
+Do not turn on a bootstrap feature in shared Railway production merely
+because this runbook or CI exists. Require RED/GREEN and full PostgreSQL
+RLS/security tests; release still verifies the USD 5 maximum, two attempts,
+75-second carrier limit, Gemini tenant isolation and live stop procedure.
+Preserve the certified outbound call PR #847 without rewriting it.
