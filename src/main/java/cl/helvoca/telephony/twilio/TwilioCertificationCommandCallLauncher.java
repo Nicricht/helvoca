@@ -84,7 +84,8 @@ public class TwilioCertificationCommandCallLauncher {
                 + "&" + form("StatusCallbackEvent", "ringing")
                 + "&" + form("StatusCallbackEvent", "answered")
                 + "&" + form("StatusCallbackEvent", "completed")
-                + "&" + form("Timeout", "25");
+                + "&" + form("Timeout", "25")
+                + "&" + form("TimeLimit", Integer.toString(maxSeconds));
 
         String basic = Base64.getEncoder().encodeToString(
                 (twilio.getAccountSid().trim() + ":" + twilio.getAuthToken().trim())

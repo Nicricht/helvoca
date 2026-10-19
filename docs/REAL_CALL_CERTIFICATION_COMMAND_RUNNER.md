@@ -24,7 +24,7 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - The global `TWILIO_CERTIFICATION_INGRESS_ENABLED` flag can remain `false`.
 - Twilio must present the one-shot token on its signed webhook request.
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
-- Every launched call retains the configured safety hangup bounded to 20–180 seconds.
+- Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
 
 ## One-time production enablement
 
