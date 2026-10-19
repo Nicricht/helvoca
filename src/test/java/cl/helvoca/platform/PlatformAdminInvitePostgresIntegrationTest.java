@@ -129,6 +129,68 @@ class PlatformAdminInvitePostgresIntegrationTest {
         assertEquals(0, users(toExpire));
     }
 
+
+    @Test
+    void expiredBootstrapRequiresOperatorToRotateInsteadOfSilentlyDoingNothing() {
+        String email = newEmail();
+        String token = newToken();
+        UUID id = service.bootstrap("Authorized Human", email, token);
+        assertNotNull(id);
+        owner.update("UPDATE platform_admin_invitation SET expires_at = clock_timestamp() - interval '1 second' WHERE invitation_id=?", id);
+        assertThrows(IllegalStateException.class,
+                () -> service.bootstrap("Authorized Human", email, token),
+                "An expired bootstrap invitation must explicitly fail rather than leave the operator believing setup succeeded");
+        assertEquals(0, users(email));
+    }
+
+    @Test
+    void malformedSecretsAndOperatorIdentityNeverCreateAnInvitation() {
+        String email = newEmail();
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap("First", email, "short"));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap(null, email, newToken()));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap(" ", email, newToken()));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap("n".repeat(151), email, newToken()));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap("First", null, newToken()));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap("First", "not-an-email", newToken()));
+        assertThrows(IllegalArgumentException.class, () -> service.bootstrap("First", "x".repeat(181), newToken()));
+        assertEquals(0, owner.queryForObject("SELECT COUNT(*) FROM platform_admin_invitation", Integer.class));
+        assertThrows(ResponseStatusException.class, () -> service.accept(null, "GoodPassword123"));
+        assertThrows(ResponseStatusException.class, () -> service.accept("broken", "GoodPassword123"));
+        assertThrows(ResponseStatusException.class, () -> service.accept(newToken(), null));
+        assertThrows(ResponseStatusException.class, () -> service.accept(newToken(), "short"));
+        assertThrows(ResponseStatusException.class, () -> service.accept(newToken(), "x".repeat(73)));
+    }
+
+    @Test
+    void unverifiedIdentityAndRevokedInviterCannotCreatePrivilegedAccounts() {
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Unverified", newEmail())));
+        assertThrows(AccessDeniedException.class,
+                () -> context.runAsSystem(() -> service.revoke(UUID.randomUUID())));
+        String firstEmail = newEmail();
+        String firstToken = newToken();
+        service.bootstrap("First", firstEmail, firstToken);
+        UUID first = service.accept(firstToken, "OnlyFirstKnows123");
+        asPlatform(first, firstEmail);
+        assertThrows(AccessDeniedException.class,
+                () -> service.invite("Bypassed", newEmail()),
+                "An authenticated admin must have explicit SYSTEM database scope");
+        assertThrows(ResponseStatusException.class,
+                () -> context.callAsSystem(() -> service.invite("Self", firstEmail)));
+        String pendingEmail = newEmail();
+        PlatformAdminInviteService.InviteView second =
+                context.callAsSystem(() -> service.invite("Second", pendingEmail));
+        assertThrows(ResponseStatusException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", pendingEmail)));
+        owner.update("UPDATE app_user SET active = false WHERE id = ?", first);
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Third", newEmail())));
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(second.token(), "OnlySecondKnows123"),
+                "A revoked platform inviter cannot mint a replacement privileged account");
+        assertEquals(0, users(pendingEmail));
+    }
+
     private void asPlatform(UUID id, String email) {
         Instant now = Instant.now();
         Jwt jwt = new Jwt("local-fixture", now, now.plusSeconds(300),
