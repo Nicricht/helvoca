@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -53,6 +54,12 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
             assertTrue(commands.enqueue(legacy, "test"));
             assertTrue(commands.enqueue(bound, "test", demo));
         });
+        assertEquals(1L, scope.callAsTenant(demo, () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM twilio_certification_command WHERE run_id = ?", Long.class, bound)));
+        assertEquals(0L, scope.callAsTenant(other, () -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM twilio_certification_command WHERE run_id = ?", Long.class, bound)));
+        assertThrows(DataAccessException.class, () -> scope.runAsTenant(other, () ->
+                commands.enqueue("foreign-" + UUID.randomUUID(), "test", demo)));
 
         var claim = scope.callAsSystem(() -> commands.claimNext().orElseThrow());
         assertEquals(bound, claim.runId());

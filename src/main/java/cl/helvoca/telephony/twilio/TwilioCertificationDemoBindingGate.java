@@ -41,6 +41,10 @@ public final class TwilioCertificationDemoBindingGate {
 
     public UUID pinnedBusinessId() { return pinnedBusinessId; }
 
+    public boolean allowsNumber(String businessPhone) {
+        return from != null && from.equals(businessPhone) && allows(pinnedBusinessId);
+    }
+
     public boolean allows(UUID commandBusinessId) {
         if (pinnedBusinessId == null || !pinnedBusinessId.equals(commandBusinessId)
                 || from == null || from.isBlank() || accountSid == null
