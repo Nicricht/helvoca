@@ -3,14 +3,24 @@ package cl.helvoca.platform;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.telephony.twilio.TwilioCertificationCommandStore;
+import cl.helvoca.telephony.twilio.TwilioCertificationDemoBindingGate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PlatformCertificationRunService {
     private final TwilioCertificationCommandStore commands;
+    private final TwilioCertificationDemoBindingGate demoBinding;
 
-    public PlatformCertificationRunService(TwilioCertificationCommandStore commands) {
+    @Autowired
+    public PlatformCertificationRunService(TwilioCertificationCommandStore commands,
+            TwilioCertificationDemoBindingGate demoBinding) {
         this.commands = commands;
+        this.demoBinding = demoBinding;
+    }
+
+    PlatformCertificationRunService(TwilioCertificationCommandStore commands) {
+        this(commands, null);
     }
 
     public PlatformCertificationRunResponse create(String runId, String requestedBy) {
@@ -21,7 +31,13 @@ public class PlatformCertificationRunService {
         String actor = requestedBy == null || requestedBy.isBlank()
                 ? "platform-admin"
                 : requestedBy.trim().substring(0, Math.min(requestedBy.trim().length(), 180));
-        if (!commands.enqueue(normalizedRunId, actor)) {
+        if (demoBinding != null && !demoBinding.allows(demoBinding.pinnedBusinessId())) {
+            throw new IllegalStateException("certification DEMO tenant/phone binding unavailable");
+        }
+        boolean inserted = demoBinding == null
+                ? commands.enqueue(normalizedRunId, actor)
+                : commands.enqueue(normalizedRunId, actor, demoBinding.pinnedBusinessId());
+        if (!inserted) {
             throw new ConflictException("Certification run id already exists");
         }
         return get(normalizedRunId);

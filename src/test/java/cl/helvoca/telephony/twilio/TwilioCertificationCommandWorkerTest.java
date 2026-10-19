@@ -4,11 +4,30 @@ import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TwilioCertificationCommandWorkerTest {
+
+    @Test
+    void mismatchedDemoBindingFailsBeforeCarrierCall() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(
+                "aurora-demo-20261019-001", "11111111-1111-1111-1111-111111111111", UUID.randomUUID());
+        when(store.claimNext()).thenReturn(Optional.of(command));
+        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
+                new TenantDatabaseContext(), binding);
+
+        worker.poll();
+
+        verify(binding).allows(command.businessId());
+        verifyNoInteractions(launcher);
+        verify(store).markFailed(command.runId(), "certification DEMO tenant/phone binding unavailable");
+    }
 
     @Test
     void disabledWorkerDoesNotTouchQueue() {

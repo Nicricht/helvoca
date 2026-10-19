@@ -1,12 +1,30 @@
 package cl.helvoca.telephony.twilio;
 
 import org.junit.jupiter.api.Test;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 class TwilioCertificationIngressTokenGateTest {
+
+    @Test
+    void tokenRequiresSamePinnedDemoBusinessBeforeConsumption() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var tenant = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(tenant);
+        var gate = new TwilioCertificationIngressTokenGate(store, FROM, ALLOWED_TO,
+                FORBIDDEN_TO, binding);
+
+        assertFalse(gate.authorize(TOKEN, CALL_SID, FROM, ALLOWED_TO));
+        verifyNoInteractions(store);
+        when(binding.allows(tenant)).thenReturn(true);
+        when(store.consumeIngressToken(TOKEN, CALL_SID, tenant)).thenReturn(true);
+        assertTrue(gate.authorize(TOKEN, CALL_SID, FROM, ALLOWED_TO));
+        verify(store).consumeIngressToken(TOKEN, CALL_SID, tenant);
+    }
     private static final String TOKEN = "11111111-1111-1111-1111-111111111111";
     private static final String CALL_SID = "CA0123456789abcdef0123456789abcdef";
     private static final String FROM = "+14355652512";

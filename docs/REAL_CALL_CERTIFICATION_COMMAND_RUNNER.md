@@ -1,6 +1,6 @@
 # Real-call certification command runner
 
-RecepVoz supports a persistent, fail-closed command runner for authorized real-call certification without changing Railway variables or redeploying for every call.
+RecepVoz supports a persistent, fail-closed command runner for authorized real-call certification. As of the DEMO tenant binding change, an unbound command cannot be claimed.
 
 
 ## Aurora Sur outbound demonstration: protected preparation (2026-10-18)
@@ -25,27 +25,31 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - Twilio must present the one-shot token on its signed webhook request.
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
 - Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
+- The command stores an immutable DEMO `business_id`. The worker checks that the configured caller is an active, carrier-verified number belonging to that active DEMO tenant and that its pinned existing-number route has independent approval evidence. Ingress atomically consumes the token only for the same tenant.
+- A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 
 ## One-time production enablement
 
-After the feature has passed CI and the exact merged SHA is deployed, set:
+After the feature has passed CI and the exact merged SHA is deployed, enroll the carrier-owned DEMO number through the two-person platform process, verify callbacks and configured route pins, and set the DEMO tenant pin. Then set:
 
 ```
 TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED=true
+TWILIO_CERTIFICATION_DEMO_BUSINESS_ID=<existing active DEMO business UUID>
+TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true
 ```
 
-This is the only feature toggle that needs to stay enabled. Do not enable global certification ingress.
+The existing voice route must also be pinned and enabled for this exact DEMO phone. Do not enable global certification ingress or global pilot external effects. Roll back the DEMO route and runner flags to false and hang up the known Call SID if necessary.
 
 ## Request one authorized call
 
 Insert a unique run id into PostgreSQL:
 
 ```sql
-INSERT INTO twilio_certification_command (run_id)
-VALUES ('latency-20260927-001');
+INSERT INTO twilio_certification_command (run_id, business_id)
+VALUES ('aurora-demo-20261019-001', '<certified DEMO business UUID>');
 ```
 
-Do not add phone numbers or provider identifiers to the command.
+Do not add phone numbers or provider identifiers to the command. A legacy command without `business_id` remains pending and cannot launch. The platform API and one-time bootstrap bind the configured DEMO ID after validating the active route.
 
 The worker claims the row and updates its state through:
 
