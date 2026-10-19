@@ -2,6 +2,15 @@
 
 RecepVoz supports a persistent, fail-closed command runner for authorized real-call certification without changing Railway variables or redeploying for every call.
 
+
+## Aurora Sur outbound demonstration: protected preparation (2026-10-18)
+
+**NO-GO until independently verified.** The production caller number is assigned to an existing business with WhatsApp activity. The one-shot certification route currently resolves tenant context through that phone number, so a booking demonstration MUST NOT run against it. Do not reassign or mutate that customer's number, tenant, bookings, or WhatsApp service.
+
+The owner authorized preparing a controlled production release **after** implementation, branch QA, tenant-isolation certification, and cost/stop verification; this is not authorization to enable live flags, launch calls, or exceed the existing USD 5 cumulative budget. The target participant consented to a test call at a destination ending in 9611, with a currently configured 75-second maximum. Do not store the full participant number in the repository.
+
+Acceptance before staging production: explicit isolated demo-tenant binding throughout signed Twilio ingress, call/session/media/callback/tool context and real PostgreSQL booking persistence; reject wrong account/tenant/token, replay and expiry; enforce call duration at the Twilio provider *and* keep scoped server-side hangup as backup; verify applicable provider costs and cumulative budget, Gemini runtime readiness, and tenant-scoped rollback. Follow `AGENTS.md`, `docs/engineering/QA_POLICY.md` and PR receipt V2. Do not use an in-memory simulator as PostgreSQL evidence. Document real provider call and terminal SID only after one actually exists.
+
 ## Safety invariants
 
 - The worker is disabled by default with `TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED=false`.
