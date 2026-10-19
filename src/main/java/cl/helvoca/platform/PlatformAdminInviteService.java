@@ -110,7 +110,7 @@ public final class PlatformAdminInviteService {
                     SELECT COUNT(*) FROM platform_admin_invitation
                      WHERE lower(email)=? AND accepted_at IS NULL AND revoked_at IS NULL
                     """, Integer.class, normalizedEmail);
-            if (pending != null && pending != 0)
+            if (!Integer.valueOf(0).equals(pending))
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Invitation pending");
             byte[] entropy = new byte[32];
             random.nextBytes(entropy);
@@ -197,7 +197,7 @@ public final class PlatformAdminInviteService {
                 WHERE u.id=? AND u.active AND u.business_id IS NULL
                   AND lower(u.email)=lower(?) AND r.code='PLATFORM_ADMIN'
                 """, Integer.class, id, jwt.getClaimAsString("email"));
-        if (n == null || n != 1) throw new AccessDeniedException("Platform role no longer active");
+        if (!Integer.valueOf(1).equals(n)) throw new AccessDeniedException("Platform role no longer active");
         return id;
     }
 
@@ -214,7 +214,7 @@ public final class PlatformAdminInviteService {
                 WHERE u.id=? AND u.active AND u.business_id IS NULL
                     AND r.code='PLATFORM_ADMIN'
                 """, Integer.class, id);
-        return n != null && n == 1;
+        return Integer.valueOf(1).equals(n);
     }
 
     private int platformCount() {
@@ -227,7 +227,7 @@ public final class PlatformAdminInviteService {
     private boolean userExists(String email) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM app_user WHERE lower(email)=?",
                 Integer.class, email);
-        return count != null && count != 0;
+        return !Integer.valueOf(0).equals(count);
     }
 
     private static String email(String value) {

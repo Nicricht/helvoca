@@ -371,6 +371,41 @@ class PlatformAdminInvitePostgresIntegrationTest {
                 () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
     }
 
+
+    @Test
+    void nullPlatformIssuerMustFailClosedWithoutQueryingAnotherTenant() {
+        Boolean permitted = org.springframework.test.util.ReflectionTestUtils.invokeMethod(
+                service, "activePlatformAdmin", (Object) null);
+        assertFalse(permitted);
+    }
+
+    @Test
+    void invalidOrAbsentPlatformJwtSubjectAndUnauthenticatedIdentityAreRejected() {
+        String address = newEmail(), secret = newToken();
+        service.bootstrap("First", address, secret);
+        UUID first = service.accept(secret, "AnIndependentPassword123");
+        Instant now = Instant.now();
+        var role = new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN");
+
+        Jwt missingSubject = new Jwt("fixture", now, now.plusSeconds(300),
+                Map.of("alg", "HS256"),
+                Map.of("email", address, "roles", List.of("PLATFORM_ADMIN")));
+        SecurityContextHolder.getContext().setAuthentication(
+                new JwtAuthenticationToken(missingSubject, List.of(role)));
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        var unauthenticated = new org.springframework.security.authentication.TestingAuthenticationToken(
+                "unauthenticated", "irrelevant", "ROLE_PLATFORM_ADMIN");
+        unauthenticated.setAuthenticated(false);
+        SecurityContextHolder.getContext().setAuthentication(unauthenticated);
+        assertThrows(AccessDeniedException.class,
+                () -> context.callAsSystem(() -> service.invite("Second", newEmail())));
+
+        asPlatform(first, address);
+        assertNotNull(context.callAsSystem(() -> service.invite("Real Human", newEmail())));
+    }
+
     private void asPlatform(UUID id, String email) {
         Instant now = Instant.now();
         Jwt jwt = new Jwt("local-fixture", now, now.plusSeconds(300),

@@ -4,6 +4,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PlatformAdminInviteServiceTest {
+
+    @Test
+    void unavailableSha256ProviderMustFailClosedWithoutWritingASecret() {
+        try (org.mockito.MockedStatic<java.security.MessageDigest> mocked =
+                org.mockito.Mockito.mockStatic(java.security.MessageDigest.class)) {
+            mocked.when(() -> java.security.MessageDigest.getInstance("SHA-256"))
+                    .thenThrow(new java.security.NoSuchAlgorithmException("fixture"));
+            IllegalStateException failure = assertThrows(IllegalStateException.class,
+                    () -> PlatformAdminInviteService.fingerprint("A".repeat(43)));
+            assertEquals("SHA-256 is unavailable", failure.getMessage());
+        }
+    }
+
     @Test
     void rejectsWeakOrMalformedInvitationTokens() {
         assertFalse(PlatformAdminInviteService.validToken(null));
