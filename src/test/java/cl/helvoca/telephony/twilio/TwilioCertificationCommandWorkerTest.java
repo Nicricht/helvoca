@@ -30,7 +30,7 @@ class TwilioCertificationCommandWorkerTest {
     }
 
     @Test
-    void durationOverSeventyFiveSecondsFailsBeforeCarrierCall() {
+    void durationOverSeventyFiveSecondsFailsBeforeCarrierCall() throws Exception {
         var store = mock(TwilioCertificationCommandStore.class);
         var launcher = mock(TwilioCertificationCommandCallLauncher.class);
         var binding = mock(TwilioCertificationDemoBindingGate.class);
