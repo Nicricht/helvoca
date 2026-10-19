@@ -43,7 +43,8 @@ class TwilioCertificationCommandWorkerTest {
 
         worker.poll();
 
-        verifyNoMoreInteractions(launcher);
+        verify(launcher).durationWithinDemoLimit();
+        verify(launcher, never()).launch(anyString());
         verify(store).markFailed(command.runId(), "certification DEMO duration exceeds 75 seconds");
     }
 
