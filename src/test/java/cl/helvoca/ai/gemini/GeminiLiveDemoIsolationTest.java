@@ -63,6 +63,9 @@ class GeminiLiveDemoIsolationTest {
         properties.setApiKey("synthetic-test-key");
         assertFalse(provider.configuredFor("+12025550123"));
         assertFalse(provider(properties, null, true).configuredFor("+12025550123"));
+        assertFalse(provider(properties, null, true)
+                .sessionProperties(context(UUID.randomUUID(), "+12025550123")).isEnabled(),
+                "A global-off Gemini must not start a demo session without a certified carrier binding");
         assertFalse(provider.sessionProperties(null).ready());
         assertFalse(provider.sessionProperties(context(null, "+12025550123")).ready());
         when(binding.pinnedBusinessId()).thenReturn(UUID.randomUUID());

@@ -62,6 +62,8 @@ class TwilioCertificationDemoBindingGateTest {
 
         assertFalse(gate.allows(UUID.randomUUID()));
         assertFalse(gate.allows(DEMO_ID));
+        assertFalse(gate.allowsNumber(FROM),
+                "An exact phone match cannot bypass missing two-administrator route approval");
         when(route.allows(phone)).thenReturn(true);
         assertTrue(gate.allows(DEMO_ID));
         assertEquals(DEMO_ID, gate.pinnedBusinessId());
