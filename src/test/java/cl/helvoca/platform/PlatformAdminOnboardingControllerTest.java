@@ -1,6 +1,9 @@
 package cl.helvoca.platform;
 
 import org.junit.jupiter.api.Test;
+import org.aopalliance.intercept.MethodInterceptor;
+import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import java.time.Instant;
@@ -10,6 +13,24 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PlatformAdminOnboardingControllerTest {
+    @Test
+    void platformInviteControllerSupportsClassBasedSecurityAdviceWhenEnabled() {
+        PlatformAdminInviteService service = mock(PlatformAdminInviteService.class);
+        ProxyFactory proxyFactory = new ProxyFactory(new PlatformAdminInviteController(service));
+        proxyFactory.setProxyTargetClass(true);
+        proxyFactory.addAdvice((MethodInterceptor) invocation -> {
+            if ("invite".equals(invocation.getMethod().getName())) {
+                throw new AccessDeniedException("Authorization required");
+            }
+            return invocation.proceed();
+        });
+
+        PlatformAdminInviteController secured = (PlatformAdminInviteController) proxyFactory.getProxy();
+        var attempt = new PlatformAdminInviteController.InvitationRequest("Another Admin", "admin@example.test");
+        assertThrows(AccessDeniedException.class, () -> secured.invite(attempt));
+        verifyNoInteractions(service);
+    }
+
     @Test
     void invitationAndRevocationUseOnlyAuthenticatedServiceWithNoStoreResponse() {
         PlatformAdminInviteService service = mock(PlatformAdminInviteService.class);
