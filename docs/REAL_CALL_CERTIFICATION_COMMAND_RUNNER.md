@@ -116,7 +116,22 @@ The response intentionally excludes the callback token. Requests use a dedicated
 For the first controlled deployment smoke only, `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` may contain one unique run id. It is idempotent through the same primary key and should be cleared after the smoke test. Future runs should use the authenticated platform API.
 
 ## Platform administrator onboarding (design gate, not yet activated)
-### Implementation candidate in separate PR #849 (NOT deployed)
+### Administrator onboarding in PR #849 (Aurora isolated only; NOT merged to production)
+
+> **2026-10-20 Aurora isolation runtime regression:** enabling `HELVOCA_PLATFORM_ADMIN_INVITES_ENABLED=true`
+> on isolated Railway deployment `f00ed592-ec5c-417a-ab16-0c0d61ef5fb1` caused
+> application startup failure: Spring Method Security could not CGLIB-proxy
+> the `final` `PlatformAdminInviteController`. The isolated environment was
+> recovered ONLINE with that flag OFF in deployment
+> `faa94f10-5abc-4332-afa4-14bcdaf1c120`, without touching production,
+> Twilio or Gemini. PR #849 adds a regression for class-based security advice
+> and removes the controller's `final` modifier. **Do not enable the invite
+> route or redeploy the revised code as certified** until exact-new-HEAD
+> Fast/Full QA reaches terminal PASS and a separate isolated release gate is
+> completed. The bootstrap invitation's persistence has **not** been
+> independently confirmed merely by recovering the application: check
+> PostgreSQL's invitation row and expiry, without exposing token hashes.
+> No phone call or provider demonstration was executed.
 
 The onboarding backend is separate from the Twilio demo binding and is
 disabled unless the operator opts in. For first-time authorized setup,
