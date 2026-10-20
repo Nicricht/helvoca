@@ -16,7 +16,7 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "HELVOCA_PLATFORM_ADMIN_INVITES_ENABLED", havingValue = "true")
 @RequestMapping("/api/v1/platform/admin-invitations")
 @PreAuthorize("hasRole('PLATFORM_ADMIN')")
-public final class PlatformAdminInviteController {
+public class PlatformAdminInviteController {
     public record InvitationRequest(@NotBlank @Size(max = 150) String name,
                                     @NotBlank @Email @Size(max = 180) String email) {}
     private final PlatformAdminInviteService service;
