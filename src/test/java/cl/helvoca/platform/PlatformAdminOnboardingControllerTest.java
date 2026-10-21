@@ -69,4 +69,16 @@ class PlatformAdminOnboardingControllerTest {
         verify(service).bootstrap("First Person", "first@example.test", token);
         verifyNoMoreInteractions(service);
     }
+
+    @Test
+    void operatorRecoveryOnlyRequestsAHashedSingleUseRecoveryClaim() {
+        PlatformAdminInviteService service = mock(PlatformAdminInviteService.class);
+        String token = "r".repeat(43);
+        var runner = new PlatformAdminRecoveryRunner(service, "existing@example.test", token);
+
+        runner.run();
+
+        verify(service).recover("existing@example.test", token);
+        verifyNoMoreInteractions(service);
+    }
 }

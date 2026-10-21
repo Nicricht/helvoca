@@ -10,6 +10,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.web.server.ResponseStatusException;
@@ -41,6 +42,7 @@ class PlatformAdminInvitePostgresIntegrationTest {
     @Autowired @Qualifier("migrationDataSource") DataSource ownerSource;
     @Autowired PlatformAdminInviteService service;
     @Autowired TenantDatabaseContext context;
+    @Autowired PasswordEncoder passwordEncoder;
     private JdbcTemplate owner;
 
     @BeforeEach
@@ -404,6 +406,98 @@ class PlatformAdminInvitePostgresIntegrationTest {
 
         asPlatform(first, address);
         assertNotNull(context.callAsSystem(() -> service.invite("Real Human", newEmail())));
+    }
+
+    @Test
+    void operatorRecoveryIsHashOnlySingleUseAndPreservesTheExistingPlatformIdentity() {
+        String address = newEmail();
+        String bootstrapToken = newToken();
+        service.bootstrap("Existing Platform Admin", address, bootstrapToken);
+        UUID user = service.accept(bootstrapToken, "OriginalPrivatePassword123");
+        String recoveryToken = newToken();
+
+        UUID recoveryId = service.recover(address.toUpperCase(Locale.ROOT), recoveryToken);
+
+        assertNotNull(recoveryId);
+        assertEquals("RECOVERY", owner.queryForObject(
+                "SELECT purpose FROM platform_admin_invitation WHERE invitation_id=?",
+                String.class, recoveryId));
+        String storedFingerprint = owner.queryForObject(
+                "SELECT token_hash FROM platform_admin_invitation WHERE invitation_id=?",
+                String.class, recoveryId);
+        assertEquals(64, storedFingerprint.length());
+        assertNotEquals(recoveryToken, storedFingerprint);
+        assertTrue(owner.queryForObject(
+                "SELECT expires_at <= clock_timestamp() + interval '30 minutes' FROM platform_admin_invitation WHERE invitation_id=?",
+                Boolean.class, recoveryId));
+
+        UUID recovered = service.accept(recoveryToken, "RecoveredPrivatePassword123");
+
+        assertEquals(user, recovered);
+        assertEquals(1, users(address));
+        assertEquals(1, platformRoles(user));
+        String passwordHash = owner.queryForObject(
+                "SELECT password_hash FROM app_user WHERE id=?", String.class, user);
+        assertTrue(passwordEncoder.matches("RecoveredPrivatePassword123", passwordHash));
+        assertFalse(passwordEncoder.matches("OriginalPrivatePassword123", passwordHash));
+        assertEquals(user, owner.queryForObject(
+                "SELECT accepted_user_id FROM platform_admin_invitation WHERE invitation_id=?",
+                UUID.class, recoveryId));
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(recoveryToken, "AnotherPrivatePassword123"));
+    }
+
+    @Test
+    void operatorRecoveryRejectsMalformedOrIneligibleTargetsAndExpiredTokens() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.recover(newEmail(), "short"));
+        assertThrows(IllegalStateException.class,
+                () -> service.recover(newEmail(), newToken()));
+
+        String nonPlatform = newEmail();
+        owner.update("INSERT INTO app_user(id,name,email,password_hash,active) VALUES (?,?,?,?,TRUE)",
+                UUID.randomUUID(), "Ordinary User", nonPlatform, "fixture-hash");
+        assertThrows(IllegalStateException.class,
+                () -> service.recover(nonPlatform, newToken()));
+
+        String address = newEmail();
+        String bootstrapToken = newToken();
+        service.bootstrap("Existing Platform Admin", address, bootstrapToken);
+        UUID user = service.accept(bootstrapToken, "OriginalPrivatePassword123");
+        String expiredToken = newToken();
+        UUID recoveryId = service.recover(address, expiredToken);
+        owner.update("UPDATE platform_admin_invitation SET expires_at=clock_timestamp() - interval '1 second' WHERE invitation_id=?",
+                recoveryId);
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(expiredToken, "RecoveredPrivatePassword123"));
+        String unchangedHash = owner.queryForObject(
+                "SELECT password_hash FROM app_user WHERE id=?", String.class, user);
+        assertTrue(passwordEncoder.matches("OriginalPrivatePassword123", unchangedHash));
+
+        owner.update("UPDATE app_user SET active=FALSE WHERE id=?", user);
+        assertThrows(IllegalStateException.class,
+                () -> service.recover(address, newToken()));
+    }
+
+    @Test
+    void rotatingRecoveryRevokesTheOldTokenAndKeepsExactlyOnePendingRecovery() {
+        String address = newEmail();
+        String bootstrapToken = newToken();
+        service.bootstrap("Existing Platform Admin", address, bootstrapToken);
+        UUID user = service.accept(bootstrapToken, "OriginalPrivatePassword123");
+        String oldToken = newToken();
+        UUID oldId = service.recover(address, oldToken);
+        String currentToken = newToken();
+        UUID currentId = service.recover(address, currentToken);
+
+        assertNotEquals(oldId, currentId);
+        assertEquals(1, owner.queryForObject("""
+                SELECT COUNT(*) FROM platform_admin_invitation
+                WHERE purpose='RECOVERY' AND accepted_at IS NULL AND revoked_at IS NULL
+                """, Integer.class));
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(oldToken, "OldTokenMustNotWork123"));
+        assertEquals(user, service.accept(currentToken, "CurrentRecoveryPassword123"));
     }
 
     private void asPlatform(UUID id, String email) {
