@@ -1,0 +1,438 @@
+{
+  "business": {
+    "name": "Mercado del Patio",
+    "phone": "+56 9 5555 1122",
+    "instagram": "@mercadodelpatio",
+    "currencySymbol": "$",
+    "currencyCode": null
+  },
+  "products": [
+    {
+      "name": "Tostadas de palta + huevo pochado",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 5900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "veggie"
+      ],
+      "hasVisiblePhoto": true
+    },
+    {
+      "name": "Croissant jamón queso",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 4800,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Shakshuka del patio",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 6700,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "picante"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "French toast berries",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 5500,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Omelette caprese",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 5300,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "veggie"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Bagel salmón cream cheese",
+      "category": "Desayunos y Brunch",
+      "description": null,
+      "price": 6900,
+      "previousPrice": null,
+      "availability": "unavailable",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Hamburguesa patio doble",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 8900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "nuevo"
+      ],
+      "hasVisiblePhoto": true
+    },
+    {
+      "name": "Bowl mediterráneo",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 7600,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "veggie"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Pollo thai con arroz jazmín",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 8200,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "picante"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Ensalada césar con pollo",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 7100,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Ravioles de zapallo",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 8400,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [
+        "veggie"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Sándwich mechada italiana",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 7900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Lasaña vegetariana",
+      "category": "Fondos / Almuerzos",
+      "description": null,
+      "price": 7800,
+      "previousPrice": 7200,
+      "availability": "available",
+      "tags": [
+        "veggie"
+      ],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Espresso",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 1900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Americano",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 2400,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Cappuccino",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 3200,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": true
+    },
+    {
+      "name": "Latte vainilla",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 3700,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Matcha latte",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 4100,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Jugo naranja natural",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 3500,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Limonada menta jengibre",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 3900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Smoothie berries banana",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 4300,
+      "previousPrice": 4100,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Té chai helado",
+      "category": "Café y Bebidas",
+      "description": null,
+      "price": 3800,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Cheesecake frutos rojos",
+      "category": "Postres",
+      "description": null,
+      "price": 4200,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": true
+    },
+    {
+      "name": "Brownie tibio con helado",
+      "category": "Postres",
+      "description": null,
+      "price": 4500,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": true
+    },
+    {
+      "name": "Torta de zanahoria",
+      "category": "Postres",
+      "description": null,
+      "price": 3600,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Cookie gigante chocolate",
+      "category": "Postres",
+      "description": null,
+      "price": 2900,
+      "previousPrice": null,
+      "availability": "available",
+      "tags": [],
+      "hasVisiblePhoto": false
+    }
+  ],
+  "extras": [
+    {
+      "name": "Palta",
+      "price": 1200
+    },
+    {
+      "name": "Huevo extra",
+      "price": 900
+    },
+    {
+      "name": "Queso cheddar",
+      "price": 800
+    },
+    {
+      "name": "Pollo grillado",
+      "price": 1800
+    },
+    {
+      "name": "Tocino crocante",
+      "price": 1500
+    },
+    {
+      "name": "Leche vegetal",
+      "price": 700
+    },
+    {
+      "name": "Shot extra de espresso",
+      "price": 900
+    },
+    {
+      "name": "Pan sin gluten",
+      "price": 1000
+    }
+  ],
+  "promotions": [
+    {
+      "name": "COMBO ALMUERZO",
+      "type": "combo",
+      "price": 11900,
+      "discountPercent": null,
+      "days": [],
+      "startTime": null,
+      "endTime": null,
+      "conditions": "Incluye fondo + bebida + mini postre",
+      "eligibleProducts": []
+    },
+    {
+      "name": "HAPPY HOUR DULCE",
+      "type": "combo",
+      "price": 4900,
+      "discountPercent": null,
+      "days": [],
+      "startTime": "16:00",
+      "endTime": "18:00",
+      "conditions": "Cappuccino + cookie gigante",
+      "eligibleProducts": [
+        "Cappuccino",
+        "Cookie gigante chocolate"
+      ]
+    },
+    {
+      "name": "PROMO BRUNCH 2x1",
+      "type": "2x1",
+      "price": null,
+      "discountPercent": null,
+      "days": [
+        "Lunes",
+        "Martes",
+        "Miércoles"
+      ],
+      "startTime": "08:00",
+      "endTime": "11:30",
+      "conditions": "En cafés filtrados o americanos al pedir cualquier desayuno.",
+      "eligibleProducts": []
+    },
+    {
+      "name": "MARTES VEGGIE",
+      "type": "discount",
+      "price": null,
+      "discountPercent": 15,
+      "days": [
+        "Martes"
+      ],
+      "startTime": null,
+      "endTime": null,
+      "conditions": "15% dcto. en bowl mediterráneo y ravioles de zapallo",
+      "eligibleProducts": [
+        "Bowl mediterráneo",
+        "Ravioles de zapallo"
+      ]
+    }
+  ],
+  "businessHours": [
+    {
+      "days": [
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes"
+      ],
+      "open": "08:00",
+      "close": "20:30"
+    },
+    {
+      "days": [
+        "Sábado"
+      ],
+      "open": "09:00",
+      "close": "21:00"
+    },
+    {
+      "days": [
+        "Domingo"
+      ],
+      "open": "09:30",
+      "close": "18:00"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Wi-Fi",
+      "answer": "PATIO_GUEST"
+    },
+    {
+      "question": "¿Es pet friendly?",
+      "answer": "Pet friendly en terraza"
+    },
+    {
+      "question": "¿Hay delivery?",
+      "answer": "Delivery disponible desde las 12:30"
+    },
+    {
+      "question": "¿Qué medios de pago aceptan?",
+      "answer": "Aceptamos débito, crédito y efectivo"
+    },
+    {
+      "question": "¿Cuál es el tiempo promedio de cocina?",
+      "answer": "15-20 min"
+    },
+    {
+      "question": "¿Tienen opciones veganas y sin gluten?",
+      "answer": "Consulta por opciones veganas y sin gluten"
+    }
+  ],
+  "generalNotices": [
+    "Algunos productos pueden contener gluten, lácteos o frutos secos."
+  ],
+  "warnings": [
+    "El código ISO de la moneda no está explícito en el documento, solo se muestra el símbolo '$'."
+  ]
+}
