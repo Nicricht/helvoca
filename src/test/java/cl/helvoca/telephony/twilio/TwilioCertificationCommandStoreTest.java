@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -175,7 +176,7 @@ class TwilioCertificationCommandStoreTest {
     @Test
     void emptyQueueReturnsNoClaim() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<String>>any(), any(), any()))
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
                 .thenReturn(List.of());
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
 
@@ -185,14 +186,39 @@ class TwilioCertificationCommandStoreTest {
     @Test
     void pendingCommandIsClaimedWithGeneratedToken() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<String>>any(), any(), any()))
-                .thenReturn(List.of("latency-20260927-003"));
+        UUID businessId = UUID.randomUUID();
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
+                .thenAnswer(invocation -> {
+                    RowMapper<TwilioCertificationCommandStore.ClaimedCommand> mapper = invocation.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getString(1)).thenReturn("latency-20260927-003");
+                    when(rs.getObject(2, UUID.class)).thenReturn(businessId);
+                    return List.of(mapper.mapRow(rs, 0));
+                });
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
 
         var claimed = store.claimNext().orElseThrow();
 
         assertEquals("latency-20260927-003", claimed.runId());
+        assertEquals(businessId, claimed.businessId());
         assertTrue(TwilioCertificationCommandStore.validToken(claimed.callbackToken()));
+    }
+
+    @Test
+    void demoCommandPersistsTenantAndConsumesOnlyWithinSameTenant() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        var store = new TwilioCertificationCommandStore(jdbc);
+        UUID tenant = UUID.randomUUID();
+        String token = "11111111-1111-1111-1111-111111111111";
+        String sid = "CA0123456789abcdef0123456789abcdef";
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
+
+        assertTrue(store.enqueue("aurora-demo-20261019-001", "platform-user", tenant));
+        assertTrue(store.consumeIngressToken(token, sid, tenant));
+        assertFalse(store.consumeIngressToken(token, sid, null));
+        assertFalse(store.consumeIngressToken("bad", sid, tenant));
+        assertFalse(store.consumeIngressToken(token, "bad", tenant));
+        verify(jdbc).update(contains("business_id = ?"), eq(sid), eq(token), eq(tenant), eq(sid));
     }
 
     @Test

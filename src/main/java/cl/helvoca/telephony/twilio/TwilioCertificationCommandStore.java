@@ -25,15 +25,31 @@ public class TwilioCertificationCommandStore {
     }
 
     public boolean enqueue(String runId, String requestedBy) {
+        return enqueue(runId, requestedBy, null);
+    }
+
+    public boolean enqueue(String runId, String requestedBy, UUID businessId) {
         if (!validRunId(runId)) return false;
         String actor = requestedBy == null || requestedBy.isBlank()
                 ? "unknown"
                 : requestedBy.trim().substring(0, Math.min(requestedBy.trim().length(), 180));
-        int inserted = jdbc.update("""
-                INSERT INTO twilio_certification_command (run_id, requested_by)
-                VALUES (?, ?)
-                ON CONFLICT (run_id) DO NOTHING
-                """, runId.trim(), actor);
+        int inserted = businessId == null
+                ? jdbc.update("""
+                        INSERT INTO twilio_certification_command (run_id, requested_by)
+                        VALUES (?, ?) ON CONFLICT (run_id) DO NOTHING
+                        """, runId.trim(), actor)
+                : jdbc.update("""
+                        WITH quota AS (
+                            INSERT INTO twilio_certification_demo_call_quota (business_id)
+                            VALUES (?)
+                            ON CONFLICT (business_id) DO UPDATE
+                                SET business_id = EXCLUDED.business_id
+                            RETURNING business_id
+                        )
+                        INSERT INTO twilio_certification_command (run_id, requested_by, business_id)
+                        SELECT ?, ?, business_id FROM quota
+                        ON CONFLICT (run_id) DO NOTHING
+                        """, businessId, runId.trim(), actor);
         return inserted == 1;
     }
 
@@ -71,29 +87,50 @@ public class TwilioCertificationCommandStore {
 
     public Optional<ClaimedCommand> claimNext() {
         String token = UUID.randomUUID().toString();
-        List<String> rows = jdbc.query("""
+        List<ClaimedCommand> rows = jdbc.query("""
                 WITH next_command AS (
-                    SELECT run_id
-                    FROM twilio_certification_command
-                    WHERE status = 'PENDING'
-                    ORDER BY requested_at
-                    FOR UPDATE SKIP LOCKED
+                    SELECT c.run_id, c.business_id
+                    FROM twilio_certification_command c
+                    JOIN twilio_certification_demo_call_quota q
+                      ON q.business_id = c.business_id
+                    WHERE c.status = 'PENDING' AND q.reserved_calls < 2
+                    ORDER BY c.requested_at
+                    FOR UPDATE OF c, q SKIP LOCKED
                     LIMIT 1
+                ), reserved AS (
+                    UPDATE twilio_certification_demo_call_quota q
+                       SET reserved_calls = reserved_calls + 1
+                      FROM next_command n
+                     WHERE q.business_id = n.business_id AND q.reserved_calls < 2
+                    RETURNING q.business_id
                 )
                 UPDATE twilio_certification_command c
                 SET status = 'CLAIMED',
                     callback_token = ?,
                     claimed_at = CURRENT_TIMESTAMP,
                     expires_at = CURRENT_TIMESTAMP + (? * INTERVAL '1 second')
-                FROM next_command n
+                FROM next_command n JOIN reserved r ON r.business_id = n.business_id
                 WHERE c.run_id = n.run_id
-                RETURNING c.run_id
+                RETURNING c.run_id, c.business_id
                 """,
-                (rs, rowNum) -> rs.getString(1),
+                (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
+                        rs.getObject(2, UUID.class)),
                 token,
                 TOKEN_TTL.toSeconds());
         if (rows.isEmpty()) return Optional.empty();
-        return Optional.of(new ClaimedCommand(rows.getFirst(), token));
+        return Optional.of(rows.getFirst());
+    }
+
+    public boolean consumeIngressToken(String token, String callSid, UUID businessId) {
+        if (!validToken(token) || !validCallSid(callSid) || businessId == null) return false;
+        int updated = jdbc.update("""
+                UPDATE twilio_certification_command
+                SET status = 'INGRESS_CONSUMED', provider_call_sid = ?, completed_at = CURRENT_TIMESTAMP
+                WHERE callback_token = ? AND business_id = ? AND status = 'CLAIMED'
+                  AND expires_at > CURRENT_TIMESTAMP
+                  AND (provider_call_sid IS NULL OR provider_call_sid = ?)
+                """, callSid, token, businessId, callSid);
+        return updated == 1;
     }
 
     public boolean consumeIngressToken(String token, String callSid) {
@@ -152,7 +189,9 @@ public class TwilioCertificationCommandStore {
         return value == null ? null : value.toInstant();
     }
 
-    public record ClaimedCommand(String runId, String callbackToken) {}
+    public record ClaimedCommand(String runId, String callbackToken, UUID businessId) {
+        public ClaimedCommand(String runId, String callbackToken) { this(runId, callbackToken, null); }
+    }
 
     public record CommandStatus(
             String runId,

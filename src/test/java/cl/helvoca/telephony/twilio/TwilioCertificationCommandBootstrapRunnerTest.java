@@ -3,11 +3,30 @@ package cl.helvoca.telephony.twilio;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.ApplicationArguments;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TwilioCertificationCommandBootstrapRunnerTest {
+
+    @Test
+    void demoBootstrapChecksBindingBeforeEnqueueAndPersistsTenantPin() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        UUID demo = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(demo);
+        String run = "aurora-demo-bootstrap-20261019";
+        var runner = new TwilioCertificationCommandBootstrapRunner(run, store,
+                new TenantDatabaseContext(), binding);
+
+        runner.run(mock(ApplicationArguments.class));
+        verifyNoInteractions(store);
+
+        when(binding.allows(demo)).thenReturn(true);
+        runner.run(mock(ApplicationArguments.class));
+        verify(store).enqueue(run, "startup-bootstrap", demo);
+    }
 
     @Test
     void emptyBootstrapDoesNothing() {

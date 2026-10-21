@@ -4,6 +4,7 @@ import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -27,7 +28,9 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
     private final String allowedBusinessId;
     private final String allowedPhoneId;
     private final String allowedAccountSid;
+    private final boolean demoEnabled;
 
+    @Autowired
     public TwilioVerifiedExistingVoiceRouteGate(
             JdbcTemplate jdbc,
             ControlledPilotExternalEffectGuard pilot,
@@ -35,7 +38,8 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
             @Value("${app.telephony.twilio.existing-voice-route-enabled:false}") boolean enabled,
             @Value("${app.telephony.twilio.existing-voice-route-business-id:}") String allowedBusinessId,
             @Value("${app.telephony.twilio.existing-voice-route-phone-id:}") String allowedPhoneId,
-            @Value("${app.telephony.twilio.existing-voice-route-account-sid:}") String allowedAccountSid) {
+            @Value("${app.telephony.twilio.existing-voice-route-account-sid:}") String allowedAccountSid,
+            @Value("${TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED:false}") boolean demoEnabled) {
         this.jdbc = jdbc;
         this.pilot = pilot;
         this.databaseContext = databaseContext;
@@ -43,6 +47,14 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
         this.allowedBusinessId = allowedBusinessId;
         this.allowedPhoneId = allowedPhoneId;
         this.allowedAccountSid = allowedAccountSid;
+        this.demoEnabled = demoEnabled;
+    }
+
+    TwilioVerifiedExistingVoiceRouteGate(JdbcTemplate jdbc,
+            ControlledPilotExternalEffectGuard pilot, TenantDatabaseContext databaseContext,
+            boolean enabled, String allowedBusinessId, String allowedPhoneId, String allowedAccountSid) {
+        this(jdbc, pilot, databaseContext, enabled, allowedBusinessId,
+                allowedPhoneId, allowedAccountSid, false);
     }
 
     public boolean allows(PhoneNumber phone) {
@@ -61,11 +73,7 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
         try {
             // NOT_PILOT_MANAGED is "allowed" for legacy tenants; explicitly reject
             // it rather than treating the global pilot switch as a universal kill switch.
-            var decision = pilot.evaluate(phone.getBusinessId(),
-                    ControlledPilotExternalEffectGuard.Effect.VOICE);
-            if (!decision.pilotManaged() || !decision.allowed()
-                    || !"RUNNING".equals(decision.status())
-                    || !pilot.globalExternalEffectsEnabled()) {
+            if (!allowsScopedControl(phone)) {
                 return false;
             }
 
@@ -107,5 +115,23 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
             // or unexpected pilot state must never fail open or leak SQL details.
             return false;
         }
+    }
+
+    private boolean allowsScopedControl(PhoneNumber phone) {
+        if (demoEnabled) {
+            // A DEMO-specific route is scoped by the existing exact tenant/phone/account pins
+            // and the same durable two-human enrollment audit. It never opens a global flag.
+            return Boolean.TRUE.equals(jdbc.queryForObject("""
+                    SELECT EXISTS (SELECT 1 FROM business b
+                        WHERE b.id = ? AND b.mode = 'DEMO' AND b.status = 'ACTIVE'
+                          AND NOT EXISTS (SELECT 1 FROM pilot_launch_control p
+                                          WHERE p.business_id = b.id))
+                    """, Boolean.class, phone.getBusinessId()));
+        }
+        var decision = pilot.evaluate(phone.getBusinessId(),
+                ControlledPilotExternalEffectGuard.Effect.VOICE);
+        return decision.pilotManaged() && decision.allowed()
+                && "RUNNING".equals(decision.status())
+                && pilot.globalExternalEffectsEnabled();
     }
 }
