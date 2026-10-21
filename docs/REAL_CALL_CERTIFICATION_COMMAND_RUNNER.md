@@ -168,6 +168,46 @@ request, approve and execute operations. The current API implementation
 and any new V106 migration require exact-HEAD full CI and production
 release approval. Do not enable flags, merge or deploy on this plan alone.
 
+### Operator-controlled platform password recovery
+
+If an existing, active, tenant-less `PLATFORM_ADMIN` forgets the personal
+password, do not edit `app_user.password_hash` directly, rerun bootstrap,
+promote another user, or replace the identity. PR #849 provides a default-off
+recovery path backed by Flyway V107 and the same hash-only invitation ledger.
+
+Generate a new 32-byte cryptographically random value encoded as unpadded
+Base64URL (43 characters), deliver it only through the private operator
+channel, and configure only the isolated target environment:
+
+```
+HELVOCA_PLATFORM_ADMIN_RECOVERY_ENABLED=true
+HELVOCA_PLATFORM_ADMIN_RECOVERY_EMAIL=<existing platform administrator email>
+HELVOCA_PLATFORM_ADMIN_RECOVERY_TOKEN=<43-character private token>
+```
+
+On startup the runner verifies that the email belongs to exactly one active
+tenant-less platform administrator, stores only the SHA-256 fingerprint, and
+creates a 30-minute `RECOVERY` claim. Reusing the same live configuration is
+idempotent; rotating the token revokes the prior pending recovery. Invalid,
+expired, revoked, or replayed tokens fail closed.
+
+The administrator personally submits the private token plus a new 10–72
+character password to the existing
+`POST /api/v1/auth/invitations/platform/accept` endpoint. Acceptance updates
+only the existing account's BCrypt password hash and consumes the claim in the
+same PostgreSQL transaction; user ID, tenant-less scope, active state and role
+links remain unchanged. No login or JWT is generated automatically.
+
+After successful acceptance, set
+`HELVOCA_PLATFORM_ADMIN_RECOVERY_ENABLED=false`, clear the recovery email and
+token variables, redeploy the isolated service, and verify a new independent
+login plus `/api/v1/auth/me`. Previously issued JWTs expire according to the
+normal access-token lifetime; if compromise rather than simple loss is
+suspected, keep privileged operations paused until that window has elapsed.
+This recovery flow does not authorize invitation revocation, Twilio
+enrollment, provider activation, a real call, spending, merge, or production
+deployment.
+
 
 The verified-existing number enrollment is a normal two-person PLATFORM_ADMIN
 workflow, including for DEMO. The first PLATFORM_ADMIN cannot be created

@@ -419,6 +419,7 @@ class PlatformAdminInvitePostgresIntegrationTest {
         UUID recoveryId = service.recover(address.toUpperCase(Locale.ROOT), recoveryToken);
 
         assertNotNull(recoveryId);
+        assertEquals(recoveryId, service.recover(address, recoveryToken));
         assertEquals("RECOVERY", owner.queryForObject(
                 "SELECT purpose FROM platform_admin_invitation WHERE invitation_id=?",
                 String.class, recoveryId));
@@ -445,6 +446,12 @@ class PlatformAdminInvitePostgresIntegrationTest {
                 UUID.class, recoveryId));
         assertThrows(ResponseStatusException.class,
                 () -> service.accept(recoveryToken, "AnotherPrivatePassword123"));
+        assertEquals(recoveryId, service.recover(address, recoveryToken),
+                "A consumed configured token must be a safe no-op until the operator disables recovery");
+        assertEquals(0, owner.queryForObject("""
+                SELECT COUNT(*) FROM platform_admin_invitation
+                WHERE purpose='RECOVERY' AND accepted_at IS NULL AND revoked_at IS NULL
+                """, Integer.class));
     }
 
     @Test
@@ -468,6 +475,8 @@ class PlatformAdminInvitePostgresIntegrationTest {
         UUID recoveryId = service.recover(address, expiredToken);
         owner.update("UPDATE platform_admin_invitation SET expires_at=clock_timestamp() - interval '1 second' WHERE invitation_id=?",
                 recoveryId);
+        assertThrows(IllegalStateException.class,
+                () -> service.recover(address, expiredToken));
         assertThrows(ResponseStatusException.class,
                 () -> service.accept(expiredToken, "RecoveredPrivatePassword123"));
         String unchangedHash = owner.queryForObject(
@@ -477,6 +486,13 @@ class PlatformAdminInvitePostgresIntegrationTest {
         owner.update("UPDATE app_user SET active=FALSE WHERE id=?", user);
         assertThrows(IllegalStateException.class,
                 () -> service.recover(address, newToken()));
+
+        owner.update("UPDATE app_user SET active=TRUE WHERE id=?", user);
+        String inactiveAtAcceptance = newToken();
+        service.recover(address, inactiveAtAcceptance);
+        owner.update("UPDATE app_user SET active=FALSE WHERE id=?", user);
+        assertThrows(ResponseStatusException.class,
+                () -> service.accept(inactiveAtAcceptance, "MustRemainRejected123"));
     }
 
     @Test

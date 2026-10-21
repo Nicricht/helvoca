@@ -34,6 +34,7 @@ public final class PlatformAdminInviteService {
     public record InviteView(UUID invitationId, String token, Instant expiresAt) {}
     private record Pending(UUID id, String email, String fingerprint, Instant expiry) {}
     private record Claim(String name, String email, String purpose, UUID issuer, Instant expiresAt) {}
+    private record RecoveryTarget(UUID id, String name) {}
 
     public PlatformAdminInviteService(JdbcTemplate jdbc, TenantDatabaseContext context,
                                       PasswordEncoder encoder, PlatformTransactionManager manager) {
@@ -127,6 +128,50 @@ public final class PlatformAdminInviteService {
         });
     }
 
+    public UUID recover(String email, String token) {
+        if (!validToken(token)) throw new IllegalArgumentException("Invalid recovery token");
+        String normalizedEmail = email(email);
+        return context.callAsSystem(() -> tx.execute(status -> {
+            jdbc.execute("SELECT pg_advisory_xact_lock(601849)");
+            RecoveryTarget target = recoveryTarget(normalizedEmail);
+            if (target == null) throw new IllegalStateException("Active platform administrator required");
+            List<UUID> consumed = jdbc.query("""
+                    SELECT invitation_id FROM platform_admin_invitation
+                    WHERE purpose='RECOVERY' AND lower(email)=? AND token_hash=?
+                      AND (accepted_at IS NOT NULL OR revoked_at IS NOT NULL)
+                    """, (rs, row) -> rs.getObject(1, UUID.class),
+                    normalizedEmail, fingerprint(token));
+            if (!consumed.isEmpty()) return consumed.get(0);
+            List<Pending> old = jdbc.query("""
+                    SELECT invitation_id,email,token_hash,expires_at
+                    FROM platform_admin_invitation
+                    WHERE purpose='RECOVERY' AND lower(email)=?
+                      AND accepted_at IS NULL AND revoked_at IS NULL
+                    FOR UPDATE
+                    """, (rs, row) -> new Pending(
+                    rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3),
+                    rs.getTimestamp(4).toInstant()), normalizedEmail);
+            for (Pending pending : old) {
+                if (fingerprint(token).equals(pending.fingerprint())
+                        && Instant.now().isBefore(pending.expiry())) return pending.id();
+                if (fingerprint(token).equals(pending.fingerprint()))
+                    throw new IllegalStateException("Recovery claim expired; rotate secret");
+            }
+            jdbc.update("""
+                    UPDATE platform_admin_invitation SET revoked_at=clock_timestamp()
+                    WHERE purpose='RECOVERY' AND lower(email)=?
+                      AND accepted_at IS NULL AND revoked_at IS NULL
+                    """, normalizedEmail);
+            UUID id = UUID.randomUUID();
+            jdbc.update("""
+                    INSERT INTO platform_admin_invitation
+                      (invitation_id,name,email,token_hash,purpose,expires_at)
+                    VALUES (?,?,?,?,'RECOVERY',clock_timestamp() + INTERVAL '30 minutes')
+                    """, id, target.name(), normalizedEmail, fingerprint(token));
+            return id;
+        }));
+    }
+
     public void revoke(UUID invitationId) {
         authenticatedPlatformActor();
         if (invitationId == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
@@ -154,6 +199,22 @@ public final class PlatformAdminInviteService {
             if (claims.isEmpty() || !Instant.now().isBefore(claims.get(0).expiresAt()))
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Invitation unavailable");
             Claim claim = claims.get(0);
+            if ("RECOVERY".equals(claim.purpose())) {
+                RecoveryTarget target = recoveryTarget(claim.email());
+                if (target == null)
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Platform administrator is no longer active");
+                jdbc.update("""
+                        UPDATE app_user SET password_hash=?
+                        WHERE id=? AND active AND business_id IS NULL
+                        """, encoder.encode(personalPassword), target.id());
+                jdbc.update("""
+                        UPDATE platform_admin_invitation
+                        SET accepted_at=clock_timestamp(), accepted_user_id=?
+                        WHERE token_hash=?
+                        """, target.id(), fingerprint(token));
+                return target.id();
+            }
             if ("BOOTSTRAP".equals(claim.purpose()) && platformCount() != 0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Bootstrap is closed");
             if ("INVITE".equals(claim.purpose()) && !activePlatformAdmin(claim.issuer()))
@@ -215,6 +276,19 @@ public final class PlatformAdminInviteService {
                     AND r.code='PLATFORM_ADMIN'
                 """, Integer.class, id);
         return Integer.valueOf(1).equals(n);
+    }
+
+    private RecoveryTarget recoveryTarget(String email) {
+        List<RecoveryTarget> targets = jdbc.query("""
+                SELECT u.id,u.name FROM app_user u
+                JOIN user_role ur ON ur.user_id=u.id
+                JOIN role r ON r.id=ur.role_id
+                WHERE lower(u.email)=? AND u.active AND u.business_id IS NULL
+                  AND r.code='PLATFORM_ADMIN'
+                FOR UPDATE OF u
+                """, (rs, row) -> new RecoveryTarget(
+                rs.getObject(1, UUID.class), rs.getString(2)), email);
+        return targets.size() == 1 ? targets.get(0) : null;
     }
 
     private int platformCount() {
