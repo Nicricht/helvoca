@@ -177,7 +177,8 @@ recovery path backed by Flyway V107 and the same hash-only invitation ledger.
 
 Generate a new 32-byte cryptographically random value encoded as unpadded
 Base64URL (43 characters), deliver it only through the private operator
-channel, and configure only the isolated target environment:
+channel, never reuse it for another account or environment, and configure only
+the isolated target environment:
 
 ```
 HELVOCA_PLATFORM_ADMIN_RECOVERY_ENABLED=true
