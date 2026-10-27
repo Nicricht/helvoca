@@ -61,6 +61,8 @@ class RegistrationServiceTest {
         AppUser user = userCaptor.getValue();
         assertEquals("ana@example.com", user.getEmail());
         assertEquals("HASH", user.getPasswordHash());
+        assertNotNull(user.getEmailVerifiedAt(),
+                "legacy/default-OFF registration must stay login-eligible if verification is later enabled");
         assertTrue(user.getRoles().contains(ownerRole));
         assertTrue(user.getRoles().contains(adminRole));
         assertSame(businessCaptor.getValue(), user.getBusiness());
