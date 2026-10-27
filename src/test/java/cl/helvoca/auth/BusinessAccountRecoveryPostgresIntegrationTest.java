@@ -55,6 +55,9 @@ class BusinessAccountRecoveryPostgresIntegrationTest {
     void setup() {
         owner = new JdbcTemplate(ownerSource);
         owner.update("DELETE FROM business_account_token");
+        // MockMvc uses the same loopback IP in every test. Each case gets a
+        // fresh distributed counter; production IP throttling remains active.
+        owner.update("DELETE FROM api_rate_limit_bucket");
         mvc = MockMvcBuilders.webAppContextSetup(web).apply(springSecurity()).build();
         reset(mail);
     }
