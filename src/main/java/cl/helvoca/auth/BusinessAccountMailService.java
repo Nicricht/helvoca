@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.util.Locale;
+import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The sole outbound boundary for business identity email. OFF without an
@@ -17,6 +20,8 @@ import java.util.Locale;
  */
 @Service
 public final class BusinessAccountMailService {
+    private static final Pattern INVITE_PATH = Pattern.compile(
+            "^/app/invite\\?businessId=([0-9a-fA-F-]{36})&token=([A-Za-z0-9_-]{43})$");
     private final JavaMailSender sender;
     private final boolean enabled;
     private final boolean verificationRequired;
@@ -61,6 +66,25 @@ public final class BusinessAccountMailService {
                 "Para confirmar tu correo, abre este enlace dentro de 24 horas:\n\n"
                         + publicOrigin + "/app/verify-email#token=" + token
                         + "\n\nSi no creaste esta cuenta, ignora este mensaje.");
+    }
+
+    /** Send the already-created manual invitation; never mint or rotate one. */
+    public void sendInvitation(String recipient, String invitePath) {
+        if (!enabled || !invitationDeliveryEnabled) {
+            throw new IllegalStateException("Automatic invitation delivery is disabled");
+        }
+        Matcher match = INVITE_PATH.matcher(invitePath == null ? "" : invitePath);
+        if (!match.matches()) throw new IllegalArgumentException("Invalid invitation path");
+        try {
+            UUID.fromString(match.group(1));
+        } catch (IllegalArgumentException malformed) {
+            throw new IllegalArgumentException("Invalid invitation business", malformed);
+        }
+        send(recipient, match.group(2), "Invitación personal a RecepVoz",
+                "Te invitaron a colaborar en un negocio de RecepVoz. "
+                        + "Abre este enlace privado dentro de 72 horas:\n\n"
+                        + publicOrigin + invitePath
+                        + "\n\nNo compartas este enlace con otras personas.");
     }
 
     private void send(String recipient, String token, String subject, String body) {
