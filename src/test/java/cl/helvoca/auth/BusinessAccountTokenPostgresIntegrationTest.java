@@ -18,6 +18,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import javax.sql.DataSource;
 import java.time.Instant;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -118,6 +122,80 @@ class BusinessAccountTokenPostgresIntegrationTest {
                                 "SELECT token_hash FROM business_account_token WHERE user_id=?",
                                 String.class, user)));
         assertNotNull(valid.token());
+    }
+
+    @Test
+    void verificationTokensHaveOneDayLifetimeAndWrongInputsAreRejected() {
+        UUID business = business();
+        UUID user = user(business);
+        Instant now = Instant.now();
+        BusinessAccountTokenService.Issued issued =
+                tokens.issue(business, user, BusinessAccountTokenService.Purpose.VERIFY);
+        assertTrue(issued.expiresAt().isAfter(now.plusSeconds(23 * 3600)));
+        assertTrue(issued.expiresAt().isBefore(now.plusSeconds(25 * 3600)));
+
+        AtomicInteger called = new AtomicInteger();
+        assertThrows(ResponseStatusException.class,
+                () -> tokens.redeem(null, BusinessAccountTokenService.Purpose.VERIFY, c -> called.incrementAndGet()));
+        assertThrows(ResponseStatusException.class,
+                () -> tokens.redeem("bad", BusinessAccountTokenService.Purpose.VERIFY, c -> called.incrementAndGet()));
+        assertThrows(ResponseStatusException.class,
+                () -> tokens.redeem(issued.token(), null, c -> called.incrementAndGet()));
+        assertThrows(ResponseStatusException.class,
+                () -> tokens.redeem(issued.token(), BusinessAccountTokenService.Purpose.VERIFY, null));
+        assertThrows(IllegalArgumentException.class,
+                () -> tokens.issue(null, user, BusinessAccountTokenService.Purpose.RESET));
+        assertThrows(IllegalArgumentException.class,
+                () -> tokens.issue(business, null, BusinessAccountTokenService.Purpose.RESET));
+        assertThrows(IllegalArgumentException.class, () -> tokens.issue(business, user, null));
+        assertEquals(0, called.get());
+
+        tokens.redeem(issued.token(), BusinessAccountTokenService.Purpose.VERIFY,
+                claim -> called.incrementAndGet());
+        assertEquals(1, called.get());
+    }
+
+    @Test
+    void credentialMutationFailureRollsBackConsumption() {
+        UUID business = business();
+        UUID user = user(business);
+        BusinessAccountTokenService.Issued issued =
+                tokens.issue(business, user, BusinessAccountTokenService.Purpose.RESET);
+        assertThrows(IllegalStateException.class,
+                () -> tokens.redeem(issued.token(), BusinessAccountTokenService.Purpose.RESET,
+                        claim -> { throw new IllegalStateException("credential update failed"); }));
+
+        AtomicInteger applied = new AtomicInteger();
+        tokens.redeem(issued.token(), BusinessAccountTokenService.Purpose.RESET,
+                claim -> applied.incrementAndGet());
+        assertEquals(1, applied.get(), "failed credential transactions must preserve the claim");
+    }
+
+    @Test
+    void concurrentClaimsPermitOnlyOneMutation() throws Exception {
+        UUID business = business();
+        UUID user = user(business);
+        BusinessAccountTokenService.Issued issued =
+                tokens.issue(business, user, BusinessAccountTokenService.Purpose.RESET);
+        AtomicInteger applied = new AtomicInteger();
+        CountDownLatch start = new CountDownLatch(1);
+        try (var threads = Executors.newFixedThreadPool(2)) {
+            java.util.concurrent.Callable<Boolean> attempt = () -> {
+                if (!start.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("threads did not start");
+                try {
+                    tokens.redeem(issued.token(), BusinessAccountTokenService.Purpose.RESET,
+                            claim -> applied.incrementAndGet());
+                    return true;
+                } catch (ResponseStatusException rejected) {
+                    return false;
+                }
+            };
+            Future<Boolean> a = threads.submit(attempt);
+            Future<Boolean> b = threads.submit(attempt);
+            start.countDown();
+            assertNotEquals(a.get(15, TimeUnit.SECONDS), b.get(15, TimeUnit.SECONDS));
+        }
+        assertEquals(1, applied.get());
     }
 
     private UUID business() {
