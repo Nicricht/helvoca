@@ -71,7 +71,9 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
 
         if ("/api/v1/auth/login".equals(path)) return from("login", properties.getLogin(), false);
         if ("/api/v1/auth/password-reset/request".equals(path)
-                || "/api/v1/auth/password-reset/confirm".equals(path)) {
+                || "/api/v1/auth/password-reset/confirm".equals(path)
+                || "/api/v1/auth/email/resend".equals(path)
+                || "/api/v1/auth/email/confirm".equals(path)) {
             return from("password-recovery", properties.getRegister(), false);
         }
         if ("/api/v1/auth/invitations/platform/accept".equals(path)) {

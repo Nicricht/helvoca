@@ -193,6 +193,9 @@ public class TeamInvitationService {
         user.setName(invitation.getName());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        // The individual proved possession of the destination email's private,
+        // single-use invitation; enabling verification later must not lock them out.
+        user.setEmailVerifiedAt(Instant.now());
         user.getRoles().add(role);
         if (compatibilityAdmin != null) user.getRoles().add(compatibilityAdmin);
         users.saveAndFlush(user);

@@ -3,6 +3,7 @@ package cl.helvoca.auth;
 import cl.helvoca.security.JwtProperties;
 import cl.helvoca.security.RolePermissionCatalog;
 import cl.helvoca.user.AppUserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -18,6 +19,7 @@ public class AuthService {
     private final AppUserRepository users;
     private final JwtEncoder encoder;
     private final JwtProperties properties;
+    private BusinessAccountMailService mail;
 
     public AuthService(AuthenticationManager authenticationManager,
                        AppUserRepository users,
@@ -29,6 +31,11 @@ public class AuthService {
         this.properties = properties;
     }
 
+    @Autowired(required = false)
+    void setAccountMail(BusinessAccountMailService mail) {
+        this.mail = mail;
+    }
+
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
         authenticationManager.authenticate(
@@ -36,6 +43,10 @@ public class AuthService {
 
         var user = users.findByEmailIgnoreCase(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+        if (mail != null && mail.isVerificationRequired() && user.getBusiness() != null
+                && user.getEmailVerifiedAt() == null) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Email confirmation required");
+        }
 
         Instant now = Instant.now();
         Instant expiresAt = now.plusSeconds(properties.accessTokenMinutes() * 60);

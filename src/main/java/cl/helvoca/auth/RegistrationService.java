@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
+import java.time.Instant;
 import java.util.Locale;
 
 @Service
@@ -24,6 +25,9 @@ public class RegistrationService {
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
     private BusinessSubscriptionService subscriptions;
+    private BusinessAccountVerificationService verification;
+
+    public record RegistrationResult(LoginResponse session, boolean verificationPending) {}
 
     public RegistrationService(BusinessRepository businesses,
                                AppUserRepository users,
@@ -42,8 +46,13 @@ public class RegistrationService {
         this.subscriptions = subscriptions;
     }
 
+    @Autowired(required = false)
+    void setVerification(BusinessAccountVerificationService verification) {
+        this.verification = verification;
+    }
+
     @Transactional
-    public LoginResponse register(RegisterBusinessRequest request) {
+    public RegistrationResult register(RegisterBusinessRequest request) {
         String email = request.email().trim().toLowerCase(Locale.ROOT);
         if (users.existsByEmailIgnoreCase(email)) {
             throw new ConflictException("An account with that email already exists");
@@ -70,11 +79,17 @@ public class RegistrationService {
         user.setName(request.adminName().trim());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
+        boolean pending = verification != null && verification.isRequired();
+        if (!pending) user.setEmailVerifiedAt(Instant.now());
         user.getRoles().add(businessOwner);
         user.getRoles().add(businessAdmin);
         users.saveAndFlush(user);
 
-        return authService.login(new LoginRequest(email, request.password()));
+        if (pending) {
+            verification.scheduleRegistrationMessage(business.getId(), user.getId(), email);
+            return new RegistrationResult(null, true);
+        }
+        return new RegistrationResult(authService.login(new LoginRequest(email, request.password())), false);
     }
 
     private static void validateTimezone(String timezone) {

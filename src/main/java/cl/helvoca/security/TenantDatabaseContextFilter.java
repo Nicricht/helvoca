@@ -68,6 +68,8 @@ public class TenantDatabaseContextFilter extends OncePerRequestFilter {
                 || path.equals("/api/v1/auth/register")
                 || path.equals("/api/v1/auth/password-reset/request")
                 || path.equals("/api/v1/auth/password-reset/confirm")
+                || path.equals("/api/v1/auth/email/resend")
+                || path.equals("/api/v1/auth/email/confirm")
                 || path.startsWith("/api/v1/auth/invitations/")
                 || path.startsWith("/webhooks/")
                 || path.startsWith("/ws/");

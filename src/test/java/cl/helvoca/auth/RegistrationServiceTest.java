@@ -46,11 +46,12 @@ class RegistrationServiceTest {
                         List.of("BUSINESS_ADMIN", "BUSINESS_OWNER")));
         when(auth.login(new LoginRequest("ana@example.com", "very-secure-password"))).thenReturn(expected);
 
-        LoginResponse result = service.register(new RegisterBusinessRequest(
+        RegistrationService.RegistrationResult result = service.register(new RegisterBusinessRequest(
                 "Ana", "ANA@EXAMPLE.COM", "very-secure-password", "Clínica Norte",
                 "America/Santiago", "es", "+56911112222"));
 
-        assertSame(expected, result);
+        assertSame(expected, result.session());
+        assertFalse(result.verificationPending());
         ArgumentCaptor<Business> businessCaptor = ArgumentCaptor.forClass(Business.class);
         verify(businesses).saveAndFlush(businessCaptor.capture());
         assertEquals("Clínica Norte", businessCaptor.getValue().getName());
