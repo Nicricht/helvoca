@@ -30,9 +30,6 @@ public class AppUser {
     @Column(nullable = false)
     private boolean active = true;
 
-    @Column(name = "email_verified_at")
-    private Instant emailVerifiedAt;
-
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_role",
@@ -57,8 +54,6 @@ public class AppUser {
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
-    public Instant getEmailVerifiedAt() { return emailVerifiedAt; }
-    public void setEmailVerifiedAt(Instant emailVerifiedAt) { this.emailVerifiedAt = emailVerifiedAt; }
     public Set<Role> getRoles() { return roles; }
     public Instant getCreatedAt() { return createdAt; }
 }

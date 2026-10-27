@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.ZoneId;
-import java.time.Instant;
 import java.util.Locale;
 
 @Service
@@ -80,7 +79,6 @@ public class RegistrationService {
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         boolean pending = verification != null && verification.isRequired();
-        if (!pending) user.setEmailVerifiedAt(Instant.now());
         user.getRoles().add(businessOwner);
         user.getRoles().add(businessAdmin);
         users.saveAndFlush(user);
@@ -89,6 +87,7 @@ public class RegistrationService {
             verification.scheduleRegistrationMessage(business.getId(), user.getId(), email);
             return new RegistrationResult(null, true);
         }
+        if (verification != null) verification.markTrustedPossession(business.getId(), user.getId());
         return new RegistrationResult(authService.login(new LoginRequest(email, request.password())), false);
     }
 

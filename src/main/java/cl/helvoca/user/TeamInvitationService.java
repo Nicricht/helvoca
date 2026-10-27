@@ -2,6 +2,7 @@ package cl.helvoca.user;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.auth.AuthService;
+import cl.helvoca.auth.BusinessAccountVerificationService;
 import cl.helvoca.auth.LoginRequest;
 import cl.helvoca.auth.LoginResponse;
 import cl.helvoca.business.Business;
@@ -9,6 +10,7 @@ import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +52,7 @@ public class TeamInvitationService {
     private final AuthService authService;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
+    private BusinessAccountVerificationService verification;
 
     public TeamInvitationService(TeamInvitationRepository invitations,
                                  AppUserRepository users,
@@ -67,6 +70,11 @@ public class TeamInvitationService {
         this.authService = authService;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
+    }
+
+    @Autowired(required = false)
+    void setAccountVerification(BusinessAccountVerificationService verification) {
+        this.verification = verification;
     }
 
     @Transactional(readOnly = true)
@@ -193,12 +201,11 @@ public class TeamInvitationService {
         user.setName(invitation.getName());
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        // The individual proved possession of the destination email's private,
-        // single-use invitation; enabling verification later must not lock them out.
-        user.setEmailVerifiedAt(Instant.now());
         user.getRoles().add(role);
         if (compatibilityAdmin != null) user.getRoles().add(compatibilityAdmin);
         users.saveAndFlush(user);
+        // Possession of the private, one-time invitation is adequate email proof.
+        if (verification != null) verification.markTrustedPossession(businessId, user.getId());
 
         invitation.setAcceptedAt(Instant.now());
         invitations.saveAndFlush(invitation);

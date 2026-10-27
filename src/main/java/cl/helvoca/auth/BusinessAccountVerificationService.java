@@ -35,6 +35,40 @@ public final class BusinessAccountVerificationService {
     public boolean isRequired() { return mail.isVerificationRequired(); }
 
     /**
+     * The verification column is deliberately NOT mapped on the JPA AppUser
+     * entity: the rollback contract must boot this binary on a pre-V108 schema
+     * when the feature flag is off. Only explicit verification paths read it.
+     */
+    public boolean isVerified(UUID businessId, UUID userId) {
+        if (businessId == null || userId == null) return false;
+        Boolean verified = context.callAsSystem(() -> jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM app_user
+                     WHERE id=? AND business_id=? AND active=true
+                       AND email_verified_at IS NOT NULL
+                )
+                """, Boolean.class, userId, businessId));
+        return Boolean.TRUE.equals(verified);
+    }
+
+    /** Invoked only after possession-bound registration or team invitation. */
+    public void markTrustedPossession(UUID businessId, UUID userId) {
+        if (businessId == null || userId == null) {
+            throw new IllegalArgumentException("Business and user identity required");
+        }
+        context.runAsSystem(() -> {
+            int marked = jdbc.update("""
+                    UPDATE app_user SET email_verified_at=clock_timestamp()
+                     WHERE id=? AND business_id=? AND active=true
+                       AND email_verified_at IS NULL
+                    """, userId, businessId);
+            if (marked != 1) {
+                throw new IllegalStateException("Trusted business identity could not be marked verified");
+            }
+        });
+    }
+
+    /**
      * Only a committed signup may send a usable link. A rolled-back tenant
      * registration never produces external email. Delivery failures do not
      * pretend to verify the address; resend remains available.

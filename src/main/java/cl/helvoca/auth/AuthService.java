@@ -19,7 +19,7 @@ public class AuthService {
     private final AppUserRepository users;
     private final JwtEncoder encoder;
     private final JwtProperties properties;
-    private BusinessAccountMailService mail;
+    private BusinessAccountVerificationService verification;
 
     public AuthService(AuthenticationManager authenticationManager,
                        AppUserRepository users,
@@ -32,8 +32,8 @@ public class AuthService {
     }
 
     @Autowired(required = false)
-    void setAccountMail(BusinessAccountMailService mail) {
-        this.mail = mail;
+    void setAccountVerification(BusinessAccountVerificationService verification) {
+        this.verification = verification;
     }
 
     @Transactional(readOnly = true)
@@ -43,8 +43,8 @@ public class AuthService {
 
         var user = users.findByEmailIgnoreCase(request.email())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
-        if (mail != null && mail.isVerificationRequired() && user.getBusiness() != null
-                && user.getEmailVerifiedAt() == null) {
+        if (verification != null && verification.isRequired() && user.getBusiness() != null
+                && !verification.isVerified(user.getBusiness().getId(), user.getId())) {
             throw new org.springframework.security.authentication.BadCredentialsException("Email confirmation required");
         }
 
