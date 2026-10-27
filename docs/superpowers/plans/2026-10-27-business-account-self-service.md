@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-27-business-account-self-service-design.md`.
 
+**CI routing note:** PR #851 is stacked on #849 for migrations. Because the
+repository's pull-request workflows target only `main`, the draft may
+temporarily target `main` for exact-HEAD RED/GREEN CI. This does not authorize
+merging either PR or deploying the combined diff; retarget to #849 before
+release review.
+
 ## Global Constraints
 
 - Business IDs are read from persisted identity, never a caller-supplied tenant.
