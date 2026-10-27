@@ -10,6 +10,15 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-27-business-account-self-service-design.md`.
 
+**Checkpoint de implementación (2026-10-27, Draft PR #851):** token ledger V108,
+solicitud/confirmación de recuperación, SMTP opt-in, verificación condicional
+al registrarse, invitación por correo opt-in después de commit y formularios
+React quedaron propuestos en commits del PR. RED de backend observado y
+revisado; PostgreSQL 18 y rollback V103 cuentan con verificaciones exitosas
+de commits previos. **El SHA final sigue IN_PROGRESS**, sin certificación
+Fast/Full ni cobertura diferencial completa hasta comprobarla en el HEAD
+definitivo. Sin merge, despliegue, envío real, llamada ni pago.
+
 **CI routing note:** PR #851 is stacked on #849 for migrations. Because the
 repository's pull-request workflows target only `main`, the draft may
 temporarily target `main` for exact-HEAD RED/GREEN CI. This does not authorize
