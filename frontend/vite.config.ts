@@ -22,6 +22,8 @@ function directReactRoutes() {
       const salesDir = fileURLToPath(new URL("../src/main/resources/static/app/sales/", import.meta.url));
       const pricingDir = fileURLToPath(new URL("../src/main/resources/static/app/pricing/", import.meta.url));
       const authDir = fileURLToPath(new URL("../src/main/resources/static/app/auth/", import.meta.url));
+      const passwordResetDir = fileURLToPath(new URL("../src/main/resources/static/app/password-reset/", import.meta.url));
+      const emailVerificationDir = fileURLToPath(new URL("../src/main/resources/static/app/verify-email/", import.meta.url));
       mkdirSync(inventoryDir, { recursive: true });
       mkdirSync(agendaDir, { recursive: true });
       mkdirSync(ordersDir, { recursive: true });
@@ -35,6 +37,8 @@ function directReactRoutes() {
       mkdirSync(salesDir, { recursive: true });
       mkdirSync(pricingDir, { recursive: true });
       mkdirSync(authDir, { recursive: true });
+      mkdirSync(passwordResetDir, { recursive: true });
+      mkdirSync(emailVerificationDir, { recursive: true });
       copyFileSync(`${appDir}index.html`, `${inventoryDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${agendaDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${ordersDir}index.html`);
@@ -48,6 +52,8 @@ function directReactRoutes() {
       copyFileSync(`${appDir}index.html`, `${salesDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${pricingDir}index.html`);
       copyFileSync(`${appDir}index.html`, `${authDir}index.html`);
+      copyFileSync(`${appDir}index.html`, `${passwordResetDir}index.html`);
+      copyFileSync(`${appDir}index.html`, `${emailVerificationDir}index.html`);
     }
   };
 }

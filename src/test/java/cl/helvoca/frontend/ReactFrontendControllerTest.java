@@ -69,5 +69,12 @@ class ReactFrontendControllerTest {
         mvc.perform(get("/app/auth/"))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/app/index.html"));
+
+        for (String path : new String[] {"/app/password-reset", "/app/password-reset/",
+                "/app/verify-email", "/app/verify-email/"}) {
+            mvc.perform(get(path))
+                    .andExpect(status().isOk())
+                    .andExpect(forwardedUrl("/app/index.html"));
+        }
     }
 }

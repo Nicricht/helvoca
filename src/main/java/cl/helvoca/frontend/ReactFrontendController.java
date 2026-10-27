@@ -33,7 +33,11 @@ public class ReactFrontendController {
             "/app/pricing",
             "/app/pricing/",
             "/app/auth",
-            "/app/auth/"
+            "/app/auth/",
+            "/app/password-reset",
+            "/app/password-reset/",
+            "/app/verify-email",
+            "/app/verify-email/"
     })
     public String application() {
         return "forward:/app/index.html";
