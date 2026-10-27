@@ -16,6 +16,14 @@ temporarily target `main` for exact-HEAD RED/GREEN CI. This does not authorize
 merging either PR or deploying the combined diff; retarget to #849 before
 release review.
 
+**Token test diagnostic (2026-10-27):** The initial PostgreSQL 18 suite exposed
+a faulty expiry fixture: setting `expires_at` before `created_at` contradicted
+the deliberate `chk_account_token_expiry` database invariant. The regression
+fixture now moves both timestamps into the past, retaining a positive original
+lifetime while proving an expired token cannot be consumed. The subsequent CI
+entry barrier also found a truncated `BASE_SHA` in a PR evidence comment;
+receipts must use the exact full 40-character base SHA before every commit.
+
 ## Global Constraints
 
 - Business IDs are read from persisted identity, never a caller-supplied tenant.
