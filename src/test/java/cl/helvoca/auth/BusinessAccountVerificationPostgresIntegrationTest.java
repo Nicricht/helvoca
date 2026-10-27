@@ -102,6 +102,27 @@ class BusinessAccountVerificationPostgresIntegrationTest {
     }
 
     @Test
+    void defaultOffSignupStillPersistsLoginEligibleOwnerAndReturnsJwt() throws Exception {
+        when(mail.isEnabled()).thenReturn(false);
+        when(mail.isVerificationRequired()).thenReturn(false);
+        String address = email();
+        String registration = """
+                {"adminName":"Ana","businessName":"Negocio sin correo saliente","email":"%s",
+                 "password":"initial-password-123","timezone":"America/Santiago","language":"es"}
+                """.formatted(address);
+        var response = mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON).content(registration))
+                .andReturn();
+        assertEquals(200, response.getResponse().getStatus());
+        assertTrue(response.getResponse().getContentAsString().contains("accessToken"));
+        UUID user = owner.queryForObject("SELECT id FROM app_user WHERE email=?", UUID.class, address);
+        assertNotNull(owner.queryForObject(
+                "SELECT email_verified_at FROM app_user WHERE id=?", java.time.Instant.class, user),
+                "default-off registration must not be locked out after later verification enablement");
+        verify(mail, never()).sendVerification(anyString(), anyString());
+    }
+
+    @Test
     void emailResendNeverEnumeratesUnknownInactivePlatformOrAlreadyVerifiedUsers() throws Exception {
         UUID business = business();
         String inactive = email();
