@@ -2,6 +2,7 @@ package cl.helvoca.user;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.auth.AuthService;
+import cl.helvoca.auth.BusinessAccountMailService;
 import cl.helvoca.auth.LoginRequest;
 import cl.helvoca.auth.LoginResponse;
 import cl.helvoca.business.Business;
@@ -79,6 +80,36 @@ class TeamInvitationServiceTest {
         assertEquals(RoleCode.OPERATOR, saved.getRoleCode());
         assertTrue(saved.getExpiresAt().isAfter(before.plusSeconds(71 * 3600)));
         assertEquals("PENDING", result.status());
+    }
+
+    @Test
+    void optInInvitationDeliveryWaitsForCommitAndPreservesManualOneUseLink() {
+        BusinessAccountMailService mail = mock(BusinessAccountMailService.class);
+        when(mail.isInvitationDeliveryEnabled()).thenReturn(true);
+        service.setAccountMail(mail);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "operador@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            TeamInvitationResponse response = service.create(new InviteUserRequest(
+                    "Operador Uno", "operador@negocio.cl", RoleCode.OPERATOR));
+            assertNotNull(response.invitePath());
+            verify(mail, never()).sendInvitation(anyString(), anyString());
+
+            var commits = org.springframework.transaction.support.TransactionSynchronizationManager
+                    .getSynchronizations();
+            assertEquals(1, commits.size());
+            commits.forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(mail).sendInvitation("operador@negocio.cl", response.invitePath());
+            verify(invitations, times(1)).saveAndFlush(any());
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
     }
 
     @Test

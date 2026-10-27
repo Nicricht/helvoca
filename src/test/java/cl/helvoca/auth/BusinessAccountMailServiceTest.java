@@ -79,4 +79,30 @@ class BusinessAccountMailServiceTest {
                 () -> mail.sendPasswordReset("owner@example.test\nBcc:evil@example.test", TOKEN));
         verifyNoMoreInteractions(sender);
     }
+
+    @Test
+    void invitationDeliveryReusesOnlyExistingCanonicalOneUseInvitePath() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        var mail = new BusinessAccountMailService(provider(sender), true, false, true,
+                "identity@example.test", "https://recepvoz.example.test");
+        String path = "/app/invite?businessId=11111111-1111-1111-1111-111111111111&token=" + TOKEN;
+        mail.sendInvitation("operator@example.test", path);
+        var captured = org.mockito.ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(sender).send(captured.capture());
+        assertTrue(captured.getValue().getText().contains("https://recepvoz.example.test" + path));
+        for (String pathValue : new String[] {
+                "https://evil.example/invite?token=" + TOKEN,
+                "/app/invite?businessId=wrong&token=" + TOKEN,
+                path + "&other=abc",
+                path + "\nBcc: attacker@example.test" }) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> mail.sendInvitation("operator@example.test", pathValue));
+        }
+        verifyNoMoreInteractions(sender);
+
+        var notEnabled = new BusinessAccountMailService(provider(mock(JavaMailSender.class)),
+                true, false, false, "identity@example.test", "https://recepvoz.example.test");
+        assertThrows(IllegalStateException.class,
+                () -> notEnabled.sendInvitation("operator@example.test", path));
+    }
 }
