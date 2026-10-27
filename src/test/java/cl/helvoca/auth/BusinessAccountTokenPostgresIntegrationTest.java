@@ -96,7 +96,10 @@ class BusinessAccountTokenPostgresIntegrationTest {
         assertThrows(ResponseStatusException.class,
                 () -> tokens.redeem(second.token(), BusinessAccountTokenService.Purpose.VERIFY,
                         claim -> called.incrementAndGet()));
-        owner.update("UPDATE business_account_token SET expires_at=clock_timestamp()-interval '1 second' WHERE user_id=?", user);
+        // Simulate a token whose *originally valid* lifetime elapsed, while preserving
+        // the database invariant that its expiry must be after its creation.
+        owner.update("UPDATE business_account_token SET created_at=clock_timestamp()-interval '2 minutes', "
+                + "expires_at=clock_timestamp()-interval '1 minute' WHERE user_id=?", user);
         assertThrows(ResponseStatusException.class,
                 () -> tokens.redeem(second.token(), BusinessAccountTokenService.Purpose.RESET,
                         claim -> called.incrementAndGet()));
