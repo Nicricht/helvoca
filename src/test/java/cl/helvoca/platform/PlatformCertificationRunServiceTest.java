@@ -3,16 +3,39 @@ package cl.helvoca.platform;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.telephony.twilio.TwilioCertificationCommandStore;
+import cl.helvoca.telephony.twilio.TwilioCertificationDemoBindingGate;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class PlatformCertificationRunServiceTest {
+
+    @Test
+    void demoRouteMustBeCertifiedBeforeApiEnqueue() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        UUID tenant = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(tenant);
+        var service = new PlatformCertificationRunService(store, binding);
+
+        assertThrows(IllegalStateException.class,
+                () -> service.create("aurora-demo-20261019-001", "platform-user"));
+        verifyNoInteractions(store);
+
+        when(binding.allows(tenant)).thenReturn(true);
+        String run = "aurora-demo-20261019-002";
+        when(store.enqueue(run, "platform-user", tenant)).thenReturn(true);
+        when(store.find(run)).thenReturn(Optional.of(new TwilioCertificationCommandStore.CommandStatus(
+                run, "PENDING", "platform-user", Instant.now(), null, null, null, null, null)));
+        assertEquals("PENDING", service.create(run, "platform-user").status());
+        verify(store).enqueue(run, "platform-user", tenant);
+    }
 
     @Test
     void createsCommandWithAuthenticatedActorAndReturnsStatus() {

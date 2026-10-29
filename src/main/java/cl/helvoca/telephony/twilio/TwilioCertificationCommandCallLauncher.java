@@ -84,7 +84,8 @@ public class TwilioCertificationCommandCallLauncher {
                 + "&" + form("StatusCallbackEvent", "ringing")
                 + "&" + form("StatusCallbackEvent", "answered")
                 + "&" + form("StatusCallbackEvent", "completed")
-                + "&" + form("Timeout", "25");
+                + "&" + form("Timeout", "25")
+                + "&" + form("TimeLimit", Integer.toString(maxSeconds));
 
         String basic = Base64.getEncoder().encodeToString(
                 (twilio.getAccountSid().trim() + ":" + twilio.getAuthToken().trim())
@@ -129,6 +130,10 @@ public class TwilioCertificationCommandCallLauncher {
                 && E164.matcher(to.trim()).matches()
                 && TwilioCertificationStartupRunner.isAllowedTarget(to, allowedTo)
                 && !TwilioCertificationStartupRunner.isForbiddenTarget(to, forbiddenTo);
+    }
+
+    boolean durationWithinDemoLimit() {
+        return maxSeconds <= 75;
     }
 
     private void scheduleSafetyHangup(String callSid) {

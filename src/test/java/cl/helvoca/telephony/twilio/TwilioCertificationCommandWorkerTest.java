@@ -4,11 +4,69 @@ import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 class TwilioCertificationCommandWorkerTest {
+
+    @Test
+    void mismatchedDemoBindingFailsBeforeCarrierCall() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(
+                "aurora-demo-20261019-001", "11111111-1111-1111-1111-111111111111", UUID.randomUUID());
+        when(store.claimNext()).thenReturn(Optional.of(command));
+        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
+                new TenantDatabaseContext(), binding);
+
+        worker.poll();
+
+        verify(binding).allows(command.businessId());
+        verifyNoInteractions(launcher);
+        verify(store).markFailed(command.runId(), "certification DEMO tenant/phone binding unavailable");
+    }
+
+    @Test
+    void durationOverSeventyFiveSecondsFailsBeforeCarrierCall() throws Exception {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(
+                "aurora-demo-20261019-002", "22222222-2222-2222-2222-222222222222", UUID.randomUUID());
+        when(store.claimNext()).thenReturn(Optional.of(command));
+        when(binding.allows(command.businessId())).thenReturn(true);
+        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
+                new TenantDatabaseContext(), binding);
+
+        worker.poll();
+
+        verify(launcher).durationWithinDemoLimit();
+        verify(launcher, never()).launch(anyString());
+        verify(store).markFailed(command.runId(), "certification DEMO duration exceeds 75 seconds");
+    }
+
+    @Test
+    void certifiedDemoAndBoundedDurationLaunchesOnce() throws Exception {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(
+                "aurora-demo-20261019-003", "33333333-3333-3333-3333-333333333333", UUID.randomUUID());
+        when(store.claimNext()).thenReturn(Optional.of(command));
+        when(binding.allows(command.businessId())).thenReturn(true);
+        when(launcher.durationWithinDemoLimit()).thenReturn(true);
+        when(launcher.launch(command.callbackToken())).thenReturn("CA" + "a".repeat(32));
+        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
+                new TenantDatabaseContext(), binding);
+
+        worker.poll();
+
+        verify(launcher).launch(command.callbackToken());
+        verify(store).recordProviderCall(command.runId(), command.callbackToken(), "CA" + "a".repeat(32));
+    }
 
     @Test
     void disabledWorkerDoesNotTouchQueue() {
