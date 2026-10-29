@@ -64,19 +64,19 @@ jobs:
           mvn --batch-mode --no-transfer-progress -Dhelvoca.test.postgres.image="${{ matrix.pg_image }}" -Dtest="$tests" test
 
 # C2-B: prove the actual previous main binary can start on the forward-only
-  # V103 schema. Never touch Railway or download a production archive.
-  legacy-main-binary-on-v103:
+  # V108 schema. Never touch Railway or download a production archive.
+  legacy-main-binary-on-v108:
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      PREVIOUS_MAIN_SHA: ca58693e167752bd6eab8ff4e9be770391fe4293
+      PREVIOUS_MAIN_SHA: a46077a5fe5d26505cef59ee3921c9190cff3d8a
     steps:
       - name: Checkout current candidate
         uses: actions/checkout@v7
       - name: Checkout exactly the deployed pre-release main commit
         uses: actions/checkout@v7
         with:
-          ref: ca58693e167752bd6eab8ff4e9be770391fe4293
+          ref: a46077a5fe5d26505cef59ee3921c9190cff3d8a
           path: previous-main
           persist-credentials: false
       - name: Set up Java 21
@@ -92,7 +92,7 @@ jobs:
           test "$(git -C previous-main rev-parse HEAD)" = "$PREVIOUS_MAIN_SHA"
           mvn --batch-mode --no-transfer-progress -Dmaven.test.skip=true package
           (cd previous-main && mvn --batch-mode --no-transfer-progress -Dmaven.test.skip=true package)
-      - name: Run previous main binary against disposable V103 over internal Docker network
+      - name: Run deployed main binary against disposable V108 over internal Docker network
         shell: bash
         run: |
           set -euo pipefail
@@ -189,7 +189,7 @@ jobs:
               'import json,sys; assert isinstance(json.load(sys.stdin), list)'
           }
           docker run -d --name "$current" --network "$net" \
-            -e SPRING_FLYWAY_TARGET=103 \
+            -e SPRING_FLYWAY_TARGET=108 \
             --env-file c2b-legacy-synthetic.env \
             -v "$PWD/${new_jars[0]}:/app/helvoca.jar:ro" \
             eclipse-temurin:21-jre java -jar /app/helvoca.jar >/dev/null
@@ -199,8 +199,8 @@ jobs:
           sql() {
             docker exec "$db" psql -U helvoca -d helvoca -At -v ON_ERROR_STOP=1 -c "$1"
           }
-          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103') AND success")" = 4
-          sql "INSERT INTO business(id,name) VALUES ('00000000-0000-0000-0000-000000000191','Synthetic V103 rollback tenant')" >/dev/null
+          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103','104','105','106','107','108') AND success")" = 9
+          sql "INSERT INTO business(id,name) VALUES ('00000000-0000-0000-0000-000000000191','Synthetic V108 rollback tenant')" >/dev/null
           sql "INSERT INTO phone_number(id,business_id,phone_number,provider,external_id,active) VALUES ('00000000-0000-0000-0000-000000000192','00000000-0000-0000-0000-000000000191','+12025550199','TWILIO','PNcccccccccccccccccccccccccccccccc',TRUE)" >/dev/null
           checksum_before="$(sql "SELECT md5(string_agg(row_to_json(p)::text, ',' ORDER BY p.id)) FROM phone_number p")"
           docker run -d --name "$old" --network "$net" \
@@ -208,9 +208,11 @@ jobs:
             -v "$PWD/${old_jars[0]}:/app/helvoca.jar:ro" \
             eclipse-temurin:21-jre java -jar /app/helvoca.jar >/dev/null
           probe "$old"
-          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103') AND success")" = 4
-          test "$(sql "SELECT MAX(version::integer) FROM flyway_schema_history WHERE success")" = 103
+          test "$(sql "SELECT COUNT(*) FROM flyway_schema_history WHERE version IN ('100','101','102','103','104','105','106','107','108') AND success")" = 9
+          test "$(sql "SELECT MAX(version::integer) FROM flyway_schema_history WHERE success")" = 108
           test "$(sql "SELECT md5(string_agg(row_to_json(p)::text, ',' ORDER BY p.id)) FROM phone_number p")" = "$checksum_before"
           test "$(sql "SELECT COUNT(*) FROM phone_number WHERE twilio_binding_source IS NULL AND twilio_account_sid IS NULL AND voice_verified_at IS NULL")" = 1
-          echo "C2B_LEGACY_MAIN_BINARY_V103_PG18_SYNTHETIC_SMOKE_PASS"
+          test "$(sql "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'business_account_token'")" = 1
+          test "$(sql "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'app_user' AND column_name = 'email_verified_at'")" = 1
+          echo "C2B_LEGACY_MAIN_BINARY_V108_PG18_SYNTHETIC_SMOKE_PASS"
 
