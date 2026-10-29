@@ -139,6 +139,27 @@ class ApiRateLimitFilterTest {
     }
 
     @Test
+    void anonymousPasswordRecoveryRequestAndConfirmUseStrictIpThrottling() throws Exception {
+        ApiRateLimitProperties properties = new ApiRateLimitProperties();
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        when(limiter.consume(startsWith("password-recovery:"), eq(5), eq(3600), any(Instant.class)))
+                .thenReturn(new DistributedRateLimiter.Result(false, 6, 0,
+                        Instant.now().getEpochSecond() + 120));
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(properties, limiter, new SimpleMeterRegistry());
+
+        for (String path : new String[] {
+                "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm" }) {
+            HttpServletRequest request = request("POST", path, "203.0.113.100");
+            HttpServletResponse response = mock(HttpServletResponse.class);
+            when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+            FilterChain chain = mock(FilterChain.class);
+            filter.doFilter(request, response, chain);
+            verify(response).setStatus(429);
+            verify(chain, never()).doFilter(any(), any());
+        }
+    }
+
+    @Test
     void platformInvitationCreationUsesPerAdminLimit() throws Exception {
         ApiRateLimitProperties properties = new ApiRateLimitProperties();
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);

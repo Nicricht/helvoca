@@ -2,6 +2,8 @@ package cl.helvoca.user;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.auth.AuthService;
+import cl.helvoca.auth.BusinessAccountVerificationService;
+import cl.helvoca.auth.BusinessAccountMailService;
 import cl.helvoca.auth.LoginRequest;
 import cl.helvoca.auth.LoginResponse;
 import cl.helvoca.business.Business;
@@ -9,9 +11,12 @@ import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.common.ConflictException;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.security.TenantProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -50,6 +55,8 @@ public class TeamInvitationService {
     private final AuthService authService;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
+    private BusinessAccountVerificationService verification;
+    private BusinessAccountMailService mail;
 
     public TeamInvitationService(TeamInvitationRepository invitations,
                                  AppUserRepository users,
@@ -67,6 +74,16 @@ public class TeamInvitationService {
         this.authService = authService;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
+    }
+
+    @Autowired(required = false)
+    void setAccountVerification(BusinessAccountVerificationService verification) {
+        this.verification = verification;
+    }
+
+    @Autowired(required = false)
+    void setAccountMail(BusinessAccountMailService mail) {
+        this.mail = mail;
     }
 
     @Transactional(readOnly = true)
@@ -140,7 +157,27 @@ public class TeamInvitationService {
         }
 
         String path = "/app/invite?businessId=" + businessId + "&token=" + rawToken;
+        scheduleOptionalEmail(email, path);
         return response(invitation, path);
+    }
+
+    private void scheduleOptionalEmail(String email, String invitePath) {
+        if (mail == null || !mail.isInvitationDeliveryEnabled()) return;
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new IllegalStateException("Invitation delivery requires a committed transaction");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    mail.sendInvitation(email, invitePath);
+                } catch (RuntimeException deliveryUnavailable) {
+                    // Manual private-link delivery remains available. Never log
+                    // recipient details, token, SMTP credentials or link.
+                }
+            }
+        });
     }
 
     @Transactional
@@ -196,6 +233,8 @@ public class TeamInvitationService {
         user.getRoles().add(role);
         if (compatibilityAdmin != null) user.getRoles().add(compatibilityAdmin);
         users.saveAndFlush(user);
+        // Possession of the private, one-time invitation is adequate email proof.
+        if (verification != null) verification.markTrustedPossession(businessId, user.getId());
 
         invitation.setAcceptedAt(Instant.now());
         invitations.saveAndFlush(invitation);

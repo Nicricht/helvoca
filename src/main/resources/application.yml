@@ -17,6 +17,13 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 50MB
+  mail:
+    # SMTP host/credentials are intentionally absent by default. Operators may
+    # set SPRING_MAIL_HOST/PORT/USERNAME/PASSWORD explicitly when approved.
+    properties:
+      "mail.smtp.connectiontimeout": ${HELVOCA_SMTP_CONNECTION_TIMEOUT_MS:5000}
+      "mail.smtp.timeout": ${HELVOCA_SMTP_READ_TIMEOUT_MS:5000}
+      "mail.smtp.writetimeout": ${HELVOCA_SMTP_WRITE_TIMEOUT_MS:5000}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -46,6 +53,14 @@ springdoc:
     path: /swagger-ui.html
 
 app:
+  account-email:
+    # Master outbound email switch and verification enrollment gate default OFF.
+    enabled: ${HELVOCA_ACCOUNT_EMAIL_ENABLED:false}
+    verification-required: ${HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED:false}
+    invitation-delivery-enabled: ${HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED:false}
+    transport: ${HELVOCA_ACCOUNT_EMAIL_TRANSPORT:SMTP}
+    from: ${HELVOCA_ACCOUNT_EMAIL_FROM:}
+    public-base-url: ${HELVOCA_ACCOUNT_EMAIL_PUBLIC_BASE_URL:}
   telephony:
     twilio:
       # Existing-number voice routing is deliberately OFF until a distinct

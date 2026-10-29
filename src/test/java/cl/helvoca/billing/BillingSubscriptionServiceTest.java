@@ -308,6 +308,11 @@ class BillingSubscriptionServiceTest {
         local.setBillingProvider("mercadopago");
         local.setExternalSubscriptionId("pre-renew");
         OffsetDateTime debitDate = OffsetDateTime.of(2026, 10, 27, 12, 0, 0, 0, ZoneOffset.UTC);
+        // The approved renewal must be newer than the current cycle. The
+        // activeBasic() helper uses Instant.now(), so its default cycle would
+        // turn this historical debit into a stale invoice after 2026-10-27.
+        local.setCurrentPeriodStart(debitDate.minusMonths(1).toInstant());
+        local.setCurrentPeriodEnd(debitDate.toInstant());
 
         when(subscriptions.findByExternalSubscriptionId("pre-renew")).thenReturn(Optional.of(local));
         when(gateway.getInvoice("invoice-renew"))

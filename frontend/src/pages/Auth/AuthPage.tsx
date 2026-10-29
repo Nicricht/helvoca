@@ -23,7 +23,8 @@ import styles from "./AuthPage.module.css";
 type AuthMode = "register" | "login";
 
 type AuthResponse = {
-  accessToken: string;
+  accessToken?: string;
+  status?: string;
   user?: {
     email?: string;
     roles?: string[];
@@ -126,6 +127,7 @@ export function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [checkingSession, setCheckingSession] = useState(() => Boolean(getAccessToken()));
   const [message, setMessage] = useState("");
+  const [messageKind, setMessageKind] = useState<"error" | "success">("error");
 
   const features = useMemo(() => [
     { feature: "calls", icon: PhoneCall, title: "Llamadas", detail: "Atención automática con contexto del negocio." },
@@ -158,6 +160,7 @@ export function AuthPage() {
         if (!cancelled) {
           setMode("login");
           setMessage("Tu sesión expiró. Ingresa nuevamente.");
+          setMessageKind("error");
           setCheckingSession(false);
         }
         return null;
@@ -170,6 +173,7 @@ export function AuthPage() {
     }).catch(error => {
       if (cancelled) return;
       setMessage(errorMessage(error, "No pudimos verificar tu sesión."));
+      setMessageKind("error");
       setCheckingSession(false);
     });
 
@@ -183,6 +187,7 @@ export function AuthPage() {
     if (busy) return;
     setMode(next);
     setMessage("");
+    setMessageKind("error");
   };
 
   const submitRegister = async (event: FormEvent<HTMLFormElement>) => {
@@ -205,9 +210,18 @@ export function AuthPage() {
           humanTransferPhone: null
         })
       }, false);
+      if (result.status === "EMAIL_VERIFICATION_REQUIRED") {
+        setMode("login");
+        setBusy(false);
+        setMessageKind("success");
+        setMessage("Cuenta creada. Revisa tu correo para confirmar tu dirección antes de ingresar.");
+        return;
+      }
+      if (!result.accessToken) throw new Error("El servidor no entregó una sesión de acceso.");
       setAccessToken(result.accessToken);
       window.location.assign(destinationForRoles(result.user?.roles));
     } catch (error) {
+      setMessageKind("error");
       setMessage(errorMessage(error, "No fue posible crear la empresa."));
       setBusy(false);
     }
@@ -227,9 +241,11 @@ export function AuthPage() {
           password: String(form.get("password") || "")
         })
       }, false);
+      if (!result.accessToken) throw new Error("El servidor no entregó una sesión de acceso.");
       setAccessToken(result.accessToken);
       window.location.assign(destinationForRoles(result.user?.roles));
     } catch (error) {
+      setMessageKind("error");
       setMessage(errorMessage(error, "Credenciales inválidas."));
       setBusy(false);
     }
@@ -324,13 +340,18 @@ export function AuthPage() {
                         <label htmlFor="loginEmail">Correo<input id="loginEmail" name="email" required type="email" autoComplete="email" placeholder="ana@empresa.cl" /></label>
                         <label htmlFor="loginPassword">Contraseña<input id="loginPassword" name="password" required type="password" autoComplete="current-password" /></label>
                         <button className={styles.primaryButton} type="submit" disabled={busy}>{busy ? "Ingresando…" : "Ingresar a RecepVoz"}</button>
+                        <a className={styles.forgotLink} href="/app/password-reset">¿Olvidaste tu contraseña?</a>
                       </>
                     )}
                   </form>
                 </>
               )}
 
-              <div id="authMessage" className={styles.message} role={message ? "alert" : undefined} hidden={!message}>{message}</div>
+              <div id="authMessage" className={`${styles.message} ${messageKind === "success" ? styles.messageSuccess : ""}`}
+                role={message ? (messageKind === "success" ? "status" : "alert") : undefined} hidden={!message}>
+                {message}
+                {messageKind === "success" && <a className={styles.verifyLink} href="/app/verify-email">Reenviar confirmación</a>}
+              </div>
               <p className={styles.legal}>Al crear una cuenta aceptas los <a href="/terms.html">Términos</a> y la <a href="/privacy.html">Política de privacidad</a>.</p>
               <a className={styles.secondaryLink} href="/app/sales">Ver cómo funciona <ArrowRight size={14} /></a>
             </motion.article>

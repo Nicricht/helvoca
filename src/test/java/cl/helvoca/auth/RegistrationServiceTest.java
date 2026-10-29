@@ -29,6 +29,8 @@ class RegistrationServiceTest {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         AuthService auth = mock(AuthService.class);
         RegistrationService service = new RegistrationService(businesses, users, roles, encoder, auth);
+        BusinessAccountVerificationService verification = mock(BusinessAccountVerificationService.class);
+        service.setVerification(verification);
 
         Role ownerRole = new Role();
         ownerRole.setCode(RoleCode.BUSINESS_OWNER);
@@ -38,19 +40,28 @@ class RegistrationServiceTest {
         adminRole.setName("Business admin");
         when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(ownerRole));
         when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(adminRole));
-        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> i.getArgument(0));
-        when(users.saveAndFlush(any(AppUser.class))).thenAnswer(i -> i.getArgument(0));
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> {
+            Business saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        when(users.saveAndFlush(any(AppUser.class))).thenAnswer(i -> {
+            AppUser saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
         when(encoder.encode("very-secure-password")).thenReturn("HASH");
         LoginResponse expected = new LoginResponse("jwt", "Bearer", 3600,
                 new LoginResponse.UserInfo(UUID.randomUUID(), UUID.randomUUID(), "Ana", "ana@example.com",
                         List.of("BUSINESS_ADMIN", "BUSINESS_OWNER")));
         when(auth.login(new LoginRequest("ana@example.com", "very-secure-password"))).thenReturn(expected);
 
-        LoginResponse result = service.register(new RegisterBusinessRequest(
+        RegistrationService.RegistrationResult result = service.register(new RegisterBusinessRequest(
                 "Ana", "ANA@EXAMPLE.COM", "very-secure-password", "Clínica Norte",
                 "America/Santiago", "es", "+56911112222"));
 
-        assertSame(expected, result);
+        assertSame(expected, result.session());
+        assertFalse(result.verificationPending());
         ArgumentCaptor<Business> businessCaptor = ArgumentCaptor.forClass(Business.class);
         verify(businesses).saveAndFlush(businessCaptor.capture());
         assertEquals("Clínica Norte", businessCaptor.getValue().getName());
@@ -61,6 +72,7 @@ class RegistrationServiceTest {
         AppUser user = userCaptor.getValue();
         assertEquals("ana@example.com", user.getEmail());
         assertEquals("HASH", user.getPasswordHash());
+        verify(verification).markTrustedPossession(businessCaptor.getValue().getId(), user.getId());
         assertTrue(user.getRoles().contains(ownerRole));
         assertTrue(user.getRoles().contains(adminRole));
         assertSame(businessCaptor.getValue(), user.getBusiness());
@@ -78,5 +90,47 @@ class RegistrationServiceTest {
                 "Ana", "ana@example.com", "very-secure-password", "Negocio",
                 "America/Santiago", "es", null)));
         verifyNoInteractions(businesses);
+    }
+
+    @Test
+    void registerCannotCreateAnOwnerWithoutBothSeededBusinessRoles() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(new Role()));
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> i.getArgument(0));
+        RegistrationService service = new RegistrationService(
+                businesses, users, roles, mock(PasswordEncoder.class), mock(AuthService.class));
+        assertThrows(IllegalStateException.class, () -> service.register(new RegisterBusinessRequest(
+                "Ana", "new@example.com", "very-secure-password", "Negocio",
+                "America/Santiago", "es", null)));
+        verify(users, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void legacyStandaloneRegistrationWithoutEmailFeatureStillReturnsLogin() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        AuthService auth = mock(AuthService.class);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(new Role()));
+        when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(new Role()));
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> {
+            Business saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        when(users.saveAndFlush(any(AppUser.class))).thenAnswer(i -> {
+            AppUser saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        RegistrationService service = new RegistrationService(
+                businesses, users, roles, mock(PasswordEncoder.class), auth);
+        RegistrationService.RegistrationResult result = service.register(new RegisterBusinessRequest(
+                "Ana", "legacy@example.com", "very-secure-password", "Negocio",
+                "America/Santiago", "es", null));
+        assertFalse(result.verificationPending());
+        verify(auth).login(new LoginRequest("legacy@example.com", "very-secure-password"));
     }
 }

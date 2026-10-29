@@ -129,6 +129,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_CONSOLE_ASSETS).permitAll()
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/register",
+                                "/api/v1/auth/password-reset/request",
+                                "/api/v1/auth/password-reset/confirm",
+                                "/api/v1/auth/email/resend",
+                                "/api/v1/auth/email/confirm",
                                 "/api/v1/auth/invitations/**",
                                 "/api/v1/public/pricing", "/api/v1/public/booking-pages/**",
                                 "/actuator/health").permitAll()

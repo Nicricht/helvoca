@@ -26,8 +26,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public LoginResponse register(@Valid @RequestBody RegisterBusinessRequest request) {
-        return registrationService.register(request);
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterBusinessRequest request) {
+        RegistrationService.RegistrationResult result = registrationService.register(request);
+        if (result.verificationPending()) {
+            return ResponseEntity.accepted().body(Map.of("status", "EMAIL_VERIFICATION_REQUIRED"));
+        }
+        return ResponseEntity.ok(result.session());
     }
 
     @PostMapping("/login")

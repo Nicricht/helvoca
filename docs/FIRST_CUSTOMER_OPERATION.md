@@ -133,6 +133,48 @@ Si uno falla, convertir el cierre en **piloto aceptado pendiente de activación/
 
 ## 8. Onboarding después del pago
 
+### Acceso de empresa y correo (implementación candidata, todavía NO desplegada)
+
+El flujo propuesto en el Draft PR [#851](https://github.com/Nicricht/helvoca/pull/851)
+se monta sobre la aplicación multi-tenant existente. **Crear una empresa no
+provisiona una nueva máquina o servicio Railway:** añade un `business`, su
+propietario y la prueba BASIC a la infraestructura compartida con aislamiento
+de datos. La compra o activación de números, WhatsApp, voz y pagos no se
+ejecuta por crear la cuenta.
+
+- Por defecto, el registro sigue permitiendo ingresar inmediatamente. Con
+  `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=true`, un registro nuevo queda
+  pendiente, devuelve HTTP 202 sin JWT y requiere el enlace personal recibido
+  por correo. Cuentas ya existentes, administradores de plataforma e
+  integrantes que aceptaron una invitación privada conservan su acceso.
+- La página `/app/password-reset` permite solicitar recuperación. La API
+  responde 202 tanto si existe la cuenta como si no; un enlace válido de
+  30 minutos cambia únicamente la contraseña BCrypt y se consume una sola
+  vez. La confirmación está en esa misma ruta con el token en el fragmento.
+- `/app/verify-email` permite confirmar o pedir otro enlace (24 horas). Los
+  fragmentos se eliminan del historial visible al abrir la página. Ningún
+  formulario público debe devolver JWT ni un secreto de recuperación.
+- Las invitaciones del equipo siguen ofreciendo un **enlace para copiar**.
+  El envío por correo del mismo enlace se puede habilitar por separado y
+  ocurre solo después de confirmar la transacción; si falla, el enlace manual
+  continúa disponible. Nunca se generan invitaciones duplicadas por el correo.
+- **Railway Free/Trial/Hobby:** Railway bloquea SMTP saliente en esos planes. La rama incorpora transporte `RESEND_HTTPS` por la API oficial de Resend, sin subir el plan Railway. Configurar `HELVOCA_ACCOUNT_EMAIL_TRANSPORT=RESEND_HTTPS` y reutilizar la clave privada de Resend almacenada en `SPRING_MAIL_PASSWORD`. El envío sigue apagado con los tres flags hasta verificar dominio, protección de secretos, entrega real y los gates de publicación. SMTP permanece como alternativa para Railway Pro.
+
+  **Puerta de publicación Resend HTTPS:** conservar `HELVOCA_ACCOUNT_EMAIL_ENABLED=false`, `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=false` y `HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED=false` hasta confirmar en Resend el estado `Verified` del dominio emisor, la cobertura diferencial de líneas/ramas/métodos del último SHA y las pruebas de regresión de ese mismo SHA. Antes de aplicar las variables preparadas en Railway, certificar V108 y su rollback, las dependencias PR #847 → #849 → #851, revisar el backup y obtener aprobación de publicación. Habilitar después un envío de prueba únicamente a un destinatario autorizado y registrar entrega real. La creación de la clave y los tests con HTTP simulado no acreditan envío real.
+- **Correo saliente inicialmente OFF**: `HELVOCA_ACCOUNT_EMAIL_ENABLED=false`,
+  `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=false` y
+  `HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED=false`. Una operación futura y
+  autorizada deberá proporcionar SMTP mediante `SPRING_MAIL_HOST`,
+  `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`, más
+  `HELVOCA_ACCOUNT_EMAIL_FROM` y
+  `HELVOCA_ACCOUNT_EMAIL_PUBLIC_BASE_URL` con **origen HTTPS** estricto.
+  No ingresar credenciales en documentación, repositorios ni comentarios.
+- Los tests con remitentes simulados prueban el contrato **offline**; no
+  certifican entrega real SMTP, recepción en bandeja, activación de canales,
+  pagos ni disponibilidad en producción. Antes de activar hay que revisar el
+  SHA final, Fast/Full CI, cobertura afectada, proveedor, autorización y
+  operación asistida del primer cliente.
+
 1. Completar `docs/FIRST_CUSTOMER_ONBOARDING_FORM.md`.
 2. Crear/configurar el tenant sin editar producción manualmente cuando exista flujo soportado.
 3. Cargar solo datos confirmados: servicios, precios, horarios, FAQ y políticas.

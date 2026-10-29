@@ -2,6 +2,8 @@ package cl.helvoca.user;
 
 import cl.helvoca.audit.AuditService;
 import cl.helvoca.auth.AuthService;
+import cl.helvoca.auth.BusinessAccountMailService;
+import cl.helvoca.auth.BusinessAccountVerificationService;
 import cl.helvoca.auth.LoginRequest;
 import cl.helvoca.auth.LoginResponse;
 import cl.helvoca.business.Business;
@@ -79,6 +81,83 @@ class TeamInvitationServiceTest {
         assertEquals(RoleCode.OPERATOR, saved.getRoleCode());
         assertTrue(saved.getExpiresAt().isAfter(before.plusSeconds(71 * 3600)));
         assertEquals("PENDING", result.status());
+    }
+
+    @Test
+    void optInInvitationDeliveryWaitsForCommitAndPreservesManualOneUseLink() {
+        BusinessAccountMailService mail = mock(BusinessAccountMailService.class);
+        when(mail.isInvitationDeliveryEnabled()).thenReturn(true);
+        service.setAccountMail(mail);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "operador@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        org.springframework.transaction.support.TransactionSynchronizationManager.initSynchronization();
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            TeamInvitationResponse response = service.create(new InviteUserRequest(
+                    "Operador Uno", "operador@negocio.cl", RoleCode.OPERATOR));
+            assertNotNull(response.invitePath());
+            verify(mail, never()).sendInvitation(anyString(), anyString());
+
+            var commits = org.springframework.transaction.support.TransactionSynchronizationManager
+                    .getSynchronizations();
+            assertEquals(1, commits.size());
+            commits.forEach(org.springframework.transaction.support.TransactionSynchronization::afterCommit);
+            verify(mail).sendInvitation("operador@negocio.cl", response.invitePath());
+            doThrow(new IllegalStateException("SMTP offline")).when(mail)
+                    .sendInvitation("operador@negocio.cl", response.invitePath());
+            assertDoesNotThrow(() -> commits.forEach(
+                    org.springframework.transaction.support.TransactionSynchronization::afterCommit));
+            verify(invitations, times(1)).saveAndFlush(any());
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clearSynchronization();
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+    }
+
+    @Test
+    void optInInvitationCannotSendBeforeTransactionAndCannotSendWithoutSynchronization() {
+        BusinessAccountMailService mail = mock(BusinessAccountMailService.class);
+        when(mail.isInvitationDeliveryEnabled()).thenReturn(true);
+        service.setAccountMail(mail);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "operador@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        InviteUserRequest request = new InviteUserRequest(
+                "Operador Uno", "operador@negocio.cl", RoleCode.OPERATOR);
+
+        assertThrows(IllegalStateException.class, () -> service.create(request));
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThrows(IllegalStateException.class, () -> service.create(request));
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+        verify(mail, never()).sendInvitation(anyString(), anyString());
+    }
+
+    @Test
+    void disabledInvitationDeliveryLeavesManualLinkAvailable() {
+        BusinessAccountMailService mail = mock(BusinessAccountMailService.class);
+        service.setAccountMail(mail);
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business));
+        when(invitations.findAllByBusinessIdAndEmailIgnoreCaseAndAcceptedAtIsNullAndRevokedAtIsNull(
+                businessId, "operador@negocio.cl")).thenReturn(List.of());
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        TeamInvitationResponse response = service.create(new InviteUserRequest(
+                "Operador Uno", "operador@negocio.cl", RoleCode.OPERATOR));
+        assertNotNull(response.invitePath());
+        verify(mail, never()).sendInvitation(anyString(), anyString());
+    }
+
+    @Test
+    void unknownBusinessCannotCreateInvitation() {
+        assertThrows(cl.helvoca.common.NotFoundException.class, () -> service.create(
+                new InviteUserRequest("Operator", "new@example.test", RoleCode.OPERATOR)));
+        verify(invitations, never()).saveAndFlush(any());
     }
 
     @Test
@@ -220,6 +299,37 @@ class TeamInvitationServiceTest {
         verify(users).saveAndFlush(user.capture());
         assertTrue(user.getValue().getRoles().contains(owner));
         assertTrue(user.getValue().getRoles().contains(admin));
+    }
+
+    @Test
+    void acceptanceRequiresSeededCompatibilityAdminRoleForPrincipalOwner() {
+        String raw = "missing-admin-role-token";
+        TeamInvitation invitation = invitation(raw, RoleCode.BUSINESS_OWNER, Instant.now().plusSeconds(3600));
+        when(invitations.findByBusinessIdAndTokenHash(businessId, TeamInvitationService.hash(raw)))
+                .thenReturn(Optional.of(invitation));
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(mock(Role.class)));
+        assertThrows(IllegalStateException.class, () -> service.accept(
+                businessId, raw, new AcceptInvitationRequest("UnaClaveMuySegura123")));
+        verify(users, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void possessionOfAcceptedPrivateInvitationMarksTheAccountTrusted() {
+        BusinessAccountVerificationService verification = mock(BusinessAccountVerificationService.class);
+        service.setAccountVerification(verification);
+        String raw = "verified-invite-token";
+        TeamInvitation invitation = invitation(raw, RoleCode.OPERATOR, Instant.now().plusSeconds(3600));
+        when(invitations.findByBusinessIdAndTokenHash(businessId, TeamInvitationService.hash(raw)))
+                .thenReturn(Optional.of(invitation));
+        when(roles.findByCode(RoleCode.OPERATOR)).thenReturn(Optional.of(mock(Role.class)));
+        when(users.saveAndFlush(any())).thenAnswer(invocation -> {
+            AppUser saved = invocation.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        when(invitations.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        service.accept(businessId, raw, new AcceptInvitationRequest("UnaClaveMuySegura123"));
+        verify(verification).markTrustedPossession(eq(businessId), any(UUID.class));
     }
 
     @Test
