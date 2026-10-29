@@ -48,6 +48,40 @@ class ResendHttpsSenderTest {
         assertThrows(IllegalArgumentException.class, () -> ready.send(new SimpleMailMessage()));
     }
 
+
+    @Test
+    void rejectsEveryIncompleteMailFieldWithoutIssuingHttpRequest() {
+        ResendHttpsSender sender = new ResendHttpsSender("re_test-only", RestClient.builder());
+        SimpleMailMessage noTo = new SimpleMailMessage();
+        noTo.setFrom("acceso@cuentas.recepvoz.cl");
+        noTo.setSubject("Subject");
+        noTo.setText("Body");
+        assertThrows(IllegalArgumentException.class, () -> sender.send(noTo));
+
+        SimpleMailMessage twoRecipients = email();
+        twoRecipients.setTo("one@example.test", "two@example.test");
+        assertThrows(IllegalArgumentException.class, () -> sender.send(twoRecipients));
+
+        SimpleMailMessage noSubject = email();
+        noSubject.setSubject(null);
+        assertThrows(IllegalArgumentException.class, () -> sender.send(noSubject));
+
+        SimpleMailMessage noText = email();
+        noText.setText(null);
+        assertThrows(IllegalArgumentException.class, () -> sender.send(noText));
+
+        SimpleMailMessage noFrom = email();
+        noFrom.setFrom(null);
+        assertThrows(IllegalArgumentException.class, () -> sender.send(noFrom));
+    }
+
+    @Test
+    void whitespaceAndNullApiKeysAreBothUnconfigured() {
+        assertFalse(new ResendHttpsSender(null, RestClient.builder()).isConfigured());
+        assertFalse(new ResendHttpsSender("  ", RestClient.builder()).isConfigured());
+        assertTrue(new ResendHttpsSender(" re_test-only ", RestClient.builder()).isConfigured());
+    }
+
     @Test
     void rejectsProviderFailureWithoutExposingResponseBody() {
         RestClient.Builder builder = RestClient.builder();

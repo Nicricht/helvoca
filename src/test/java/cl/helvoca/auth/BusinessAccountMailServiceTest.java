@@ -120,6 +120,27 @@ class BusinessAccountMailServiceTest {
                         "UNKNOWN", httpsProvider(https)));
     }
 
+
+    @Test
+    void httpsTransportFailsClosedWithMissingKeyOrAbsentProvider() {
+        ResendHttpsSender missingKey = mock(ResendHttpsSender.class);
+        when(missingKey.isConfigured()).thenReturn(false);
+        assertThrows(IllegalStateException.class,
+                () -> new BusinessAccountMailService(provider(null), true, false, false,
+                        "identity@example.test", "https://recepvoz.example.test",
+                        "RESEND_HTTPS", httpsProvider(missingKey)));
+        assertThrows(IllegalStateException.class,
+                () -> new BusinessAccountMailService(provider(null), true, false, false,
+                        "identity@example.test", "https://recepvoz.example.test",
+                        "RESEND_HTTPS", null));
+
+        var disabled = new BusinessAccountMailService(provider(null), false, false, false,
+                "", "", "RESEND_HTTPS", null);
+        assertFalse(disabled.isEnabled());
+        assertThrows(IllegalStateException.class,
+                () -> disabled.sendPasswordReset("owner@example.test", TOKEN));
+    }
+
     @Test
     void invitationDeliveryReusesOnlyExistingCanonicalOneUseInvitePath() {
         JavaMailSender sender = mock(JavaMailSender.class);
