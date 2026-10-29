@@ -158,6 +158,7 @@ ejecuta por crear la cuenta.
   El envío por correo del mismo enlace se puede habilitar por separado y
   ocurre solo después de confirmar la transacción; si falla, el enlace manual
   continúa disponible. Nunca se generan invitaciones duplicadas por el correo.
+- **Railway Free/Trial/Hobby:** Railway bloquea SMTP saliente en esos planes. La rama incorpora transporte `RESEND_HTTPS` por la API oficial de Resend, sin subir el plan Railway. Configurar `HELVOCA_ACCOUNT_EMAIL_TRANSPORT=RESEND_HTTPS` y reutilizar la clave privada de Resend almacenada en `SPRING_MAIL_PASSWORD`. El envío sigue apagado con los tres flags hasta verificar dominio, protección de secretos, entrega real y los gates de publicación. SMTP permanece como alternativa para Railway Pro.
 - **Correo saliente inicialmente OFF**: `HELVOCA_ACCOUNT_EMAIL_ENABLED=false`,
   `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=false` y
   `HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED=false`. Una operación futura y

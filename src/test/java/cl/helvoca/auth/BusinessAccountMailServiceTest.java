@@ -90,6 +90,36 @@ class BusinessAccountMailServiceTest {
         verifyNoMoreInteractions(sender);
     }
 
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<ResendHttpsSender> httpsProvider(ResendHttpsSender sender) {
+        ObjectProvider<ResendHttpsSender> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(sender);
+        return provider;
+    }
+
+    @Test
+    void resendHttpsTransportDoesNotRequireSmtpAndUsesExistingValidation() {
+        ResendHttpsSender https = mock(ResendHttpsSender.class);
+        when(https.isConfigured()).thenReturn(true);
+        var mail = new BusinessAccountMailService(provider(null), true, false, false,
+                "identity@example.test", "https://recepvoz.example.test",
+                "RESEND_HTTPS", httpsProvider(https));
+        mail.sendPasswordReset("owner@example.test", TOKEN);
+        verify(https).send(any(SimpleMailMessage.class));
+        assertThrows(IllegalArgumentException.class,
+                () -> mail.sendPasswordReset("not-an-email", TOKEN));
+        var missing = httpsProvider(null);
+        assertThrows(IllegalStateException.class,
+                () -> new BusinessAccountMailService(provider(null), true, false, false,
+                        "identity@example.test", "https://recepvoz.example.test",
+                        "RESEND_HTTPS", missing));
+        assertThrows(IllegalStateException.class,
+                () -> new BusinessAccountMailService(provider(null), true, false, false,
+                        "identity@example.test", "https://recepvoz.example.test",
+                        "UNKNOWN", httpsProvider(https)));
+    }
+
     @Test
     void invitationDeliveryReusesOnlyExistingCanonicalOneUseInvitePath() {
         JavaMailSender sender = mock(JavaMailSender.class);

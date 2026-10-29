@@ -58,6 +58,7 @@ app:
     enabled: ${HELVOCA_ACCOUNT_EMAIL_ENABLED:false}
     verification-required: ${HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED:false}
     invitation-delivery-enabled: ${HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED:false}
+    transport: ${HELVOCA_ACCOUNT_EMAIL_TRANSPORT:SMTP}
     from: ${HELVOCA_ACCOUNT_EMAIL_FROM:}
     public-base-url: ${HELVOCA_ACCOUNT_EMAIL_PUBLIC_BASE_URL:}
   telephony:

@@ -3,6 +3,7 @@ package cl.helvoca.auth;
 import jakarta.mail.internet.AddressException;
 import jakarta.mail.internet.InternetAddress;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -23,6 +24,7 @@ public final class BusinessAccountMailService {
     private static final Pattern INVITE_PATH = Pattern.compile(
             "^/app/invite\\?businessId=([0-9a-fA-F-]{36})&token=([A-Za-z0-9_-]{43})$");
     private final JavaMailSender sender;
+    private final ResendHttpsSender httpsSender;
     private final boolean enabled;
     private final boolean verificationRequired;
     private final boolean invitationDeliveryEnabled;
@@ -31,19 +33,38 @@ public final class BusinessAccountMailService {
 
     public BusinessAccountMailService(
             ObjectProvider<JavaMailSender> providers,
+            boolean enabled, boolean verificationRequired, boolean invitationDeliveryEnabled,
+            String from, String baseUrl) {
+        this(providers, enabled, verificationRequired, invitationDeliveryEnabled,
+                from, baseUrl, "SMTP", null);
+    }
+
+    @Autowired
+    public BusinessAccountMailService(
+            ObjectProvider<JavaMailSender> providers,
             @Value("${app.account-email.enabled:false}") boolean enabled,
             @Value("${app.account-email.verification-required:false}") boolean verificationRequired,
             @Value("${app.account-email.invitation-delivery-enabled:false}") boolean invitationDeliveryEnabled,
             @Value("${app.account-email.from:}") String from,
-            @Value("${app.account-email.public-base-url:}") String baseUrl) {
+            @Value("${app.account-email.public-base-url:}") String baseUrl,
+            @Value("${app.account-email.transport:SMTP}") String transport,
+            ObjectProvider<ResendHttpsSender> httpsProviders) {
         if (!enabled && (verificationRequired || invitationDeliveryEnabled)) {
             throw new IllegalStateException("Account email enrollment requires the outbound email opt-in");
         }
-        this.sender = enabled ? providers.getIfAvailable() : null;
+        if (enabled && !"SMTP".equalsIgnoreCase(transport) && !"RESEND_HTTPS".equalsIgnoreCase(transport)) {
+            throw new IllegalStateException("Unsupported account email transport");
+        }
+        boolean useHttps = enabled && "RESEND_HTTPS".equalsIgnoreCase(transport);
+        this.httpsSender = useHttps ? (httpsProviders == null ? null : httpsProviders.getIfAvailable()) : null;
+        this.sender = enabled && !useHttps ? providers.getIfAvailable() : null;
         this.enabled = enabled;
         this.verificationRequired = verificationRequired;
         this.invitationDeliveryEnabled = invitationDeliveryEnabled;
-        if (enabled && sender == null) {
+        if (enabled && useHttps && (httpsSender == null || !httpsSender.isConfigured())) {
+            throw new IllegalStateException("Account email requires configured HTTPS provider");
+        }
+        if (enabled && !useHttps && sender == null) {
             throw new IllegalStateException("Account email requires an explicitly configured SMTP sender");
         }
         this.from = enabled ? validAddress(from) : null;
@@ -97,7 +118,11 @@ public final class BusinessAccountMailService {
         message.setTo(validAddress(recipient));
         message.setSubject(subject);
         message.setText(body);
-        sender.send(message);
+        if (httpsSender != null) {
+            httpsSender.send(message);
+        } else {
+            sender.send(message);
+        }
     }
 
     private static String validAddress(String raw) {
