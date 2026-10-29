@@ -79,7 +79,8 @@ class BusinessAccountMailServiceTest {
         assertThrows(IllegalArgumentException.class, () -> mail.sendPasswordReset("owner@example.test", "bad"));
         assertThrows(IllegalArgumentException.class, () -> mail.sendPasswordReset("owner@example.test", null));
         for (String recipient : new String[] { "", "  ", "owner@example.test\rBcc:evil@example.test",
-                "Alice <owner@example.test>", "owner.example.test" }) {
+                "Alice <owner@example.test>", "owner.example.test",
+                "owner@@example.test", "owner@ex ample.test" }) {
             assertThrows(IllegalArgumentException.class,
                     () -> mail.sendPasswordReset(recipient, TOKEN));
         }
