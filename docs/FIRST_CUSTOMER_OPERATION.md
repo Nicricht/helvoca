@@ -159,6 +159,8 @@ ejecuta por crear la cuenta.
   ocurre solo después de confirmar la transacción; si falla, el enlace manual
   continúa disponible. Nunca se generan invitaciones duplicadas por el correo.
 - **Railway Free/Trial/Hobby:** Railway bloquea SMTP saliente en esos planes. La rama incorpora transporte `RESEND_HTTPS` por la API oficial de Resend, sin subir el plan Railway. Configurar `HELVOCA_ACCOUNT_EMAIL_TRANSPORT=RESEND_HTTPS` y reutilizar la clave privada de Resend almacenada en `SPRING_MAIL_PASSWORD`. El envío sigue apagado con los tres flags hasta verificar dominio, protección de secretos, entrega real y los gates de publicación. SMTP permanece como alternativa para Railway Pro.
+
+  **Puerta de publicación Resend HTTPS:** conservar `HELVOCA_ACCOUNT_EMAIL_ENABLED=false`, `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=false` y `HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED=false` hasta confirmar en Resend el estado `Verified` del dominio emisor, la cobertura diferencial de líneas/ramas/métodos del último SHA y las pruebas de regresión de ese mismo SHA. Antes de aplicar las variables preparadas en Railway, certificar V108 y su rollback, las dependencias PR #847 → #849 → #851, revisar el backup y obtener aprobación de publicación. Habilitar después un envío de prueba únicamente a un destinatario autorizado y registrar entrega real. La creación de la clave y los tests con HTTP simulado no acreditan envío real.
 - **Correo saliente inicialmente OFF**: `HELVOCA_ACCOUNT_EMAIL_ENABLED=false`,
   `HELVOCA_ACCOUNT_EMAIL_VERIFICATION_REQUIRED=false` y
   `HELVOCA_ACCOUNT_EMAIL_INVITATIONS_ENABLED=false`. Una operación futura y
