@@ -92,7 +92,7 @@ test.describe('business account self-service React journey', () => {
     await page.goto('/app/verify-email#token=' + TOKEN);
     await expect(page).toHaveURL(/\/app\/verify-email\/?$/);
     await page.getByRole('button', { name: 'Confirmar correo' }).click();
-    await expect(page.getByRole('status')).toContainText(/correo confirmado/i);
+    await expect(page.getByRole('status')).toContainText(/correo est[aá] confirmado/i);
     expect(confirmations).toBe(1);
 
     await page.route('**/api/v1/auth/email/resend', route => route.fulfill(json({}, 202)));
