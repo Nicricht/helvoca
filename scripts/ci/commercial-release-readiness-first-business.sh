@@ -97,6 +97,7 @@ bash scripts/ci/commercial-pilot-rehearsal.sh
 
 echo "Running launch-cage browser contracts..."
 npm install --no-audit --no-fund
+npm run frontend:build
 npx playwright install --with-deps chromium
 npx playwright test   e2e/pilot-preflight.spec.js   e2e/operations-internal.spec.js   e2e/frontend-release-candidate.spec.js   e2e/frontend-release-candidate-hardening.spec.js
 
