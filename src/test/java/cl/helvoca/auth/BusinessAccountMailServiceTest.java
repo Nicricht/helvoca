@@ -28,6 +28,7 @@ class BusinessAccountMailServiceTest {
         assertFalse(mail.isInvitationDeliveryEnabled());
         verifyNoInteractions(provider);
         assertThrows(IllegalStateException.class, () -> mail.sendPasswordReset("owner@example.test", TOKEN));
+        assertThrows(IllegalStateException.class, () -> mail.sendInvitation("owner@example.test", null));
         assertThrows(IllegalStateException.class,
                 () -> new BusinessAccountMailService(provider, false, true, false, "", ""));
         assertThrows(IllegalStateException.class,
@@ -47,7 +48,8 @@ class BusinessAccountMailServiceTest {
         for (String url : new String[] {
                 "", "http://recepvoz.example.test", "https://user@recepvoz.example.test",
                 "https://recepvoz.example.test/path", "https://recepvoz.example.test?q=1",
-                "https://recepvoz.example.test#fragment" }) {
+                "https://recepvoz.example.test#fragment", "https:/relative-path", "https://%bad",
+                "https://recepvoz.example.test/%zz" }) {
             assertThrows(IllegalStateException.class,
                     () -> new BusinessAccountMailService(available, true, false, false,
                             "identity@example.test", url));
@@ -75,6 +77,13 @@ class BusinessAccountMailServiceTest {
                 .contains("https://recepvoz.example.test/app/verify-email#token=" + TOKEN));
         assertFalse(captured.getAllValues().get(0).getText().contains("?token="));
         assertThrows(IllegalArgumentException.class, () -> mail.sendPasswordReset("owner@example.test", "bad"));
+        assertThrows(IllegalArgumentException.class, () -> mail.sendPasswordReset("owner@example.test", null));
+        for (String recipient : new String[] { "", "  ", "owner@example.test\rBcc:evil@example.test",
+                "Alice <owner@example.test>", "owner.example.test" }) {
+            assertThrows(IllegalArgumentException.class,
+                    () -> mail.sendPasswordReset(recipient, TOKEN));
+        }
+        assertThrows(IllegalArgumentException.class, () -> mail.sendPasswordReset(null, TOKEN));
         assertThrows(IllegalArgumentException.class,
                 () -> mail.sendPasswordReset("owner@example.test\nBcc:evil@example.test", TOKEN));
         verifyNoMoreInteractions(sender);
@@ -98,6 +107,11 @@ class BusinessAccountMailServiceTest {
             assertThrows(IllegalArgumentException.class,
                     () -> mail.sendInvitation("operator@example.test", pathValue));
         }
+        assertThrows(IllegalArgumentException.class,
+                () -> mail.sendInvitation("operator@example.test", null));
+        assertThrows(IllegalArgumentException.class,
+                () -> mail.sendInvitation("operator@example.test",
+                        "/app/invite?businessId=" + "x".repeat(36) + "&token=" + TOKEN));
         verifyNoMoreInteractions(sender);
 
         var notEnabled = new BusinessAccountMailService(provider(mock(JavaMailSender.class)),

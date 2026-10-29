@@ -126,6 +126,23 @@ class BusinessAccountRecoveryPostgresIntegrationTest {
     }
 
     @Test
+    void smtpFailureNeverRevealsWhetherAnEligibleBusinessAccountExists() throws Exception {
+        when(mail.isEnabled()).thenReturn(true);
+        UUID business = business();
+        UUID user = account(business, email(), true);
+        String address = owner.queryForObject("SELECT email FROM app_user WHERE id=?", String.class, user);
+        doThrow(new IllegalStateException("Simulated SMTP outage"))
+                .when(mail).sendPasswordReset(eq(address), anyString());
+
+        var response = mvc.perform(post("/api/v1/auth/password-reset/request")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"" + address + "\"}"))
+                .andReturn();
+        assertEquals(202, response.getResponse().getStatus());
+        assertFalse(response.getResponse().getContentAsString().contains(address));
+        assertEquals(1L, owner.queryForObject("SELECT count(*) FROM business_account_token", Long.class));
+    }
+
+    @Test
     void wrongPurposeAndPasswordValidationCannotChangeCredentialsOrConsumeValidToken() throws Exception {
         UUID business = business();
         UUID user = account(business, email(), true);

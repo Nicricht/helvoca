@@ -91,4 +91,46 @@ class RegistrationServiceTest {
                 "America/Santiago", "es", null)));
         verifyNoInteractions(businesses);
     }
+
+    @Test
+    void registerCannotCreateAnOwnerWithoutBothSeededBusinessRoles() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(new Role()));
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> i.getArgument(0));
+        RegistrationService service = new RegistrationService(
+                businesses, users, roles, mock(PasswordEncoder.class), mock(AuthService.class));
+        assertThrows(IllegalStateException.class, () -> service.register(new RegisterBusinessRequest(
+                "Ana", "new@example.com", "very-secure-password", "Negocio",
+                "America/Santiago", "es", null)));
+        verify(users, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void legacyStandaloneRegistrationWithoutEmailFeatureStillReturnsLogin() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        AppUserRepository users = mock(AppUserRepository.class);
+        RoleRepository roles = mock(RoleRepository.class);
+        AuthService auth = mock(AuthService.class);
+        when(roles.findByCode(RoleCode.BUSINESS_OWNER)).thenReturn(Optional.of(new Role()));
+        when(roles.findByCode(RoleCode.BUSINESS_ADMIN)).thenReturn(Optional.of(new Role()));
+        when(businesses.saveAndFlush(any(Business.class))).thenAnswer(i -> {
+            Business saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        when(users.saveAndFlush(any(AppUser.class))).thenAnswer(i -> {
+            AppUser saved = i.getArgument(0);
+            org.springframework.test.util.ReflectionTestUtils.setField(saved, "id", UUID.randomUUID());
+            return saved;
+        });
+        RegistrationService service = new RegistrationService(
+                businesses, users, roles, mock(PasswordEncoder.class), auth);
+        RegistrationService.RegistrationResult result = service.register(new RegisterBusinessRequest(
+                "Ana", "legacy@example.com", "very-secure-password", "Negocio",
+                "America/Santiago", "es", null));
+        assertFalse(result.verificationPending());
+        verify(auth).login(new LoginRequest("legacy@example.com", "very-secure-password"));
+    }
 }
