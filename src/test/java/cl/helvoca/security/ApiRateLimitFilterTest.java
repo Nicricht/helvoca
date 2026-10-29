@@ -121,6 +121,42 @@ class ApiRateLimitFilterTest {
         assertEquals("198.51.100.9", ApiRateLimitFilter.clientAddress(fallback));
     }
 
+    @Test
+    void publicPlatformInvitationAcceptanceUsesStrictClientRateLimit() throws Exception {
+        ApiRateLimitProperties properties = new ApiRateLimitProperties();
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        when(limiter.consume(startsWith("platform-admin-activate:"), eq(5), eq(3600), any(Instant.class)))
+                .thenReturn(new DistributedRateLimiter.Result(false, 6, 0,
+                        Instant.now().getEpochSecond() + 120));
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(properties, limiter, new SimpleMeterRegistry());
+        HttpServletRequest request = request("POST", "/api/v1/auth/invitations/platform/accept", "203.0.113.90");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+        FilterChain chain = mock(FilterChain.class);
+        filter.doFilter(request, response, chain);
+        verify(response).setStatus(429);
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    @Test
+    void platformInvitationCreationUsesPerAdminLimit() throws Exception {
+        ApiRateLimitProperties properties = new ApiRateLimitProperties();
+        DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
+        when(limiter.consume(startsWith("platform-admin-invite:"), eq(5), eq(3600), any(Instant.class)))
+                .thenReturn(new DistributedRateLimiter.Result(true, 1, 4,
+                        Instant.now().getEpochSecond() + 3600));
+        Jwt jwt = new Jwt("platform-jwt-fixture", Instant.now(), Instant.now().plusSeconds(300),
+                Map.of("alg", "none"), Map.of("sub", "platform-actor"));
+        SecurityContextHolder.getContext().setAuthentication(new JwtAuthenticationToken(jwt));
+        ApiRateLimitFilter filter = new ApiRateLimitFilter(properties, limiter, new SimpleMeterRegistry());
+        HttpServletRequest request = request("POST", "/api/v1/platform/admin-invitations", "203.0.113.91");
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        FilterChain chain = mock(FilterChain.class);
+        filter.doFilter(request, response, chain);
+        verify(limiter).consume(startsWith("platform-admin-invite:"), eq(5), eq(3600), any(Instant.class));
+        verify(chain).doFilter(request, response);
+    }
+
     private static HttpServletRequest request(String method, String uri, String remoteAddr) {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn(method);
