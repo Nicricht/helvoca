@@ -1,5 +1,6 @@
 package cl.helvoca.auth;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,6 +17,7 @@ public class ResendHttpsSender {
     private final RestClient client;
     private final String apiKey;
 
+    @Autowired
     public ResendHttpsSender(@Value("${spring.mail.password:}") String apiKey) {
         this(apiKey, RestClient.builder());
     }
