@@ -46,7 +46,7 @@ class BusinessAccountMailServiceTest {
                 () -> new BusinessAccountMailService(available, true, false, false,
                         "invalid", "https://recepvoz.example.test"));
         for (String url : new String[] {
-                "", "http://recepvoz.example.test", "https://user@recepvoz.example.test",
+                null, "", "http://recepvoz.example.test", "https://user@recepvoz.example.test",
                 "https://recepvoz.example.test/path", "https://recepvoz.example.test?q=1",
                 "https://recepvoz.example.test#fragment", "https:/relative-path", "https://%bad",
                 "https://recepvoz.example.test/%zz" }) {
@@ -111,7 +111,7 @@ class BusinessAccountMailServiceTest {
                 () -> mail.sendInvitation("operator@example.test", null));
         assertThrows(IllegalArgumentException.class,
                 () -> mail.sendInvitation("operator@example.test",
-                        "/app/invite?businessId=" + "x".repeat(36) + "&token=" + TOKEN));
+                        "/app/invite?businessId=" + "0".repeat(36) + "&token=" + TOKEN));
         verifyNoMoreInteractions(sender);
 
         var notEnabled = new BusinessAccountMailService(provider(mock(JavaMailSender.class)),

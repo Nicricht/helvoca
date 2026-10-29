@@ -105,9 +105,14 @@ public final class BusinessAccountMailService {
             if (raw == null || raw.isBlank() || raw.contains("\r") || raw.contains("\n")) {
                 throw new IllegalArgumentException("Account email address is required");
             }
+            // A local-only mailbox is never a valid outbound recipient. Reject
+            // it explicitly before Jakarta Mail's parser handles its syntax.
+            if (!raw.trim().contains("@")) {
+                throw new IllegalArgumentException("Invalid account email address");
+            }
             InternetAddress address = new InternetAddress(raw.trim(), true);
             address.validate();
-            if (!address.getAddress().equals(raw.trim()) || !address.getAddress().contains("@")) {
+            if (!address.getAddress().equals(raw.trim())) {
                 throw new IllegalArgumentException("Invalid account email address");
             }
             return address.getAddress();
@@ -119,10 +124,12 @@ public final class BusinessAccountMailService {
     private static String httpsOrigin(String raw) {
         try {
             URI parsed = URI.create(raw == null ? "" : raw.trim());
+            // Once a URI has a host, it is hierarchical: getPath() is non-null.
+            // The application origin may have no path or a single slash only.
             if (!"https".equals(parsed.getScheme()) || parsed.getHost() == null
                     || parsed.getUserInfo() != null || parsed.getQuery() != null
-                    || parsed.getFragment() != null || (parsed.getPath() != null
-                    && !parsed.getPath().isEmpty() && !"/".equals(parsed.getPath()))) {
+                    || parsed.getFragment() != null || (!parsed.getPath().isEmpty()
+                    && !"/".equals(parsed.getPath()))) {
                 throw new IllegalArgumentException("Account email public origin must be HTTPS");
             }
             return parsed.getScheme() + "://" + parsed.getRawAuthority().toLowerCase(Locale.ROOT);
