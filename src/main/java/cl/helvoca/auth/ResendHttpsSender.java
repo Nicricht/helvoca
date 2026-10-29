@@ -16,7 +16,11 @@ public class ResendHttpsSender {
     private final RestClient client;
     private final String apiKey;
 
-    public ResendHttpsSender(@Value("${spring.mail.password:}") String apiKey, RestClient.Builder builder) {
+    public ResendHttpsSender(@Value("${spring.mail.password:}") String apiKey) {
+        this(apiKey, RestClient.builder());
+    }
+
+    ResendHttpsSender(String apiKey, RestClient.Builder builder) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
         this.client = builder.baseUrl("https://api.resend.com").build();
     }
