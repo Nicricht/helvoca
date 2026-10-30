@@ -30,6 +30,10 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
     private final String allowedAccountSid;
     private final boolean demoEnabled;
     private final boolean scopedCustomerDemoEnabled;
+    @Value("${TWILIO_SINGLE_OPERATOR_DEMO_ENROLLMENT_ENABLED:false}")
+    private boolean singleOperatorDemoEnabled;
+    @Value("${RAILWAY_ENVIRONMENT_NAME:}")
+    private String environmentName;
 
     @Autowired
     public TwilioVerifiedExistingVoiceRouteGate(
@@ -90,7 +94,7 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
 
             // Every component of the identity and human approval must be matched
             // against system-only, immutable carrier and platform audit evidence.
-            return Boolean.TRUE.equals(jdbc.queryForObject("""
+            boolean dualApproval = Boolean.TRUE.equals(jdbc.queryForObject("""
                     SELECT EXISTS (
                         SELECT 1
                           FROM public.twilio_existing_enrollment_claim c
@@ -121,11 +125,36 @@ public final class TwilioVerifiedExistingVoiceRouteGate {
                     )
                     """, Boolean.class, phone.getId(), phone.getBusinessId(),
                     phone.getPhoneNumber(), phone.getTwilioAccountSid(), phone.getExternalId()));
+            return dualApproval || (demoEnabled && singleOperatorDemoEnabled
+                    && "demo-isolated".equals(environmentName)
+                    && hasSingleOperatorProof(phone));
         } catch (RuntimeException ignored) {
             // Absent tables, RLS denial, ambiguous configuration, DB outage,
             // or unexpected pilot state must never fail open or leak SQL details.
             return false;
         }
+    }
+
+    private boolean hasSingleOperatorProof(PhoneNumber phone) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM public.twilio_single_operator_demo_enrollment s
+                    JOIN public.twilio_single_operator_demo_audit a
+                      ON a.change_id = s.change_id AND a.actor_id = s.actor_id
+                    JOIN public.app_user u
+                      ON u.id = s.actor_id AND u.active AND u.business_id IS NULL
+                    JOIN public.user_role ur ON ur.user_id = u.id
+                    JOIN public.role r ON r.id = ur.role_id AND r.code = 'PLATFORM_ADMIN'
+                    WHERE s.phone_number_id = ? AND s.business_id = ?
+                      AND s.destination_e164 = ? AND s.owner_account_sid = ?
+                      AND s.phone_sid = ? AND s.state = 'APPLIED'
+                      AND s.carrier_verified_at IS NOT NULL
+                      AND s.confirmed_at IS NOT NULL
+                      AND a.action = 'CONFIRMED'
+                )
+                """, Boolean.class, phone.getId(), phone.getBusinessId(),
+                phone.getPhoneNumber(), phone.getTwilioAccountSid(),
+                phone.getExternalId()));
     }
 
     private boolean allowsScopedControl(PhoneNumber phone) {
