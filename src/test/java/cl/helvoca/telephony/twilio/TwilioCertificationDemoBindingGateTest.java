@@ -63,6 +63,9 @@ class TwilioCertificationDemoBindingGateTest {
         assertFalse(gate.allows(UUID.randomUUID()));
         when(route.allows(phone)).thenReturn(true);
         assertTrue(gate.allows(DEMO_ID));
+        customer.setMode(BusinessMode.PILOT);
+        assertFalse(gate.allows(DEMO_ID), "A scoped CUSTOMER exception must never admit PILOT tenants");
+        customer.setMode(BusinessMode.CUSTOMER);
         customer.setStatus(BusinessStatus.SUSPENDED);
         assertFalse(gate.allows(DEMO_ID));
     }
