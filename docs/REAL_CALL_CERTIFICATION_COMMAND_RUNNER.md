@@ -233,3 +233,25 @@ because this runbook or CI exists. Require RED/GREEN and full PostgreSQL
 RLS/security tests; release still verifies the USD 5 maximum, two attempts,
 75-second carrier limit, Gemini tenant isolation and live stop procedure.
 Preserve the certified outbound call PR #847 without rewriting it.
+
+
+## Carrier-owned existing-number enrollment from an empty tenant phone table (draft change, 2026-10-30)
+
+An existing Twilio number is not a new purchase. Do not use the self-service
+`POST /api/v1/phone-numbers` path for an unassigned number: this requires a
+previously managed and verified row. Do not create a false `MANAGED_PURCHASE`
+record, add a carrier PhoneSid by hand, or bypass the platform-admin
+two-human enrollment. The isolated Aurora tenant currently has no row for
+its existing Twilio number ending 6780 and remains in `CUSTOMER` mode.
+
+The proposed narrow platform workflow adds a **non-active staging step**
+for an independently carrier-attested, already-owned number. A staging
+record does not grant carrier rights, activate voice, fill a PhoneSid, or
+replace the existing request/approve/execute audit. It must fail closed for
+wrong tenant, missing platform role, incorrect Twilio account, incomplete
+webhooks, carrier failure, and duplicate number. The following independent
+approval and DEMO-only admission remain separate requirements.
+
+**Status: DRAFT, unverified code/CI, no permission to configure Twilio or
+execute real calls.** Complete exact-HEAD QA, route-mode safety review and
+owner-approved isolated deployment before changing any provider setting.
