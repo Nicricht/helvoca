@@ -248,6 +248,8 @@ public final class TwilioExistingEnrollmentAdminService {
                 """, UUID.randomUUID(), changeId, actor, action, outcome);
     }
 
+    UUID authenticatedPlatformActor() { return actor(); }
+
     private UUID actor() {
         if (context.currentOrDenied().mode() != TenantDatabaseContext.Mode.SYSTEM) {
             throw new AccessDeniedException("Platform system database scope required");
