@@ -5,6 +5,7 @@ import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -268,6 +269,22 @@ class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
         assertFalse(scope.callAsTenant(TENANT, () -> phones.findById(otherPhone).isPresent()));
         assertFalse(scope.callAsTenant(otherTenant, () -> phones.findById(PHONE_ID).isPresent()));
         assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+    }
+
+    @Test
+    void singleOperatorFlagDoesNotBypassEnvironmentOrImmutableAudit() {
+        owner.update("DELETE FROM pilot_launch_control WHERE business_id = ?", TENANT);
+        var phone = scope.callAsSystem(() -> phones.findById(PHONE_ID).orElseThrow());
+        var isolated = new TwilioVerifiedExistingVoiceRouteGate(
+                jdbc, pilot, scope, true, TENANT.toString(), PHONE_ID.toString(),
+                ACCOUNT, true, true);
+
+        ReflectionTestUtils.setField(isolated, "singleOperatorDemoEnabled", true);
+        ReflectionTestUtils.setField(isolated, "environmentName", "production");
+        assertFalse(scope.callAsSystem(() -> isolated.allows(phone)));
+
+        ReflectionTestUtils.setField(isolated, "environmentName", "demo-isolated");
+        assertFalse(scope.callAsSystem(() -> isolated.allows(phone)));
     }
 
     private UUID insertSyntheticAppliedRequestAndClaim() {
