@@ -138,9 +138,6 @@ public final class TwilioExistingSingleOperatorEnrollmentService {
         Pending pending = transaction.execute(tx -> {
             Pending row = locked(changeId);
             requirePending(row, actor);
-            if (!row.destination().equals(confirmation.expectedPhoneNumber())) {
-                throw conflict("Confirmed destination differs");
-            }
             String hash = jdbc.queryForObject(
                     "SELECT password_hash FROM app_user WHERE id = ? AND active = TRUE AND business_id IS NULL",
                     String.class, actor);
