@@ -3,7 +3,7 @@ CREATE TABLE public.twilio_single_operator_demo_enrollment (
     business_id UUID NOT NULL,
     phone_number_id UUID NOT NULL,
     destination_e164 VARCHAR(30) NOT NULL
-        CHECK (destination_e164 ~ '^\+[1-9][0-9]{7,14}),
+        CHECK (destination_e164 ~ '^\+[1-9][0-9]{7,14}$'),
     owner_account_sid VARCHAR(34) NOT NULL
         CHECK (owner_account_sid ~ '^AC[0-9a-fA-F]{32}$'),
     actor_id UUID NOT NULL REFERENCES public.app_user(id),
