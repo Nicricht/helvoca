@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.security.TenantDatabaseContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,6 +58,7 @@ class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
     @Autowired PhoneNumberRepository phones;
     @Autowired TwilioVerifiedExistingVoiceRouteGate gate;
     @Autowired TwilioCallBindingGuard binding;
+    @Autowired ControlledPilotExternalEffectGuard pilot;
 
     private JdbcTemplate owner;
 
@@ -141,6 +143,32 @@ class TwilioVerifiedExistingVoiceRoutePostgresIntegrationTest {
         owner.update("UPDATE pilot_launch_control SET status = 'PAUSED' WHERE business_id = ?", TENANT);
         assertFalse(allowed());
         assertFalse(binding.allowsIncoming("CA" + "c".repeat(32), E164, "+56911111111", ACCOUNT));
+    }
+
+
+    @Test
+    void scopedCustomerRouteStaysClosedUntilIndependentAuditInRealPostgres() {
+        owner.update("DELETE FROM pilot_launch_control WHERE business_id = ?", TENANT);
+        var phone = scope.callAsSystem(() -> phones.findById(PHONE_ID).orElseThrow());
+        var defaultOff = new TwilioVerifiedExistingVoiceRouteGate(
+                jdbc, pilot, scope, true, TENANT.toString(), PHONE_ID.toString(),
+                ACCOUNT, true, false);
+        var explicitlyScoped = new TwilioVerifiedExistingVoiceRouteGate(
+                jdbc, pilot, scope, true, TENANT.toString(), PHONE_ID.toString(),
+                ACCOUNT, true, true);
+
+        assertFalse(scope.callAsSystem(() -> defaultOff.allows(phone)));
+        assertFalse(scope.callAsSystem(() -> explicitlyScoped.allows(phone)));
+        UUID change = insertSyntheticAppliedRequestAndClaim();
+        appendAudit(change, APPROVER, "EXECUTED", "APPLIED");
+        assertFalse(scope.callAsSystem(() -> defaultOff.allows(phone)));
+        assertTrue(scope.callAsSystem(() -> explicitlyScoped.allows(phone)));
+
+        owner.update("UPDATE business SET status='SUSPENDED' WHERE id=?", TENANT);
+        assertFalse(scope.callAsSystem(() -> explicitlyScoped.allows(phone)));
+        owner.update("UPDATE business SET status='ACTIVE' WHERE id=?", TENANT);
+        assertTrue(scope.callAsSystem(() -> explicitlyScoped.allows(phone)));
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
     }
 
     @Test
