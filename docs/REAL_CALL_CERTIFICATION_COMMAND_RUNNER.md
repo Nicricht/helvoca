@@ -233,3 +233,51 @@ because this runbook or CI exists. Require RED/GREEN and full PostgreSQL
 RLS/security tests; release still verifies the USD 5 maximum, two attempts,
 75-second carrier limit, Gemini tenant isolation and live stop procedure.
 Preserve the certified outbound call PR #847 without rewriting it.
+
+
+## Carrier-owned existing-number enrollment from an empty tenant phone table (draft change, 2026-10-30)
+
+An existing Twilio number is not a new purchase. Do not use the self-service
+`POST /api/v1/phone-numbers` path for an unassigned number: this requires a
+previously managed and verified row. Do not create a false `MANAGED_PURCHASE`
+record, add a carrier PhoneSid by hand, or bypass the platform-admin
+two-human enrollment. The isolated Aurora tenant currently has no row for
+its existing Twilio number ending 6780 and remains in `CUSTOMER` mode.
+
+The proposed narrow platform workflow adds a **non-active staging step**
+for an independently carrier-attested, already-owned number. A staging
+record does not grant carrier rights, activate voice, fill a PhoneSid, or
+replace the existing request/approve/execute audit. It must fail closed for
+wrong tenant, missing platform role, incorrect Twilio account, incomplete
+webhooks, carrier failure, and duplicate number. The following independent
+approval and DEMO-only admission remain separate requirements.
+
+**Status: DRAFT, no permission to configure Twilio or execute real calls.**
+The staging code requires signed PLATFORM_ADMIN + SYSTEM scope, an exact
+`TWILIO_CERTIFICATION_DEMO_BUSINESS_ID`, active business and real GET
+carrier proof with matching webhook and callback. It creates a row with
+`active=false`, no PhoneSid/provenance and no voice rights.
+
+A separate `TWILIO_CERTIFICATION_SCOPED_CUSTOMER_DEMO_ENABLED` flag (default
+`false`) permits the existing isolated CUSTOMER business through the
+*DEMO certification route only*. This still requires the pinned tenant,
+phone UUID, carrier account and immutable two-human APPLIED approval. It
+does not enable global voice or override any other tenant policy.
+
+Complete exact-HEAD Fast/Full QA, authorized independent enrollment,
+exact-number route verification and cost limits before any isolated
+deployment or provider change.
+
+
+## Single-operator Aurora DEMO carrier enrollment (PR #853, pending exact-HEAD CI)
+
+The owner expressly retains one `PLATFORM_ADMIN` for V1. The existing two-human carrier enrollment path and its database constraints remain unchanged. An alternative, narrowly scoped route is implemented for a signed-in platform owner to authorize one pre-existing Twilio number for the isolated Aurora demonstration. It is **OFF by default** and is **not proof of a completed provider enrollment or permission to call**.
+
+- Migration `V109__twilio_single_operator_demo_enrollment.sql` creates a separate SYSTEM-only PostgreSQL ledger and append-only actor audit; the old V102/V103 dual-approval tables, constraints and routes are preserved.
+- This path accepts only the exact `TWILIO_CERTIFICATION_DEMO_BUSINESS_ID` tenant, `TWILIO_TEST_FROM` number and `RAILWAY_ENVIRONMENT_NAME=demo-isolated`, and is gated by `TWILIO_SINGLE_OPERATOR_DEMO_ENROLLMENT_ENABLED=true`. It never grants a tenant endpoint or reassigns an unrelated number.
+- Platform JWT and active database role are checked for each request; confirmation additionally requires a recent JWT (issued in the preceding five minutes), the **current platform-account password** submitted only through authenticated HTTPS, exact re-entry of the destination number and a pending unexpired 15-minute request. Failed passwords are recorded with at most three attempts per request. Do not paste passwords, bearer tokens or private provider credentials into GitHub, chat or logs.
+- The authenticated carrier verification is performed before a request and again before confirming. It must validate Twilio account, PhoneSid, voice capability and the exact primary/status webhooks. PostgreSQL atomically records the phone as `VERIFIED_EXISTING` and active, the verified carrier PN/AC, the single-operator attestation and a `CONFIRMED` audit event. Route admission checks that exact attestation, active role, phone/business/account pins, DEMO pilot guard and isolated environment; a request without final audited proof cannot admit a call. The confirmation is one-use and must fail closed on expiry, wrong account/tenant/number, any carrier failure or conflicting row.
+- The old `/api/v1/platform/twilio-existing-enrollments/stage` still stages the carrier-owned number as **inactive** after a real provider GET. Once safely staged and while the default-off single-operator feature is deliberately enabled **only in Aurora DEMO**, a logged-in platform administrator may POST `/api/v1/platform/twilio-single-operator-demo` with `businessId`, `phoneId` and `ownerAccountSid`. The response contains `changeId`. To confirm, POST `/api/v1/platform/twilio-single-operator-demo/{changeId}/confirm` with private `currentPassword` and `expectedPhoneNumber`. GET the same `{changeId}` path to inspect the final state. All operations require a real platform JWT.
+- **No phone calls are enabled merely by deploying or registering.** Route and runner remain separately disabled until signed Twilio ingress, independent callback/phone attestation, voice/Gemini readiness, consent, verified carrier-side 75-second limit, aggregate Twilio+Gemini <= USD 5 hard cap, <=2 call attempts and a STOP plan pass in the isolated tenant. Do not touch the unrelated 2512 number or activate globally. After the one authorized call, record the real CallSid, terminal outcome, persisted fictional booking and actual spend, then turn temporary switches OFF.
+
+**Current acceptance:** Code is in DRAFT PR #853 and not merged or deployed. PostgreSQL/CI for the final new implementation have not been reported terminal-green in this section. Webhooks for …6780, runtime credentials, aggregate hard cost cap and any real CallSid remain independently unverified. The correct state is `NO-GO` for the live call until these precise gates are closed.

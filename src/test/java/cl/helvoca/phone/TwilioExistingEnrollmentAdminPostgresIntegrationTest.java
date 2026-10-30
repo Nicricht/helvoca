@@ -1,6 +1,7 @@
 package cl.helvoca.phone;
 
 import cl.helvoca.security.TenantDatabaseContext;
+import cl.helvoca.telephony.twilio.TwilioExistingNumberOwnershipVerifier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -18,6 +20,7 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.server.ResponseStatusException;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -39,6 +42,7 @@ import static org.mockito.Mockito.*;
 class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
+    private static final UUID STAGING_BUSINESS = UUID.fromString("8e04b60e-6c16-4e3f-92df-63a54f061a38");
 
     @DynamicPropertySource
     static void props(DynamicPropertyRegistry r) {
@@ -48,13 +52,16 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
         r.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         r.add("spring.flyway.enabled", () -> "true");
         r.add("app.seed.enabled", () -> "false");
+        r.add("TWILIO_CERTIFICATION_DEMO_BUSINESS_ID", () -> STAGING_BUSINESS.toString());
     }
 
     @Autowired @Qualifier("migrationDataSource") DataSource ownerDataSource;
     @Autowired JdbcTemplate runtime;
     @Autowired TenantDatabaseContext context;
     @Autowired TwilioExistingEnrollmentAdminService service;
+    @Autowired PlatformTransactionManager transactions;
     @MockitoBean TwilioExistingEnrollmentReconciler reconciler;
+    @MockitoBean TwilioExistingNumberOwnershipVerifier carrier;
 
     private static final String ACCOUNT = "AC" + "a".repeat(32);
     private static final AtomicInteger SEQ = new AtomicInteger();
@@ -67,7 +74,7 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
 
     @BeforeEach
     void setup() {
-        reset(reconciler);
+        reset(reconciler, carrier);
         SecurityContextHolder.clearContext();
         owner = new JdbcTemplate(ownerDataSource);
         adminA = newAdmin(null);
@@ -160,6 +167,135 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
         UUID id = created();
         assertEquals("APPROVED", as(adminB, () -> service.approve(id)).state());
         return id;
+    }
+
+    @Test
+    void stageExistingRequiresCarrierProofAndPreservesTwoHumanApproval() {
+        String number = "+16812706780";
+        var request = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                STAGING_BUSINESS, number, ACCOUNT);
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(
+                        new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                                business, number, ACCOUNT))));
+        verifyNoInteractions(carrier);
+
+        owner.update("""
+                INSERT INTO business(id,name,status,mode)
+                VALUES (?,'Isolated staging tenant','SUSPENDED','CUSTOMER')
+                """, STAGING_BUSINESS);
+        when(carrier.verify(number, ACCOUNT, null)).thenReturn(
+                new TwilioExistingNumberOwnershipVerifier.Outcome(
+                        TwilioExistingNumberOwnershipVerifier.Code.VERIFIED,
+                        new TwilioExistingNumberOwnershipVerifier.Evidence(
+                                "PN" + "b".repeat(32), ACCOUNT,
+                                TwilioExistingNumberOwnershipVerifier.AccountKind.MAIN)));
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(request)));
+        owner.update("UPDATE business SET status='ACTIVE' WHERE id=?", STAGING_BUSINESS);
+
+        var staged = as(adminA, () -> service.stageExisting(request));
+        assertEquals("PENDING_ENROLLMENT", staged.state());
+        assertEquals(1L, owner.queryForObject("""
+                SELECT COUNT(*) FROM phone_number
+                 WHERE id=? AND business_id=? AND phone_number=?
+                   AND provider='TWILIO' AND active=FALSE
+                   AND whatsapp_enabled=FALSE
+                   AND external_id IS NULL AND twilio_account_sid IS NULL
+                   AND twilio_binding_source IS NULL AND voice_verified_at IS NULL
+                """, Long.class, staged.phoneId(), STAGING_BUSINESS, number));
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(request)));
+        var pending = as(adminA, () -> service.request(
+                new TwilioExistingEnrollmentAdminService.Request(
+                        STAGING_BUSINESS, staged.phoneId(), ACCOUNT)));
+        assertEquals("PENDING", pending.state());
+        assertThrows(AccessDeniedException.class,
+                () -> as(adminA, () -> service.approve(pending.changeId())));
+        assertEquals(1L, audits(pending.changeId()));
+    }
+
+    @Test
+    void stageExistingRejectsInvalidInputAndUnverifiedCarrierWithoutWriting() {
+        var invalidAccount = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                STAGING_BUSINESS, "+16812706781", "invalid");
+        var invalidPhone = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                STAGING_BUSINESS, "not a phone", ACCOUNT);
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(invalidAccount)));
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(invalidPhone)));
+        verifyNoInteractions(carrier);
+        var unverified = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                STAGING_BUSINESS, "+16812706781", ACCOUNT);
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(unverified)));
+        assertEquals(0L, owner.queryForObject(
+                "SELECT COUNT(*) FROM phone_number WHERE phone_number = '+16812706781'", Long.class));
+    }
+
+
+    @Test
+    void stagingRejectsMissingFieldsAndAnUnpinnedTenantBeforeContactingCarrier() {
+        String number = "+16812706782";
+        var rejected = List.of(
+                new TwilioExistingEnrollmentAdminService.StageExistingRequest(null, number, ACCOUNT),
+                new TwilioExistingEnrollmentAdminService.StageExistingRequest(STAGING_BUSINESS, null, ACCOUNT),
+                new TwilioExistingEnrollmentAdminService.StageExistingRequest(STAGING_BUSINESS, number, null));
+        assertEquals(HttpStatus.CONFLICT,
+                assertThrows(ResponseStatusException.class,
+                        () -> as(adminA, () -> service.stageExisting(null))).getStatusCode());
+        for (var request : rejected) {
+            assertEquals(HttpStatus.CONFLICT,
+                    assertThrows(ResponseStatusException.class,
+                            () -> as(adminA, () -> service.stageExisting(request))).getStatusCode());
+        }
+        var unpinned = new TwilioExistingEnrollmentAdminService(
+                runtime, context, reconciler, carrier, null, transactions);
+        assertEquals(HttpStatus.CONFLICT,
+                assertThrows(ResponseStatusException.class,
+                        () -> as(adminA, () -> unpinned.stageExisting(
+                                new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                                        STAGING_BUSINESS, number, ACCOUNT)))).getStatusCode());
+        verifyNoInteractions(carrier);
+        assertEquals(0L, owner.queryForObject(
+                "SELECT COUNT(*) FROM phone_number WHERE phone_number = ?", Long.class, number));
+    }
+
+    @Test
+    void stagingRejectsExplicitCarrierDenialAndDatabaseConstraintFailureWithoutAttribution() {
+        String number = "+16812706783";
+        var request = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                STAGING_BUSINESS, number, ACCOUNT);
+        when(carrier.verify(number, ACCOUNT, null)).thenReturn(
+                new TwilioExistingNumberOwnershipVerifier.Outcome(
+                        TwilioExistingNumberOwnershipVerifier.Code.WEBHOOK_MISMATCH, null));
+        assertEquals(HttpStatus.CONFLICT,
+                assertThrows(ResponseStatusException.class,
+                        () -> as(adminA, () -> service.stageExisting(request))).getStatusCode());
+
+        when(carrier.verify(number, ACCOUNT, null)).thenReturn(
+                new TwilioExistingNumberOwnershipVerifier.Outcome(
+                        TwilioExistingNumberOwnershipVerifier.Code.VERIFIED,
+                        new TwilioExistingNumberOwnershipVerifier.Evidence(
+                                "PN" + "b".repeat(32), ACCOUNT,
+                                TwilioExistingNumberOwnershipVerifier.AccountKind.MAIN)));
+        JdbcTemplate rejectingInsert = new JdbcTemplate(runtime.getDataSource()) {
+            @Override
+            public int update(String sql, Object... args) {
+                if (sql.contains("INSERT INTO phone_number")) {
+                    throw new DataIntegrityViolationException("Simulated database constraint failure");
+                }
+                return super.update(sql, args);
+            }
+        };
+        var guarded = new TwilioExistingEnrollmentAdminService(
+                rejectingInsert, context, reconciler, carrier, STAGING_BUSINESS.toString(), transactions);
+        var conflict = assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> guarded.stageExisting(request)));
+        assertEquals(HttpStatus.CONFLICT, conflict.getStatusCode());
+        assertEquals(0L, owner.queryForObject(
+                "SELECT COUNT(*) FROM phone_number WHERE phone_number = ?", Long.class, number));
     }
 
     @Test
