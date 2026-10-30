@@ -48,6 +48,26 @@ class TwilioCertificationDemoBindingGateTest {
     }
 
     @Test
+    void explicitlyScopedCustomerStillNeedsExactPhoneAndIndependentRouteEvidence() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var phone = certifiedPhone(DEMO_ID);
+        var customer = new Business();
+        customer.setMode(BusinessMode.CUSTOMER);
+        when(phones.findByPhoneNumberAndActiveTrue(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(customer));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, new TenantDatabaseContext(), true);
+        assertFalse(gate.allows(DEMO_ID));
+        assertFalse(gate.allows(UUID.randomUUID()));
+        when(route.allows(phone)).thenReturn(true);
+        assertTrue(gate.allows(DEMO_ID));
+        customer.setStatus(BusinessStatus.SUSPENDED);
+        assertFalse(gate.allows(DEMO_ID));
+    }
+
+    @Test
     void requiresVerifiedExistingRouteEvidenceAndExactTenant() {
         var phones = mock(PhoneNumberRepository.class);
         var businesses = mock(BusinessRepository.class);

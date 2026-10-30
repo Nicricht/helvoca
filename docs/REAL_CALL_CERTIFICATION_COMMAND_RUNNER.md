@@ -252,6 +252,18 @@ wrong tenant, missing platform role, incorrect Twilio account, incomplete
 webhooks, carrier failure, and duplicate number. The following independent
 approval and DEMO-only admission remain separate requirements.
 
-**Status: DRAFT, unverified code/CI, no permission to configure Twilio or
-execute real calls.** Complete exact-HEAD QA, route-mode safety review and
-owner-approved isolated deployment before changing any provider setting.
+**Status: DRAFT, no permission to configure Twilio or execute real calls.**
+The staging code requires signed PLATFORM_ADMIN + SYSTEM scope, an exact
+`TWILIO_CERTIFICATION_DEMO_BUSINESS_ID`, active business and real GET
+carrier proof with matching webhook and callback. It creates a row with
+`active=false`, no PhoneSid/provenance and no voice rights.
+
+A separate `TWILIO_CERTIFICATION_SCOPED_CUSTOMER_DEMO_ENABLED` flag (default
+`false`) permits the existing isolated CUSTOMER business through the
+*DEMO certification route only*. This still requires the pinned tenant,
+phone UUID, carrier account and immutable two-human APPLIED approval. It
+does not enable global voice or override any other tenant policy.
+
+Complete exact-HEAD Fast/Full QA, authorized independent enrollment,
+exact-number route verification and cost limits before any isolated
+deployment or provider change.
