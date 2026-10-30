@@ -38,6 +38,13 @@ class TwilioExistingEnrollmentAdminControllerContractTest {
         UUID change = UUID.randomUUID();
         var request = new TwilioExistingEnrollmentAdminService.Request(
                 UUID.randomUUID(), UUID.randomUUID(), "AC"+"a".repeat(32));
+        var stageRequest = new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                UUID.randomUUID(), "+16812706780", "AC" + "a".repeat(32));
+        var staged = new TwilioExistingEnrollmentAdminService.StageExistingView(
+                UUID.randomUUID(), "PENDING_ENROLLMENT");
+        when(service.stageExisting(stageRequest)).thenReturn(staged);
+        assertEquals(staged, controller.stageExisting(stageRequest));
+        verify(service).stageExisting(stageRequest);
         var pending = new TwilioExistingEnrollmentAdminService.View(change, "PENDING");
         var approved = new TwilioExistingEnrollmentAdminService.View(change, "APPROVED");
         var applied = new TwilioExistingEnrollmentAdminService.View(change, "APPLIED");

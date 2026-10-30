@@ -1,6 +1,9 @@
 package cl.helvoca.phone;
 
 import cl.helvoca.security.TenantDatabaseContext;
+import cl.helvoca.telephony.twilio.TwilioExistingNumberOwnershipVerifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,20 +29,75 @@ import java.util.regex.Pattern;
 @Service
 public final class TwilioExistingEnrollmentAdminService {
     private static final Pattern ACCOUNT = Pattern.compile("AC[0-9a-fA-F]{32}");
+    private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
 
     private final JdbcTemplate jdbc;
     private final TenantDatabaseContext context;
     private final TwilioExistingEnrollmentReconciler reconciler;
     private final TransactionTemplate transaction;
+    private final TwilioExistingNumberOwnershipVerifier carrier;
+    private final String pinnedStagingBusinessId;
 
     public TwilioExistingEnrollmentAdminService(
             JdbcTemplate jdbc, TenantDatabaseContext context,
             TwilioExistingEnrollmentReconciler reconciler,
+            TwilioExistingNumberOwnershipVerifier carrier,
+            @Value("${TWILIO_CERTIFICATION_DEMO_BUSINESS_ID:}") String pinnedStagingBusinessId,
             PlatformTransactionManager transactions) {
         this.jdbc = jdbc;
         this.context = context;
         this.reconciler = reconciler;
+        this.carrier = carrier;
+        this.pinnedStagingBusinessId = pinnedStagingBusinessId;
         this.transaction = new TransactionTemplate(transactions);
+    }
+
+
+    /** Restricted platform registration for an existing, independently attested carrier number. */
+    public record StageExistingRequest(UUID businessId, String phoneNumber, String ownerAccountSid) {}
+    public record StageExistingView(UUID phoneId, String state) {}
+
+    public StageExistingView stageExisting(StageExistingRequest data) {
+        actor();
+        if (data == null || data.businessId() == null
+                || pinnedStagingBusinessId == null
+                || !data.businessId().toString().equals(pinnedStagingBusinessId.trim())
+                || data.phoneNumber() == null || !E164.matcher(data.phoneNumber()).matches()
+                || data.ownerAccountSid() == null
+                || !ACCOUNT.matcher(data.ownerAccountSid()).matches()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Existing-number staging unavailable");
+        }
+
+        // Twilio GET must confirm SID/account, voice, and both deployed webhook URLs.
+        var proof = carrier.verify(data.phoneNumber(), data.ownerAccountSid(), null);
+        if (proof == null || !proof.verified()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Carrier ownership not verified");
+        }
+
+        return transaction.execute(status -> {
+            UUID phoneId = UUID.randomUUID();
+            try {
+                int inserted = jdbc.update("""
+                        INSERT INTO phone_number (
+                            id,business_id,provider,phone_number,active,whatsapp_enabled
+                        )
+                        SELECT ?, b.id, 'TWILIO', ?, FALSE, FALSE
+                          FROM business b
+                         WHERE b.id = ? AND b.status = 'ACTIVE'
+                           AND b.mode IN ('DEMO','CUSTOMER')
+                        ON CONFLICT (phone_number) DO NOTHING
+                        """, phoneId, data.phoneNumber(), data.businessId());
+                if (inserted != 1) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Business unavailable or phone already assigned");
+                }
+            } catch (DataIntegrityViolationException ex) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Existing-number staging conflict");
+            }
+            // Explicitly unbound and inactive until independent approval and reconciliation.
+            return new StageExistingView(phoneId, "PENDING_ENROLLMENT");
+        });
     }
 
     /** Operator-supplied expected account is a routing hint, never Twilio proof. */
