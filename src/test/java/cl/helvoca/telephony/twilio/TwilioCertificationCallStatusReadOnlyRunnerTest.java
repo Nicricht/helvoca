@@ -69,12 +69,13 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     @Test
     void handlesNullErrorCodeAndBlankOrShortNumbers() throws Exception {
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> providerResponse = response(200, """
+                {"sid":"%s","account_sid":"%s","status":"failed",
+                 "error_code":null,"from":"","to":"abc"}
+                """.formatted(CALL_SID, ACCOUNT_SID));
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(200, """
-                        {"sid":"%s","account_sid":"%s","status":"failed",
-                         "error_code":null,"from":"","to":"abc"}
-                        """.formatted(CALL_SID, ACCOUNT_SID)));
+                .thenReturn(providerResponse);
 
         var result = runner(true, CALL_SID, properties(), http).lookup(CALL_SID);
 
@@ -116,37 +117,31 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     @Test
     void rejectsEveryNonSuccessfulProviderResponse() throws Exception {
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> response199 = response(199, "{}");
+        HttpResponse<String> response503 = response(503, "{}");
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(199, "{}"));
-        assertThrows(IllegalStateException.class,
-                () -> runner(true, CALL_SID, properties(), http).lookup(CALL_SID));
-
-        when(http.send(any(HttpRequest.class),
-                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(503, "{}"));
-        assertThrows(IllegalStateException.class,
-                () -> runner(true, CALL_SID, properties(), http).lookup(CALL_SID));
+                .thenReturn(response199, response503);
+        var runner = runner(true, CALL_SID, properties(), http);
+        assertThrows(IllegalStateException.class, () -> runner.lookup(CALL_SID));
+        assertThrows(IllegalStateException.class, () -> runner.lookup(CALL_SID));
     }
 
     @Test
     void rejectsCallSidOrAccountIdentityMismatch() throws Exception {
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> wrongCallSid = response(200, """
+                {"sid":"%s","account_sid":"%s","status":"no-answer"}
+                """.formatted(OTHER_CALL_SID, ACCOUNT_SID));
+        HttpResponse<String> wrongAccountSid = response(200, """
+                {"sid":"%s","account_sid":"AC%s","status":"no-answer"}
+                """.formatted(CALL_SID, "f".repeat(32)));
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(200, """
-                        {"sid":"%s","account_sid":"%s","status":"no-answer"}
-                        """.formatted(OTHER_CALL_SID, ACCOUNT_SID)));
-        assertThrows(IllegalStateException.class,
-                () -> runner(true, CALL_SID, properties(), http).lookup(CALL_SID));
-
-        when(http.send(any(HttpRequest.class),
-                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(200, """
-                        {"sid":"%s","account_sid":"AC%s","status":"no-answer"}
-                        """.formatted(CALL_SID, "f".repeat(32))));
-        assertThrows(IllegalStateException.class,
-                () -> runner(true, CALL_SID, properties(), http).lookup(CALL_SID));
+                .thenReturn(wrongCallSid, wrongAccountSid);
+        var runner = runner(true, CALL_SID, properties(), http);
+        assertThrows(IllegalStateException.class, () -> runner.lookup(CALL_SID));
+        assertThrows(IllegalStateException.class, () -> runner.lookup(CALL_SID));
     }
 
     @Test
@@ -164,11 +159,12 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     @Test
     void startupRunnerPerformsOneReadOnlyGetAtMostOnce() throws Exception {
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> providerResponse = response(200, """
+                {"sid":"%s","account_sid":"%s","status":"completed"}
+                """.formatted(CALL_SID, ACCOUNT_SID));
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(200, """
-                        {"sid":"%s","account_sid":"%s","status":"completed"}
-                        """.formatted(CALL_SID, ACCOUNT_SID)));
+                .thenReturn(providerResponse);
         var runner = runner(true, CALL_SID, properties(), http);
 
         runner.run(null);
@@ -198,9 +194,10 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     @Test
     void startupRunnerContainsMalformedProviderResponseWithoutRetrying() throws Exception {
         HttpClient http = mock(HttpClient.class);
+        HttpResponse<String> malformedResponse = response(200, "not-json");
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
-                .thenReturn(response(200, "not-json"));
+                .thenReturn(malformedResponse);
         var runner = runner(true, CALL_SID, properties(), http);
 
         assertDoesNotThrow(() -> runner.run(null));
@@ -215,8 +212,8 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
         Method suffix = TwilioCertificationCallStatusReadOnlyRunner.class
                 .getDeclaredMethod("suffix", String.class);
         suffix.setAccessible(true);
-        assertEquals("****", suffix.invoke(null, new Object[]{null}));
-        assertEquals("****", suffix.invoke(null, ""));
+        assertEquals("", suffix.invoke(null, new Object[]{null}));
+        assertEquals("", suffix.invoke(null, ""));
         assertEquals("****", suffix.invoke(null, "12"));
         assertEquals("…6780", suffix.invoke(null, "+16812706780"));
     }
