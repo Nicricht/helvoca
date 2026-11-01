@@ -18,6 +18,10 @@ Use only in `demo-isolated`, for an existing Call SID whose destination was alre
 
 Immediately after the readback, set the enable flag to false and clear the SID variable, deploy the cleanup, and verify the live variables are disabled/blank. No new voice attempt is part of this procedure.
 
+## Unbound status callbacks
+
+`TwilioVoiceController.status` currently discards a carrier status callback when the Call SID is not yet bound to a persisted `CallSession`, returning HTTP 204. That response only acknowledges webhook receipt; it does **not** confirm that the call rang, answered, or completed. In that case, the Twilio Call resource readback is the source of truth for terminal status, duration, carrier error code, and charge. Do not infer `no-answer` from a missing voice webhook or from callback timing alone.
+
 ## Interpretation
 
 The Twilio Call resource is the source of truth for the carrier's terminal status and error code. A status callback reaching the application does not prove that the destination rang or answered. A missing voice webhook is consistent with a call that never reached the answered stage; use the provider's status and error code rather than inferring the cause from callback timing alone.
