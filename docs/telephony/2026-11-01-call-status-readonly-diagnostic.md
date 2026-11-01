@@ -22,6 +22,17 @@ Immediately after the readback, set the enable flag to false and clear the SID v
 
 `TwilioVoiceController.status` currently discards a carrier status callback when the Call SID is not yet bound to a persisted `CallSession`, returning HTTP 204. That response only acknowledges webhook receipt; it does **not** confirm that the call rang, answered, or completed. In that case, the Twilio Call resource readback is the source of truth for terminal status, duration, carrier error code, and charge. Do not infer `no-answer` from a missing voice webhook or from callback timing alone.
 
+## Acceptance and cleanup
+
+A successful diagnostic run requires all of the following:
+
+1. Exactly one `TWILIO_CALL_STATUS_READ_ONLY` result for the pre-existing Call SID, with the returned account and call identities matching the configured account and requested SID.
+2. A provider terminal status and carrier error code (or an explicit empty error code) captured without logging the raw response or credentials.
+3. No `TWILIO_CERTIFICATION_COMMAND CREATED` event, no new Call SID, no POST to Twilio's Calls collection, no new voice ingress, no Media Stream, and no Gemini session.
+4. After readback, `TWILIO_CERTIFICATION_CALL_STATUS_LOOKUP_ENABLED=false` and `TWILIO_CERTIFICATION_CALL_STATUS_LOOKUP_SID` blank, with the certification runner, ingress, startup-call, scoped route, and Gemini flags still OFF.
+
+If any condition is not evidenced, report the diagnostic as incomplete. Never retry the lookup automatically and never turn a readback failure into a new outbound call.
+
 ## Interpretation
 
 The Twilio Call resource is the source of truth for the carrier's terminal status and error code. A status callback reaching the application does not prove that the destination rang or answered. A missing voice webhook is consistent with a call that never reached the answered stage; use the provider's status and error code rather than inferring the cause from callback timing alone.
