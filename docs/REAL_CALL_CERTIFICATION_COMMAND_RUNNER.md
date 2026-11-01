@@ -26,7 +26,7 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
 - Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
 - The command stores an immutable DEMO `business_id`. The worker checks that the configured caller is an active, carrier-verified number belonging to that active DEMO tenant and that its pinned existing-number route has independent approval evidence. Ingress atomically consumes the token only for the same tenant.
-- A PostgreSQL row lock reserves at most two call attempts per DEMO tenant across concurrent workers. A failed or uncertain provider creation still consumes its slot. The DEMO worker rejects a configured `TimeLimit` above 75 seconds before reaching Twilio. This is not a substitute for verifying the live cumulative USD 5 provider spend before enabling the runner.
+- A PostgreSQL row lock records each explicitly requested call attempt per DEMO tenant across concurrent workers; there is no lifetime attempt-count ceiling. A failed or uncertain provider creation remains recorded and is never silently retried. Each call still requires a distinct, unique operator-created command, an immutable tenant binding, one-use callback token, and the DEMO worker's `TimeLimit` must not exceed 75 seconds before reaching Twilio. This does not establish a cumulative provider-spend cap.
 - A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 - `TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED=true` permits Gemini Live only for that exact certified DEMO phone and matching call tenant when the API key/model/endpoint are ready. Customer tenants still follow the independent global Gemini flag. Set the DEMO flag to false for immediate new-session rollback.
 
@@ -58,17 +58,15 @@ call or global pilot effects. It is not evidence of a successful telephone
 conversation; exact-HEAD CI and isolated deployment verification remain
 required before the next live attempt.
 
-**Quota checkpoint:** the two Aurora command reservations are already consumed:
-`aurora-demo-20261101-001` failed before carrier creation but reserved its
-slot, and `aurora-demo-20261101-002` created CallSid
+**Attempt-history checkpoint:** two Aurora commands have already been recorded:
+`aurora-demo-20261101-001` failed before carrier creation but remains in the
+attempt history, and `aurora-demo-20261101-002` created CallSid
 `CA428da039e94ca8902c20c73d61c242dc` (Twilio completed after 1 second).
-The durable quota is `reserved_calls=2` with a hard maximum of two. Do not
-insert another command, reset the counter, or bypass the quota. A further
-attempt requires an explicit, reviewed quota-policy extension in the isolated
-Aurora scope. The owner has separately authorized one more attempt; that
-authorization does not itself alter the database constraint or worker limit.
-The owner withdrew the former USD 5 cap for the authorized test; the
-75-second maximum and 6780→9611 route remain mandatory. Never use 2512.
+These records are not a lifetime attempt ceiling and must not be deleted or
+reset. A further call still requires a distinct, explicitly requested command;
+there are no automatic retries. The owner authorized one additional call and
+withdrew the former USD 5 cap for this test. The 75-second maximum and
+6780→9611 route remain mandatory. Never use 2512.
 
 
 ## One-time production enablement

@@ -93,7 +93,7 @@ public class TwilioCertificationCommandStore {
                     FROM twilio_certification_command c
                     JOIN twilio_certification_demo_call_quota q
                       ON q.business_id = c.business_id
-                    WHERE c.status = 'PENDING' AND q.reserved_calls < 2
+                    WHERE c.status = 'PENDING'
                     ORDER BY c.requested_at
                     FOR UPDATE OF c, q SKIP LOCKED
                     LIMIT 1
@@ -101,7 +101,7 @@ public class TwilioCertificationCommandStore {
                     UPDATE twilio_certification_demo_call_quota q
                        SET reserved_calls = reserved_calls + 1
                       FROM next_command n
-                     WHERE q.business_id = n.business_id AND q.reserved_calls < 2
+                     WHERE q.business_id = n.business_id
                     RETURNING q.business_id
                 )
                 UPDATE twilio_certification_command c

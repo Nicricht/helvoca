@@ -81,11 +81,12 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
     }
 
     @Test
-    void concurrentWorkersCannotReserveMoreThanTwoAttempts() throws Exception {
+    void concurrentWorkersCanReserveEveryExplicitlyRequestedAttempt() throws Exception {
         UUID demo = UUID.randomUUID();
         new JdbcTemplate(migrationDataSource).update(
                 "INSERT INTO business(id,name,mode) VALUES (?,'Synthetic quota demo','DEMO')", demo);
-        for (int i = 0; i < 3; i++) {
+        int totalAttempts = 5;
+        for (int i = 0; i < totalAttempts; i++) {
             String runId = "quota-" + UUID.randomUUID();
             assertTrue(scope.callAsSystem(() -> commands.enqueue(runId, "test", demo)));
         }
@@ -100,12 +101,15 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
             start.countDown();
             for (var claim : claims) claim.get(15, TimeUnit.SECONDS);
             while (scope.callAsSystem(commands::claimNext).isPresent()) {
-                // Drain any claim skipped while another worker held the quota row.
+                // Drain commands skipped while another worker held the quota row.
             }
-            assertEquals(2, scope.callAsSystem(() -> jdbc.queryForObject(
+            assertEquals(totalAttempts, scope.callAsSystem(() -> jdbc.queryForObject(
                     "SELECT reserved_calls FROM twilio_certification_demo_call_quota WHERE business_id = ?",
                     Integer.class, demo)));
-            assertEquals(1L, scope.callAsSystem(() -> jdbc.queryForObject(
+            assertEquals((long) totalAttempts, scope.callAsSystem(() -> jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM twilio_certification_command WHERE business_id = ? AND status = 'CLAIMED'",
+                    Long.class, demo)));
+            assertEquals(0L, scope.callAsSystem(() -> jdbc.queryForObject(
                     "SELECT COUNT(*) FROM twilio_certification_command WHERE business_id = ? AND status = 'PENDING'",
                     Long.class, demo)));
         } finally {
