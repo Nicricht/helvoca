@@ -145,6 +145,16 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     }
 
     @Test
+    void disabledStartupRunnerDoesNotContactTwilio() {
+        HttpClient http = mock(HttpClient.class);
+        var runner = runner(false, CALL_SID, properties(), http);
+
+        runner.run(null);
+
+        verifyNoInteractions(http);
+    }
+
+    @Test
     void startupRunnerIsDisabledByDefaultAndReturnsForMissingSid() {
         TwilioProperties properties = properties();
         var publicConstructor = new TwilioCertificationCallStatusReadOnlyRunner(false, CALL_SID, properties);
