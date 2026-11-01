@@ -29,8 +29,9 @@ public final class TwilioCertificationCallStatusReadOnlyRunner implements Applic
     private static final Logger log = LoggerFactory.getLogger(TwilioCertificationCallStatusReadOnlyRunner.class);
     private static final Pattern ACCOUNT_SID = Pattern.compile("^AC[0-9a-fA-F]{32}$");
     private static final Pattern CALL_SID = Pattern.compile("^CA[0-9a-fA-F]{32}$");
-    private static final AtomicBoolean FIRED = new AtomicBoolean(false);
+    
 
+    private final AtomicBoolean fired = new AtomicBoolean(false);
     private final boolean enabled;
     private final String callSid;
     private final TwilioProperties properties;
@@ -57,7 +58,7 @@ public final class TwilioCertificationCallStatusReadOnlyRunner implements Applic
 
     @Override
     public void run(ApplicationArguments args) {
-        if (!enabled || callSid == null || callSid.isBlank() || !FIRED.compareAndSet(false, true)) return;
+        if (!enabled || callSid == null || callSid.isBlank() || !fired.compareAndSet(false, true)) return;
         try {
             CallSnapshot result = lookup(callSid);
             log.info(
