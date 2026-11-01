@@ -1,6 +1,7 @@
 package cl.helvoca.telephony.twilio;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.ai.gemini.GeminiLiveVoiceProvider;
 import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.security.TenantDatabaseContext;
@@ -186,7 +187,9 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             socket.close(CloseStatus.POLICY_VIOLATION);
             return;
         }
-        if (!health.allow(provider.id(), provider.configured())) {
+        boolean configured = provider instanceof GeminiLiveVoiceProvider gemini
+                ? gemini.configuredFor(businessPhone) : provider.configured();
+        if (!health.allow(provider.id(), configured)) {
             log.warn("Voice provider circuit is open provider={} call={}", provider.id(), callSid);
             socket.close(CloseStatus.SERVICE_RESTARTED);
             return;
