@@ -212,6 +212,11 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
                  WHERE business_id=? AND phone_number=? AND provider='TWILIO'
                 """, Long.class, STAGING_BUSINESS, number));
 
+        owner.update("UPDATE business SET status='SUSPENDED' WHERE id=?", STAGING_BUSINESS);
+        assertThrows(ResponseStatusException.class,
+                () -> as(adminA, () -> service.stageExisting(request)));
+        owner.update("UPDATE business SET status='ACTIVE' WHERE id=?", STAGING_BUSINESS);
+
         UUID otherBusiness = UUID.randomUUID();
         owner.update("INSERT INTO business(id,name) VALUES (?,?)",
                 otherBusiness, "Existing phone owner " + otherBusiness);

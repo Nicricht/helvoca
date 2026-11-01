@@ -381,4 +381,16 @@ class TwilioExistingSingleOperatorEnrollmentTransitionsTest {
         assertEquals("APPLIED", service.current().state());
     }
 
+    @Test
+    void prepareFailsClosedWhenTwilioPropertiesBeanIsMissing() {
+        when(jdbc.query(contains("ORDER BY requested_at DESC"),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioExistingSingleOperatorEnrollmentService.View>>any(),
+                eq(BUSINESS), eq(NUMBER), eq(ACTOR))).thenReturn(List.of());
+        var missingProperties = new TwilioExistingSingleOperatorEnrollmentService(
+                jdbc, admin, carrier, passwords, manager,
+                true, "demo-isolated", BUSINESS.toString(), NUMBER);
+        conflict(() -> missingProperties.prepare());
+        verify(admin, never()).stageExisting(any(TwilioExistingEnrollmentAdminService.StageExistingRequest.class));
+    }
+
 }

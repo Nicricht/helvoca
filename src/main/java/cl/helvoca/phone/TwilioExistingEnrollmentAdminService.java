@@ -76,12 +76,14 @@ public final class TwilioExistingEnrollmentAdminService {
 
         return transaction.execute(status -> {
             List<UUID> existing = jdbc.query("""
-                    SELECT id FROM phone_number
-                     WHERE business_id = ? AND provider = 'TWILIO' AND phone_number = ?
-                       AND active = FALSE AND whatsapp_enabled = FALSE
-                       AND twilio_binding_source IS NULL AND voice_verified_at IS NULL
-                       AND external_id IS NULL AND twilio_account_sid IS NULL
-                     FOR UPDATE
+                    SELECT p.id FROM phone_number p
+                      JOIN business b ON b.id = p.business_id
+                     WHERE p.business_id = ? AND p.provider = 'TWILIO' AND p.phone_number = ?
+                       AND p.active = FALSE AND p.whatsapp_enabled = FALSE
+                       AND p.twilio_binding_source IS NULL AND p.voice_verified_at IS NULL
+                       AND p.external_id IS NULL AND p.twilio_account_sid IS NULL
+                       AND b.status = 'ACTIVE' AND b.mode IN ('DEMO','CUSTOMER')
+                     FOR UPDATE OF p
                     """, (rs, ignored) -> rs.getObject(1, UUID.class),
                     data.businessId(), data.phoneNumber());
             if (!existing.isEmpty()) {
