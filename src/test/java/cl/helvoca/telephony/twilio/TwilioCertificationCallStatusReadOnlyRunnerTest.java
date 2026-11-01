@@ -80,7 +80,7 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
         var result = runner(true, CALL_SID, properties(), http).lookup(CALL_SID);
 
         assertEquals("", result.errorCode());
-        assertEquals("****", result.fromSuffix());
+        assertEquals("", result.fromSuffix());
         assertEquals("****", result.toSuffix());
     }
 
