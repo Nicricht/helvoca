@@ -30,6 +30,47 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 - `TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED=true` permits Gemini Live only for that exact certified DEMO phone and matching call tenant when the API key/model/endpoint are ready. Customer tenants still follow the independent global Gemini flag. Set the DEMO flag to false for immediate new-session rollback.
 
+## Aurora scoped Gemini media admission regression · 2026-11-01
+
+The first real Aurora attempt reached authenticated Twilio ingress and the
+router selected `gemini`, but `TwilioMediaStreamHandler` rejected the stream
+before creating a Gemini session. The router already used
+`GeminiLiveVoiceProvider.configuredFor(businessPhone)` for the Aurora-scoped
+route; the media handler incorrectly rechecked `provider.configured()`,
+which requires the global `GEMINI_LIVE_ENABLED` switch.
+
+The handler now applies the same scoped readiness decision **only after**
+the signed media-route check and `TwilioCallBindingGuard.allowsMedia(...)`
+succeed:
+
+- Gemini uses `configuredFor(businessPhone)`, which requires the DEMO-specific
+  Gemini opt-in, ready local model/key/endpoint configuration and the exact
+  pinned Aurora phone/business binding.
+- Every other provider continues to use `provider.configured()`.
+- Keep global `GEMINI_LIVE_ENABLED=false`. Do not open Gemini to other tenants.
+- The positive regression proves a bound scoped Gemini stream can create and
+  start its session while global readiness is false. The negative regression
+  proves a signed stream whose scoped binding is denied is closed before any
+  call lifecycle or AI session is created.
+
+This code change does not enable the runner, route, Gemini DEMO flag, startup
+call or global pilot effects. It is not evidence of a successful telephone
+conversation; exact-HEAD CI and isolated deployment verification remain
+required before the next live attempt.
+
+**Quota checkpoint:** the two Aurora command reservations are already consumed:
+`aurora-demo-20261101-001` failed before carrier creation but reserved its
+slot, and `aurora-demo-20261101-002` created CallSid
+`CA428da039e94ca8902c20c73d61c242dc` (Twilio completed after 1 second).
+The durable quota is `reserved_calls=2` with a hard maximum of two. Do not
+insert another command, reset the counter, or bypass the quota. A further
+attempt requires an explicit, reviewed quota-policy extension in the isolated
+Aurora scope. The owner has separately authorized one more attempt; that
+authorization does not itself alter the database constraint or worker limit.
+The owner withdrew the former USD 5 cap for the authorized test; the
+75-second maximum and 6780→9611 route remain mandatory. Never use 2512.
+
+
 ## One-time production enablement
 
 After the feature has passed CI and the exact merged SHA is deployed, enroll the carrier-owned DEMO number through the two-person platform process, verify callbacks and configured route pins, and set the DEMO tenant pin. Then set:
