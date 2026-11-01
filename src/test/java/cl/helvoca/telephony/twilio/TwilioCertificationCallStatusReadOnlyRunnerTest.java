@@ -196,6 +196,21 @@ class TwilioCertificationCallStatusReadOnlyRunnerTest {
     }
 
     @Test
+    void startupRunnerContainsMalformedProviderResponseWithoutRetrying() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        when(http.send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
+                .thenReturn(response(200, "not-json"));
+        var runner = runner(true, CALL_SID, properties(), http);
+
+        assertDoesNotThrow(() -> runner.run(null));
+        runner.run(null);
+
+        verify(http, times(1)).send(any(HttpRequest.class),
+                org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+    }
+
+    @Test
     void masksNullBlankAndShortSuffixInputs() throws Exception {
         Method suffix = TwilioCertificationCallStatusReadOnlyRunner.class
                 .getDeclaredMethod("suffix", String.class);
