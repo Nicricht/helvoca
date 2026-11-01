@@ -512,4 +512,53 @@ class TwilioMediaStreamHandlerTest {
         verify(socket, never()).close(any(org.springframework.web.socket.CloseStatus.class));
     }
 
+
+    @Test
+    void signedBoundScopedGeminiStartsWithoutGlobalEnablement() throws Exception {
+        TwilioProperties properties = new TwilioProperties();
+        properties.setAuthToken("twilio-test-secret");
+        TwilioMediaRouteSigner signer = new TwilioMediaRouteSigner(properties);
+        VoiceAiProviderRegistry providers = mock(VoiceAiProviderRegistry.class);
+        cl.helvoca.ai.gemini.GeminiLiveVoiceProvider gemini =
+                mock(cl.helvoca.ai.gemini.GeminiLiveVoiceProvider.class);
+        VoiceAiSession ai = mock(VoiceAiSession.class);
+        CallLifecycleService lifecycle = mock(CallLifecycleService.class);
+        TwilioCallBindingGuard guard = mock(TwilioCallBindingGuard.class);
+        TenantDatabaseContext db = new TenantDatabaseContext();
+        WebSocketSession socket = mock(WebSocketSession.class);
+        String business = "+14355550101", caller = "+56911111111";
+        String call = "CA-scoped", stream = "MZ-scoped";
+        String account = "ACaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        UUID id = UUID.randomUUID();
+        when(socket.getId()).thenReturn("scoped-socket");
+        when(guard.allowsMedia(call, business, caller, account)).thenReturn(true);
+        when(providers.require("gemini")).thenReturn(gemini);
+        when(gemini.id()).thenReturn("gemini");
+        when(gemini.configured()).thenReturn(false);
+        when(gemini.configuredFor(business)).thenReturn(true);
+        when(lifecycle.startInboundCall("twilio", call, caller, business)).thenReturn(id);
+        RealtimeCallContext context = new RealtimeCallContext(id, UUID.randomUUID(), null,
+                caller, business, stream);
+        when(lifecycle.markStreamStarted(id, call, stream, "gemini")).thenReturn(context);
+        when(gemini.createSession(eq(context), any(VoiceTransportSession.class))).thenReturn(ai);
+        TwilioMediaStreamHandler handler = new TwilioMediaStreamHandler(
+                signer, providers, new VoiceProviderHealthRegistry(), lifecycle,
+                mock(TwilioCallControl.class), db, guard);
+        handler.afterConnectionEstablished(socket);
+        long now = Instant.now().getEpochSecond();
+        JSONObject start = new JSONObject().put("event", "start").put("streamSid", stream)
+                .put("start", new JSONObject().put("streamSid", stream)
+                        .put("accountSid", account).put("callSid", call)
+                        .put("customParameters", new JSONObject().put("business", business)
+                                .put("caller", caller).put("callSid", call)
+                                .put("provider", "gemini").put("issuedAt", String.valueOf(now))
+                                .put("route", signer.sign(business, caller, call, "gemini", now))));
+        handler.handleTextMessage(socket, new TextMessage(start.toString()));
+
+        verify(guard).allowsMedia(call, business, caller, account);
+        verify(gemini).configuredFor(business);
+        verify(ai).start();
+        verify(socket, never()).close(org.springframework.web.socket.CloseStatus.SERVICE_RESTARTED);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, db.currentOrDenied().mode());
+    }
 }
