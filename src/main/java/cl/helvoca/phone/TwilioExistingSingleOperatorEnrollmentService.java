@@ -2,7 +2,9 @@ package cl.helvoca.phone;
 
 import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.twilio.TwilioExistingNumberOwnershipVerifier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -35,6 +37,7 @@ public final class TwilioExistingSingleOperatorEnrollmentService {
     private final String environment;
     private final String pinnedBusiness;
     private final String pinnedNumber;
+    private final TwilioProperties twilioProperties;
 
     public TwilioExistingSingleOperatorEnrollmentService(
             JdbcTemplate jdbc,
@@ -46,6 +49,22 @@ public final class TwilioExistingSingleOperatorEnrollmentService {
             @Value("${RAILWAY_ENVIRONMENT_NAME:}") String environment,
             @Value("${TWILIO_CERTIFICATION_DEMO_BUSINESS_ID:}") String pinnedBusiness,
             @Value("${TWILIO_TEST_FROM:}") String pinnedNumber) {
+        this(jdbc, admin, carrier, passwords, manager, enabled, environment,
+                pinnedBusiness, pinnedNumber, null);
+    }
+
+    @Autowired
+    public TwilioExistingSingleOperatorEnrollmentService(
+            JdbcTemplate jdbc,
+            TwilioExistingEnrollmentAdminService admin,
+            TwilioExistingNumberOwnershipVerifier carrier,
+            PasswordEncoder passwords,
+            PlatformTransactionManager manager,
+            @Value("${TWILIO_SINGLE_OPERATOR_DEMO_ENROLLMENT_ENABLED:false}") boolean enabled,
+            @Value("${RAILWAY_ENVIRONMENT_NAME:}") String environment,
+            @Value("${TWILIO_CERTIFICATION_DEMO_BUSINESS_ID:}") String pinnedBusiness,
+            @Value("${TWILIO_TEST_FROM:}") String pinnedNumber,
+            TwilioProperties twilioProperties) {
         this.jdbc = jdbc;
         this.admin = admin;
         this.carrier = carrier;
@@ -55,6 +74,7 @@ public final class TwilioExistingSingleOperatorEnrollmentService {
         this.environment = environment;
         this.pinnedBusiness = pinnedBusiness;
         this.pinnedNumber = pinnedNumber;
+        this.twilioProperties = twilioProperties;
     }
 
     public record Request(UUID businessId, UUID phoneId, String ownerAccountSid) {}
@@ -196,6 +216,46 @@ public final class TwilioExistingSingleOperatorEnrollmentService {
             audit(changeId, actor, "CONFIRMED");
             return new View(changeId, "APPLIED");
         });
+    }
+
+    public View prepare() {
+        View existing = current();
+        if ("PENDING".equals(existing.state()) || "APPLIED".equals(existing.state())) {
+            return existing;
+        }
+        if (twilioProperties == null || !twilioProperties.hasAccountSid()) {
+            throw conflict("Twilio account is not configured for isolated enrollment");
+        }
+        String accountSid = twilioProperties.getAccountSid().trim();
+        if (!ACCOUNT.matcher(accountSid).matches()) {
+            throw conflict("Twilio account identifier is unavailable");
+        }
+        UUID businessId = UUID.fromString(pinnedBusiness);
+        TwilioExistingEnrollmentAdminService.StageExistingView staged =
+                admin.stageExisting(new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                        businessId, pinnedNumber, accountSid));
+        return request(new Request(businessId, staged.phoneId(), accountSid));
+    }
+
+    public View current() {
+        UUID actor = admin.authenticatedPlatformActor();
+        requireDemo();
+        UUID businessId = UUID.fromString(pinnedBusiness);
+        List<View> matches = jdbc.query("""
+                SELECT change_id, state, expires_at
+                  FROM twilio_single_operator_demo_enrollment
+                 WHERE business_id = ? AND destination_e164 = ? AND actor_id = ?
+                 ORDER BY requested_at DESC
+                 LIMIT 1
+                """, (rs, ignored) -> {
+                    String state = rs.getString("state");
+                    Instant expiresAt = rs.getTimestamp("expires_at").toInstant();
+                    if ("PENDING".equals(state) && !Instant.now().isBefore(expiresAt)) {
+                        state = "EXPIRED";
+                    }
+                    return new View(rs.getObject("change_id", UUID.class), state);
+                }, businessId, pinnedNumber, actor);
+        return matches.isEmpty() ? new View(null, "NOT_STARTED") : matches.get(0);
     }
 
     public View status(UUID changeId) {

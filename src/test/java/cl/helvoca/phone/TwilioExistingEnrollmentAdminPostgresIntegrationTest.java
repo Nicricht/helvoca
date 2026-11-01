@@ -204,8 +204,32 @@ class TwilioExistingEnrollmentAdminPostgresIntegrationTest {
                    AND external_id IS NULL AND twilio_account_sid IS NULL
                    AND twilio_binding_source IS NULL AND voice_verified_at IS NULL
                 """, Long.class, staged.phoneId(), STAGING_BUSINESS, number));
-        assertThrows(ResponseStatusException.class,
-                () -> as(adminA, () -> service.stageExisting(request)));
+        var retried = as(adminA, () -> service.stageExisting(request));
+        assertEquals(staged.phoneId(), retried.phoneId());
+        assertEquals("PENDING_ENROLLMENT", retried.state());
+        assertEquals(1L, owner.queryForObject("""
+                SELECT COUNT(*) FROM phone_number
+                 WHERE business_id=? AND phone_number=? AND provider='TWILIO'
+                """, Long.class, STAGING_BUSINESS, number));
+
+        UUID otherBusiness = UUID.randomUUID();
+        owner.update("INSERT INTO business(id,name) VALUES (?,?)",
+                otherBusiness, "Existing phone owner " + otherBusiness);
+        String occupiedNumber = "+16812706781";
+        owner.update("""
+                INSERT INTO phone_number(id,business_id,phone_number,provider,active)
+                VALUES (?,?,?,'TWILIO',FALSE)
+                """, UUID.randomUUID(), otherBusiness, occupiedNumber);
+        when(carrier.verify(occupiedNumber, ACCOUNT, null)).thenReturn(
+                new TwilioExistingNumberOwnershipVerifier.Outcome(
+                        TwilioExistingNumberOwnershipVerifier.Code.VERIFIED,
+                        new TwilioExistingNumberOwnershipVerifier.Evidence(
+                                "PN" + "c".repeat(32), ACCOUNT,
+                                TwilioExistingNumberOwnershipVerifier.AccountKind.MAIN)));
+        assertThrows(ResponseStatusException.class, () -> as(adminA, () -> service.stageExisting(
+                new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                        STAGING_BUSINESS, occupiedNumber, ACCOUNT))));
+
         var pending = as(adminA, () -> service.request(
                 new TwilioExistingEnrollmentAdminService.Request(
                         STAGING_BUSINESS, staged.phoneId(), ACCOUNT)));

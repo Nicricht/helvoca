@@ -21,15 +21,22 @@ class TwilioExistingSingleOperatorEnrollmentControllerTest {
                 "secret-not-logged", "+16812706780");
         var pending = new TwilioExistingSingleOperatorEnrollmentService.View(change, "PENDING");
         var applied = new TwilioExistingSingleOperatorEnrollmentService.View(change, "APPLIED");
+        var notStarted = new TwilioExistingSingleOperatorEnrollmentService.View(null, "NOT_STARTED");
 
+        when(service.prepare()).thenReturn(pending);
         when(service.request(request)).thenReturn(pending);
+        when(service.current()).thenReturn(notStarted);
         when(service.confirm(change, confirm)).thenReturn(applied);
         when(service.status(change)).thenReturn(applied);
 
+        assertEquals(pending, controller.prepare());
         assertEquals(pending, controller.request(request));
         assertEquals(applied, controller.confirm(change, confirm));
         assertEquals(applied, controller.status(change));
+        assertEquals(notStarted, controller.current());
 
+        verify(service).prepare();
+        verify(service).current();
         verify(service).request(request);
         verify(service).confirm(change, confirm);
         verify(service).status(change);

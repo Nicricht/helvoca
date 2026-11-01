@@ -75,6 +75,18 @@ public final class TwilioExistingEnrollmentAdminService {
         }
 
         return transaction.execute(status -> {
+            List<UUID> existing = jdbc.query("""
+                    SELECT id FROM phone_number
+                     WHERE business_id = ? AND provider = 'TWILIO' AND phone_number = ?
+                       AND active = FALSE AND whatsapp_enabled = FALSE
+                       AND twilio_binding_source IS NULL AND voice_verified_at IS NULL
+                       AND external_id IS NULL AND twilio_account_sid IS NULL
+                     FOR UPDATE
+                    """, (rs, ignored) -> rs.getObject(1, UUID.class),
+                    data.businessId(), data.phoneNumber());
+            if (!existing.isEmpty()) {
+                return new StageExistingView(existing.get(0), "PENDING_ENROLLMENT");
+            }
             UUID phoneId = UUID.randomUUID();
             try {
                 int inserted = jdbc.update("""

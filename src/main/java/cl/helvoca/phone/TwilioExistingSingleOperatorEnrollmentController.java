@@ -19,6 +19,11 @@ public class TwilioExistingSingleOperatorEnrollmentController {
         this.service = service;
     }
 
+    @PostMapping("/prepare")
+    public TwilioExistingSingleOperatorEnrollmentService.View prepare() {
+        return service.prepare();
+    }
+
     @PostMapping
     public TwilioExistingSingleOperatorEnrollmentService.View request(
             @RequestBody TwilioExistingSingleOperatorEnrollmentService.Request request) {
@@ -30,6 +35,11 @@ public class TwilioExistingSingleOperatorEnrollmentController {
             @PathVariable UUID changeId,
             @RequestBody TwilioExistingSingleOperatorEnrollmentService.Confirm confirm) {
         return service.confirm(changeId, confirm);
+    }
+
+    @GetMapping("/current")
+    public TwilioExistingSingleOperatorEnrollmentService.View current() {
+        return service.current();
     }
 
     @GetMapping("/{changeId}")

@@ -1,6 +1,7 @@
 package cl.helvoca.phone;
 
 import cl.helvoca.telephony.twilio.TwilioExistingNumberOwnershipVerifier;
+import cl.helvoca.telephony.twilio.TwilioProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +46,7 @@ class TwilioExistingSingleOperatorEnrollmentTransitionsTest {
     private PasswordEncoder passwords;
     private PlatformTransactionManager manager;
     private TwilioExistingSingleOperatorEnrollmentService service;
+    private TwilioProperties twilioProperties;
     private AtomicReference<List<String>> inventory;
     private AtomicReference<List<String>> lockedInventory;
     private AtomicReference<Long> outstanding;
@@ -69,9 +71,11 @@ class TwilioExistingSingleOperatorEnrollmentTransitionsTest {
         when(admin.authenticatedPlatformActor()).thenReturn(ACTOR);
         when(manager.getTransaction(any(TransactionDefinition.class)))
                 .thenAnswer(inv -> new SimpleTransactionStatus());
+        twilioProperties = new TwilioProperties();
+        twilioProperties.setAccountSid(ACCOUNT);
         service = new TwilioExistingSingleOperatorEnrollmentService(
                 jdbc, admin, carrier, passwords, manager,
-                true, "demo-isolated", BUSINESS.toString(), NUMBER);
+                true, "demo-isolated", BUSINESS.toString(), NUMBER, twilioProperties);
         inventory = new AtomicReference<>(List.of(NUMBER));
         lockedInventory = new AtomicReference<>(List.of(NUMBER));
         outstanding = new AtomicReference<>(0L);
@@ -299,4 +303,82 @@ class TwilioExistingSingleOperatorEnrollmentTransitionsTest {
                 eq(BUSINESS.toString()))).thenReturn(List.of("PENDING"));
         assertEquals("PENDING", service.status(CHANGE).state());
     }
+    private ResultSet currentRow(String state, Instant expiresAt) throws SQLException {
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getObject("change_id", UUID.class)).thenReturn(CHANGE);
+        when(rs.getString("state")).thenReturn(state);
+        when(rs.getTimestamp("expires_at")).thenReturn(Timestamp.from(expiresAt));
+        return rs;
+    }
+
+    private void stubCurrent(String state, Instant expiresAt) {
+        when(jdbc.query(contains("ORDER BY requested_at DESC"),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioExistingSingleOperatorEnrollmentService.View>>any(),
+                eq(BUSINESS), eq(NUMBER), eq(ACTOR))).thenAnswer(inv -> {
+            RowMapper<TwilioExistingSingleOperatorEnrollmentService.View> mapper = inv.getArgument(1);
+            return List.of(mapper.mapRow(currentRow(state, expiresAt), 0));
+        });
+    }
+
+    @Test
+    void prepareCreatesPendingEnrollmentOnceWhenNoCurrentRequestExists() {
+        when(jdbc.query(contains("ORDER BY requested_at DESC"),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioExistingSingleOperatorEnrollmentService.View>>any(),
+                eq(BUSINESS), eq(NUMBER), eq(ACTOR))).thenReturn(List.of());
+        when(admin.stageExisting(any(TwilioExistingEnrollmentAdminService.StageExistingRequest.class)))
+                .thenReturn(new TwilioExistingEnrollmentAdminService.StageExistingView(
+                        PHONE_ID, "PENDING_ENROLLMENT"));
+
+        var result = service.prepare();
+
+        assertEquals("PENDING", result.state());
+        verify(admin).stageExisting(new TwilioExistingEnrollmentAdminService.StageExistingRequest(
+                BUSINESS, NUMBER, ACCOUNT));
+        verify(jdbc).update(contains("INSERT INTO twilio_single_operator_demo_enrollment"),
+                any(), eq(BUSINESS), eq(PHONE_ID), eq(NUMBER), eq(ACCOUNT), eq(ACTOR));
+    }
+
+    @Test
+    void prepareResumesPendingOrAppliedRequestWithoutRestaging() {
+        stubCurrent("PENDING", Instant.now().plusSeconds(300));
+        assertEquals("PENDING", service.prepare().state());
+        stubCurrent("APPLIED", Instant.now().plusSeconds(300));
+        assertEquals("APPLIED", service.prepare().state());
+        verify(admin, never()).stageExisting(any(TwilioExistingEnrollmentAdminService.StageExistingRequest.class));
+        verifyNoInteractions(carrier);
+    }
+
+    @Test
+    void prepareFailsClosedWhenTwilioAccountIdentifierIsMissingOrMalformed() {
+        when(jdbc.query(contains("ORDER BY requested_at DESC"),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioExistingSingleOperatorEnrollmentService.View>>any(),
+                eq(BUSINESS), eq(NUMBER), eq(ACTOR))).thenReturn(List.of());
+        twilioProperties.setAccountSid("");
+        conflict(() -> service.prepare());
+        twilioProperties.setAccountSid("not-an-account-sid");
+        conflict(() -> service.prepare());
+        verify(admin, never()).stageExisting(any(TwilioExistingEnrollmentAdminService.StageExistingRequest.class));
+    }
+
+    @Test
+    void currentReportsNotStartedWhenNoEnrollmentExists() {
+        when(jdbc.query(contains("ORDER BY requested_at DESC"),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioExistingSingleOperatorEnrollmentService.View>>any(),
+                eq(BUSINESS), eq(NUMBER), eq(ACTOR))).thenReturn(List.of());
+        assertEquals(new TwilioExistingSingleOperatorEnrollmentService.View(null, "NOT_STARTED"),
+                service.current());
+    }
+
+    @Test
+    void currentDistinguishesPendingExpiredAndAppliedEnrollment() {
+        stubCurrent("PENDING", Instant.now().plusSeconds(300));
+        assertEquals("PENDING", service.current().state());
+
+        stubCurrent("PENDING", Instant.now().minusSeconds(1));
+        assertEquals("EXPIRED", service.current().state());
+
+        stubCurrent("APPLIED", Instant.now().minusSeconds(1));
+        assertEquals("APPLIED", service.current().state());
+    }
+
 }
