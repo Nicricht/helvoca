@@ -26,7 +26,7 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
 - Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
 - The command stores an immutable DEMO `business_id`. The worker checks that the configured caller is an active, carrier-verified number belonging to that active DEMO tenant and that its pinned existing-number route has independent approval evidence. Ingress atomically consumes the token only for the same tenant.
-- A PostgreSQL row lock records each explicitly requested call attempt per DEMO tenant across concurrent workers; there is no lifetime attempt-count ceiling. A failed or uncertain provider creation remains recorded and is never silently retried. Each call still requires a distinct, unique operator-created command, an immutable tenant binding, one-use callback token, and the DEMO worker's `TimeLimit` must not exceed 180 seconds before reaching Twilio. This does not establish a cumulative provider-spend cap.
+- A PostgreSQL row lock records each explicitly requested call attempt per DEMO tenant across concurrent workers. Migration `V105__certification_demo_call_quota.sql` enforces `reserved_calls BETWEEN 0 AND 2`; each command claim increments this quota before contacting Twilio, so a failed or uncertain provider creation still consumes a slot. Do not delete, decrement, reset or bypass the quota. Each call still requires a distinct operator-created command, immutable tenant binding, one-use callback token, and a `TimeLimit` no greater than 180 seconds. This does not establish a cumulative provider-spend cap. The separate startup runner is not backed by this quota and must remain OFF for Aurora certification.
 - A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 - `TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED=true` permits Gemini Live only for that exact certified DEMO phone and matching call tenant when the API key/model/endpoint are ready. Customer tenants still follow the independent global Gemini flag. Set the DEMO flag to false for immediate new-session rollback.
 
@@ -67,6 +67,19 @@ reset. A further call still requires a distinct, explicitly requested command;
 there are no automatic retries. The owner authorized one additional call and
 withdrew the former USD 5 cap for this test. The 180-second maximum and
 6780→9611 route remain mandatory. Never use 2512.
+
+### Completed additional voice attempt · 2026-11-03
+
+The separately authorized outbound startup-runner test completed as CallSid
+`CA0ff94a37035279f155ff48c91e14b6ab`: Twilio status `completed`, duration
+56 seconds, recorded charge USD 0.07460. Gemini Live audio connected. The
+tenant-scoped transcript/setup persistence correction and PostgreSQL 18
+regression are recorded in Issue #848.
+
+That additional authorization has been consumed. The two command-runner quota
+slots are a separate database-enforced limit and remain reserved. Do not use
+the startup runner to circumvent them. No further provider call is part of
+this change. Keep all call-launch flags OFF.
 
 
 ## One-time production enablement
