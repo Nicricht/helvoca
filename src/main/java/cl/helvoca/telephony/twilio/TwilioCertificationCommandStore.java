@@ -39,17 +39,9 @@ public class TwilioCertificationCommandStore {
                         VALUES (?, ?) ON CONFLICT (run_id) DO NOTHING
                         """, runId.trim(), actor)
                 : jdbc.update("""
-                        WITH quota AS (
-                            INSERT INTO twilio_certification_demo_call_quota (business_id)
-                            VALUES (?)
-                            ON CONFLICT (business_id) DO UPDATE
-                                SET business_id = EXCLUDED.business_id
-                            RETURNING business_id
-                        )
                         INSERT INTO twilio_certification_command (run_id, requested_by, business_id)
-                        SELECT ?, ?, business_id FROM quota
-                        ON CONFLICT (run_id) DO NOTHING
-                        """, businessId, runId.trim(), actor);
+                        VALUES (?, ?, ?) ON CONFLICT (run_id) DO NOTHING
+                        """, runId.trim(), actor, businessId);
         return inserted == 1;
     }
 
@@ -91,26 +83,20 @@ public class TwilioCertificationCommandStore {
                 WITH next_command AS (
                     SELECT c.run_id, c.business_id
                     FROM twilio_certification_command c
-                    JOIN twilio_certification_demo_call_quota q
-                      ON q.business_id = c.business_id
                     WHERE c.status = 'PENDING'
-                    ORDER BY c.requested_at
-                    FOR UPDATE OF c, q SKIP LOCKED
+                      AND c.business_id IS NOT NULL
+                    ORDER BY c.requested_at, c.run_id
+                    FOR UPDATE OF c SKIP LOCKED
                     LIMIT 1
-                ), reserved AS (
-                    UPDATE twilio_certification_demo_call_quota q
-                       SET reserved_calls = reserved_calls + 1
-                      FROM next_command n
-                     WHERE q.business_id = n.business_id
-                    RETURNING q.business_id
                 )
                 UPDATE twilio_certification_command c
                 SET status = 'CLAIMED',
                     callback_token = ?,
                     claimed_at = CURRENT_TIMESTAMP,
                     expires_at = CURRENT_TIMESTAMP + (? * INTERVAL '1 second')
-                FROM next_command n JOIN reserved r ON r.business_id = n.business_id
+                FROM next_command n
                 WHERE c.run_id = n.run_id
+                  AND c.status = 'PENDING'
                 RETURNING c.run_id, c.business_id
                 """,
                 (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,

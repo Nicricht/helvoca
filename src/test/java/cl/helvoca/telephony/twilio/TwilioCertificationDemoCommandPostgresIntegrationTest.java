@@ -64,6 +64,11 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
         assertThrows(DataAccessException.class, () -> scope.runAsTenant(other, () ->
                 commands.enqueue("foreign-" + UUID.randomUUID(), "test", demo)));
 
+        assertEquals(0L, scope.callAsSystem(() -> jdbc.queryForObject(
+                "SELECT COUNT(*) FROM twilio_certification_demo_call_quota WHERE business_id = ?",
+                Long.class, demo)), "No quota row is required or created for a DEMO command");
+        assertFalse(scope.callAsSystem(() -> commands.enqueue(bound, "duplicate", demo)));
+
         var claim = scope.callAsSystem(() -> commands.claimNext().orElseThrow());
         assertEquals(bound, claim.runId());
         assertEquals(demo, claim.businessId());
@@ -81,14 +86,17 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
     }
 
     @Test
-    void concurrentWorkersCanReserveEveryExplicitlyRequestedAttempt() throws Exception {
+    void concurrentWorkersClaimUnlimitedExplicitAttemptsWithoutChangingHistoricalQuota() throws Exception {
         UUID demo = UUID.randomUUID();
-        new JdbcTemplate(migrationDataSource).update(
-                "INSERT INTO business(id,name,mode) VALUES (?,'Synthetic quota demo','DEMO')", demo);
-        int totalAttempts = 5;
+        JdbcTemplate owner = new JdbcTemplate(migrationDataSource);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Synthetic unlimited demo','DEMO')", demo);
+        // Historical V105 quota is exhausted; a forward-only application change must not reset it.
+        owner.update("INSERT INTO twilio_certification_demo_call_quota (business_id, reserved_calls)"
+                + " VALUES (?, 2)", demo);
+        int totalAttempts = 12;
         for (int i = 0; i < totalAttempts; i++) {
-            String runId = "quota-" + UUID.randomUUID();
-            assertTrue(scope.callAsSystem(() -> commands.enqueue(runId, "test", demo)));
+            assertTrue(scope.callAsSystem(() ->
+                    commands.enqueue("unlimited-" + UUID.randomUUID(), "operator", demo)));
         }
         var pool = Executors.newFixedThreadPool(3);
         var start = new CountDownLatch(1);
@@ -99,19 +107,24 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
                         return scope.callAsSystem(commands::claimNext);
                     })).toList();
             start.countDown();
-            for (var claim : claims) claim.get(15, TimeUnit.SECONDS);
-            while (scope.callAsSystem(commands::claimNext).isPresent()) {
-                // Drain commands skipped while another worker held the quota row.
+            for (var claim : claims) {
+                assertTrue(claim.get(15, TimeUnit.SECONDS).isPresent());
             }
-            assertEquals(totalAttempts, scope.callAsSystem(() -> jdbc.queryForObject(
+            while (scope.callAsSystem(commands::claimNext).isPresent()) {
+                // Drain distinct commands; no shared quota row or cumulative cap is consulted.
+            }
+            assertEquals(2, scope.callAsSystem(() -> jdbc.queryForObject(
                     "SELECT reserved_calls FROM twilio_certification_demo_call_quota WHERE business_id = ?",
-                    Integer.class, demo)));
+                    Integer.class, demo)), "Preserve legacy quota history unchanged");
             assertEquals((long) totalAttempts, scope.callAsSystem(() -> jdbc.queryForObject(
                     "SELECT COUNT(*) FROM twilio_certification_command WHERE business_id = ? AND status = 'CLAIMED'",
                     Long.class, demo)));
             assertEquals(0L, scope.callAsSystem(() -> jdbc.queryForObject(
                     "SELECT COUNT(*) FROM twilio_certification_command WHERE business_id = ? AND status = 'PENDING'",
                     Long.class, demo)));
+            String nextRunId = "unlimited-" + UUID.randomUUID();
+            assertTrue(scope.callAsSystem(() -> commands.enqueue(nextRunId, "operator", demo)));
+            assertEquals(nextRunId, scope.callAsSystem(() -> commands.claimNext().orElseThrow().runId()));
         } finally {
             pool.shutdownNow();
         }

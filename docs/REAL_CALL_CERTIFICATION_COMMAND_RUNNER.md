@@ -26,7 +26,7 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 - The token can be consumed only once and is bound to the resulting Twilio Call SID.
 - Every launched call submits `TimeLimit` to Twilio using the bounded certification duration (20–180 seconds), independently of `Timeout=25` ringing, and retains the server-side safety hangup as defense in depth.
 - The command stores an immutable DEMO `business_id`. The worker checks that the configured caller is an active, carrier-verified number belonging to that active DEMO tenant and that its pinned existing-number route has independent approval evidence. Ingress atomically consumes the token only for the same tenant.
-- A PostgreSQL row lock records each explicitly requested call attempt per DEMO tenant across concurrent workers. Migration `V105__certification_demo_call_quota.sql` enforces `reserved_calls BETWEEN 0 AND 2`; each command claim increments this quota before contacting Twilio, so a failed or uncertain provider creation still consumes a slot. Do not delete, decrement, reset or bypass the quota. Each call still requires a distinct operator-created command, immutable tenant binding, one-use callback token, and a `TimeLimit` no greater than 180 seconds. This does not establish a cumulative provider-spend cap. The separate startup runner is not backed by this quota and must remain OFF for Aurora certification.
+- **No cumulative call-attempt quota:** each explicitly operator-requested DEMO call has its own immutable `run_id` and tenant-bound command row. The worker claims distinct pending commands atomically using `FOR UPDATE OF c SKIP LOCKED`; there is no count-based admission or automatic retry. Migration `V105__certification_demo_call_quota.sql` and its `reserved_calls BETWEEN 0 AND 2` constraint remain in the historical schema, but the current application never reads, increments or writes that old counter. Preserve all historical rows and their counts without resets, deletion or SQL workarounds. No new migration is needed for the runtime change. A new command still requires explicit authorization, immutable DEMO tenant binding, one-use callback token, and `TimeLimit` no greater than 180 seconds. This does **not** establish a cumulative Twilio/Gemini spend cap; spending is a separate operational risk. The separate startup runner stays OFF and must never be used to evade command/tenant safety controls.
 - A DEMO-specific existing voice route requires `TWILIO_CERTIFICATION_DEMO_ROUTE_ENABLED=true`, exact existing-route tenant/phone/account pins and two-person enrollment audit. It does not enable the global pilot external-effects flag. Setting the route flag to false stops new ingress and Media Streams.
 - `TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED=true` permits Gemini Live only for that exact certified DEMO phone and matching call tenant when the API key/model/endpoint are ready. Customer tenants still follow the independent global Gemini flag. Set the DEMO flag to false for immediate new-session rollback.
 
@@ -76,10 +76,12 @@ The separately authorized outbound startup-runner test completed as CallSid
 tenant-scoped transcript/setup persistence correction and PostgreSQL 18
 regression are recorded in Issue #848.
 
-That additional authorization has been consumed. The two command-runner quota
-slots are a separate database-enforced limit and remain reserved. Do not use
-the startup runner to circumvent them. No further provider call is part of
-this change. Keep all call-launch flags OFF.
+That additional authorization has been consumed. The former two-slot limit
+is historical only; the updated command runner admits any number of **new,
+explicitly authorized** commands without changing old quota rows or history.
+Unlimited attempts do not create automatic redials or imply unlimited cost
+authorization. No further provider call is part of this code change. Keep all
+call-launch flags OFF.
 
 
 ## One-time production enablement
@@ -99,13 +101,11 @@ The existing voice route must also be pinned and enabled for this exact DEMO pho
 Insert a unique run id into PostgreSQL:
 
 ```sql
-INSERT INTO twilio_certification_demo_call_quota (business_id)
-VALUES ('<certified DEMO business UUID>') ON CONFLICT DO NOTHING;
 INSERT INTO twilio_certification_command (run_id, business_id)
 VALUES ('aurora-demo-20261019-001', '<certified DEMO business UUID>');
 ```
 
-Do not add phone numbers or provider identifiers to the command. A legacy command without `business_id` remains pending and cannot launch. The platform API and one-time bootstrap create the quota row and bind the configured DEMO ID after validating the active route. A direct SQL command without a quota row remains pending.
+Do not add phone numbers or provider identifiers to the command. A legacy command without `business_id` remains pending and cannot launch. The platform API and one-time bootstrap bind the configured DEMO ID after validating the active route. No quota row is needed. A legacy command lacking `business_id` remains pending and is not claimed.
 
 The worker claims the row and updates its state through:
 
@@ -163,7 +163,7 @@ Inspect status with:
 GET /api/v1/platform/certification-runs/latency-api-20260927-001
 ```
 
-The response intentionally excludes the callback token. Requests use a dedicated per-identity rate limit of five requests per hour by default.
+The response intentionally excludes the callback token. Requests no longer have a special five-per-hour quota. They use the same default authenticated API burst throttle (600 requests per minute), with independent actor authentication and authorization still required. This traffic-safety throttle is not a cumulative limit on authorized call attempts.
 
 For the first controlled deployment smoke only, `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` may contain one unique run id. It is idempotent through the same primary key and should be cleared after the smoke test. Future runs should use the authenticated platform API.
 
