@@ -6,6 +6,7 @@ import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.telephony.twilio.TwilioCertificationDemoBindingGate;
 import cl.helvoca.voice.VoiceAiProvider;
@@ -31,6 +32,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
     private final CallCertificationService certifications;
     private final VoiceProviderHealthRegistry health;
     private final TwilioCertificationDemoBindingGate demoBinding;
+    private final TenantDatabaseContext databaseContext;
     private final boolean demoEnabled;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
@@ -45,6 +47,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
                                    CallCertificationService certifications,
                                    VoiceProviderHealthRegistry health,
                                    TwilioCertificationDemoBindingGate demoBinding,
+                                   TenantDatabaseContext databaseContext,
                                    @Value("${TWILIO_CERTIFICATION_DEMO_GEMINI_ENABLED:false}") boolean demoEnabled) {
         this.properties = properties;
         this.tools = tools;
@@ -54,10 +57,21 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         this.certifications = certifications;
         this.health = health;
         this.demoBinding = demoBinding;
+        this.databaseContext = databaseContext;
         this.demoEnabled = demoEnabled;
     }
 
-    // Legacy unit fixtures; Spring injects the scoped gate through the annotated constructor.
+    // Legacy unit fixtures; Spring injects the scoped gate and tenant context through the annotated constructor.
+    public GeminiLiveVoiceProvider(GeminiLiveProperties properties, RealtimeToolService tools,
+            CallTranscriptService transcripts, CallSummaryService summaries,
+            CallLifecycleService lifecycle, CallCertificationService certifications,
+            VoiceProviderHealthRegistry health,
+            TwilioCertificationDemoBindingGate demoBinding,
+            boolean demoEnabled) {
+        this(properties, tools, transcripts, summaries, lifecycle, certifications, health,
+                demoBinding, new TenantDatabaseContext(), demoEnabled);
+    }
+
     public GeminiLiveVoiceProvider(GeminiLiveProperties properties, RealtimeToolService tools,
             CallTranscriptService transcripts, CallSummaryService summaries,
             CallLifecycleService lifecycle, CallCertificationService certifications,
@@ -99,7 +113,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         }
         return new GeminiLiveVoiceSession(
                 context, transport, sessionProperties(context), tools, transcripts, summaries,
-                lifecycle, certifications, health, http);
+                lifecycle, certifications, health, http, databaseContext);
     }
 
     GeminiLiveProperties sessionProperties(RealtimeCallContext context) {
