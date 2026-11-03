@@ -51,3 +51,7 @@ Los eventos de Gemini Live llegan por callbacks de WebSocket que pueden ejecutar
 - La regresión `PostgresRowLevelSecurityIntegrationTest.geminiWebSocketCallbacksPersistWithinPinnedTenantOnExecutorThreads` usa PostgreSQL 18 real y el provider de Spring. Verifica la persistencia de `ai_setup_completed_at` y `call_transcript` para el tenant dueño, invisibilidad para otro tenant, rechazo de escritura cruzada y restauración del hilo a DENIED.
 
 Esta prueba no requiere Gemini real, Twilio real ni una llamada telefónica.
+
+### Fail-closed constructor guard
+
+`GeminiLiveVoiceSession` rejects both a missing `RealtimeCallContext` and a context whose `businessId` is null before accepting WebSocket work. The unit test `GeminiLiveVoiceSessionTest.constructorRejectsMissingTenantContext` covers both invalid inputs; valid tenant contexts are exercised by the existing session and PostgreSQL integration suites. The differential Java coverage gate requires 100% changed lines, branches and methods, including these rejection branches.
