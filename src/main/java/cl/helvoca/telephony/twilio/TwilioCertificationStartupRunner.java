@@ -72,7 +72,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_PUBLIC_BASE_URL:}") String publicBaseUrl,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedTo,
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
-            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:75}") int maxSeconds,
+            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:180}") int maxSeconds,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
             @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}") String providerOverride,
             @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}") String voiceOverride,
@@ -85,7 +85,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.publicBaseUrl = publicBaseUrl;
         this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
-        this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
+        this.maxSeconds = Math.max(20, Math.min(maxSeconds, TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS));
         this.direction = normalizeDirection(direction);
         this.providerOverrideValid = validProviderOverride(providerOverride, this.direction);
         this.providerOverride = VoiceCallRouter.normalizeCertificationProviderOverride(providerOverride);
@@ -155,17 +155,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 : "/webhooks/v1/twilio/outbound-test");
         String statusUrl = base + "/webhooks/v1/twilio/status";
 
-        String body = form("To", to.trim())
-                + "&" + form("From", from.trim())
-                + "&" + form("Url", voiceUrl)
-                + "&" + form("Method", "POST")
-                + "&" + form("StatusCallback", statusUrl)
-                + "&" + form("StatusCallbackMethod", "POST")
-                + "&" + form("StatusCallbackEvent", "initiated")
-                + "&" + form("StatusCallbackEvent", "ringing")
-                + "&" + form("StatusCallbackEvent", "answered")
-                + "&" + form("StatusCallbackEvent", "completed")
-                + "&" + form("Timeout", "25");
+        String body = callBody(to.trim(), from.trim(), voiceUrl, statusUrl, maxSeconds);
 
         String basic = Base64.getEncoder().encodeToString(
                 (accountSid.trim() + ":" + authToken.trim()).getBytes(StandardCharsets.UTF_8));
@@ -264,6 +254,21 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     }
 
     // Package-visible to verify Twilio form encoding without triggering provider calls.
+    static String callBody(String to, String from, String voiceUrl, String statusUrl, int maxSeconds) {
+        return form("To", to)
+                + "&" + form("From", from)
+                + "&" + form("Url", voiceUrl)
+                + "&" + form("Method", "POST")
+                + "&" + form("StatusCallback", statusUrl)
+                + "&" + form("StatusCallbackMethod", "POST")
+                + "&" + form("StatusCallbackEvent", "initiated")
+                + "&" + form("StatusCallbackEvent", "ringing")
+                + "&" + form("StatusCallbackEvent", "answered")
+                + "&" + form("StatusCallbackEvent", "completed")
+                + "&" + form("Timeout", "25")
+                + "&" + form("TimeLimit", Integer.toString(maxSeconds));
+    }
+
     static String form(String key, String value) {
         return URLEncoder.encode(key, StandardCharsets.UTF_8)
                 + "=" + URLEncoder.encode(value, StandardCharsets.UTF_8);

@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 @Component
 public class TwilioCertificationCommandCallLauncher {
+    static final int MAX_DEMO_DURATION_SECONDS = 180;
     private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
 
     private final TwilioProperties twilio;
@@ -38,7 +39,7 @@ public class TwilioCertificationCommandCallLauncher {
             @Value("${TWILIO_TEST_TO:}") String to,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedTo,
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
-            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:150}") int maxSeconds,
+            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:180}") int maxSeconds,
             TwilioCallControl callControl) {
         this(twilio, from, to, allowedTo, forbiddenTo, maxSeconds, callControl,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
@@ -58,7 +59,7 @@ public class TwilioCertificationCommandCallLauncher {
         this.to = to;
         this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
-        this.maxSeconds = Math.max(20, Math.min(maxSeconds, 180));
+        this.maxSeconds = Math.max(20, Math.min(maxSeconds, MAX_DEMO_DURATION_SECONDS));
         this.callControl = callControl;
         this.http = http;
     }
@@ -133,7 +134,7 @@ public class TwilioCertificationCommandCallLauncher {
     }
 
     boolean durationWithinDemoLimit() {
-        return maxSeconds <= 75;
+        return maxSeconds <= MAX_DEMO_DURATION_SECONDS;
     }
 
     private void scheduleSafetyHangup(String callSid) {

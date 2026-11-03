@@ -122,6 +122,7 @@ class TwilioCertificationCommandCallLauncherTest {
     @Test
     void providerEnforcesConfiguredCallDurationSeparatelyFromRingingTimeout() throws Exception {
         assertProviderTimeLimit(75, 75);
+        assertProviderTimeLimit(180, 180);
         assertProviderTimeLimit(10, 20);
         assertProviderTimeLimit(300, 180);
     }
@@ -143,7 +144,8 @@ class TwilioCertificationCommandCallLauncherTest {
                 properties(), "+14355652512", "+56966939611", "+56966939611",
                 "+56975856664", configuredSeconds, mock(TwilioCallControl.class), http);
 
-        assertEquals(expectedSeconds <= 75, launcher.durationWithinDemoLimit());
+        assertEquals(expectedSeconds <= TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS,
+                launcher.durationWithinDemoLimit());
 
         assertEquals(CALL_SID, launcher.launch(TOKEN));
         HttpRequest request = observedRequest.get();

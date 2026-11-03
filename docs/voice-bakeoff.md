@@ -40,11 +40,13 @@ The model must finish the third line and then invoke `end_call`.
 Keep normal production flags disabled, then set:
 
 ```text
-TWILIO_CERTIFICATION_VOICE_OVERRIDE=Sadachbia
+TWILIO_CERTIFICATION_VOICE_OVERRIDE=Laomedeia
 TWILIO_CERTIFICATION_CALL_ON_STARTUP=true
 TWILIO_CERTIFICATION_DIRECTION=outbound-test
-TWILIO_CERTIFICATION_MAX_SECONDS=35
+TWILIO_CERTIFICATION_MAX_SECONDS=180
 ```
+
+For this retest, audition **Laomedeia first** and **Sadachbia second** using the same script. This override affects only the outbound audition; do not replace the tenant production voice until the owner has listened and selected a winner.
 
 After Twilio creates the call, immediately return `TWILIO_CERTIFICATION_CALL_ON_STARTUP=false`.
 

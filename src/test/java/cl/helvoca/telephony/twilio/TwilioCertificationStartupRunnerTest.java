@@ -39,6 +39,16 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
+    void startupRunnerSendsThreeMinuteProviderLimitSeparatelyFromRingingTimeout() {
+        String body = TwilioCertificationStartupRunner.callBody(
+                "+56912345678", "+14355652512",
+                "https://example.test/voice", "https://example.test/status", 180);
+
+        assertTrue(body.contains("Timeout=25"));
+        assertTrue(body.contains("TimeLimit=180"));
+    }
+
+    @Test
     void maskedCertificationLogNumbersNeverDiscloseFullNumbers() {
         assertEquals("***", TwilioCertificationStartupRunner.mask(null));
         assertEquals("***", TwilioCertificationStartupRunner.mask(""));
