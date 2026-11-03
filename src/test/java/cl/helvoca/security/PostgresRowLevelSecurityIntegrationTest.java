@@ -1,8 +1,14 @@
 package cl.helvoca.security;
 
+import cl.helvoca.ai.gemini.GeminiLiveVoiceProvider;
+import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.onboarding.BusinessImportAiUsageLedger;
+import cl.helvoca.voice.VoiceAiSession;
+import cl.helvoca.voice.VoiceTransportSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,8 +24,10 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.net.http.WebSocket;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -52,6 +60,8 @@ class PostgresRowLevelSecurityIntegrationTest {
 
     @Autowired JdbcTemplate runtimeJdbc;
     @Autowired TenantDatabaseContext databaseContext;
+    @Autowired GeminiLiveVoiceProvider geminiProvider;
+    @Autowired CallTranscriptService transcripts;
     @Autowired @Qualifier("migrationDataSource") DataSource migrationDataSource;
     JdbcTemplate ownerJdbc;
 
@@ -94,6 +104,52 @@ class PostgresRowLevelSecurityIntegrationTest {
         assertNotNull(roleId, "baseline migrations must seed at least one role");
         ownerJdbc.update("INSERT INTO user_role(user_id, role_id) VALUES (?, ?)", userA, roleId);
         ownerJdbc.update("INSERT INTO user_role(user_id, role_id) VALUES (?, ?)", userB, roleId);
+    }
+
+    @Test
+    void geminiWebSocketCallbacksPersistWithinPinnedTenantOnExecutorThreads() throws Exception {
+        UUID callId = insertProjectionCall(businessA);
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessA, null, "+56911111111", "+56999999999", "MZ-rls-" + UUID.randomUUID());
+        VoiceAiSession session = geminiProvider.createSession(
+                context, org.mockito.Mockito.mock(VoiceTransportSession.class));
+        WebSocket.Listener listener = (WebSocket.Listener) session;
+        WebSocket socket = org.mockito.Mockito.mock(WebSocket.class);
+        String setupComplete = new JSONObject()
+                .put("setupComplete", new JSONObject())
+                .toString();
+        String transcriptTurn = new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject()
+                                .put("text", "Necesito una hora para medicina general."))
+                        .put("turnComplete", true))
+                .toString();
+
+        TenantDatabaseContext.Mode modeAfterCallbacks = CompletableFuture.supplyAsync(() -> {
+            listener.onText(socket, setupComplete, true);
+            listener.onText(socket, transcriptTurn, true);
+            return databaseContext.currentOrDenied().mode();
+        }).get(15, TimeUnit.SECONDS);
+
+        assertEquals(TenantDatabaseContext.Mode.DENIED, modeAfterCallbacks,
+                "the callback executor must not retain tenant scope after processing");
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM call_session WHERE id = ? AND ai_setup_completed_at IS NOT NULL",
+                Long.class, callId),
+                "Gemini setup milestone must persist for the bound call");
+        assertEquals(1L, ownerJdbc.queryForObject(
+                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ? AND speaker = 'USER'",
+                Long.class, callId),
+                "the asynchronous Gemini transcript must persist for the bound tenant");
+        assertEquals(1L, databaseContext.callAsTenant(businessA, () -> runtimeJdbc.queryForObject(
+                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
+                Long.class, callId)));
+        assertEquals(0L, databaseContext.callAsTenant(businessB, () -> runtimeJdbc.queryForObject(
+                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
+                Long.class, callId)),
+                "another tenant must not see the transcript");
+        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessB,
+                () -> transcripts.append(callId, "USER", "foreign tenant write")));
     }
 
     @Test
