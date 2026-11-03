@@ -144,8 +144,9 @@ class TwilioCertificationCommandCallLauncherTest {
                 properties(), "+14355652512", "+56966939611", "+56966939611",
                 "+56975856664", configuredSeconds, mock(TwilioCallControl.class), http);
 
-        assertEquals(expectedSeconds <= TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS,
-                launcher.durationWithinDemoLimit());
+        assertEquals(configuredSeconds <= TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS,
+                launcher.durationWithinDemoLimit(),
+                "Worker must reject a configured duration above the DEMO maximum before calling Twilio");
 
         assertEquals(CALL_SID, launcher.launch(TOKEN));
         HttpRequest request = observedRequest.get();

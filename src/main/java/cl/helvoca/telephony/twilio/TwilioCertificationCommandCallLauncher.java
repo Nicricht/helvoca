@@ -29,6 +29,7 @@ public class TwilioCertificationCommandCallLauncher {
     private final String allowedTo;
     private final String forbiddenTo;
     private final int maxSeconds;
+    private final int requestedMaxSeconds;
     private final TwilioCallControl callControl;
     private final HttpClient http;
 
@@ -59,6 +60,7 @@ public class TwilioCertificationCommandCallLauncher {
         this.to = to;
         this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
+        this.requestedMaxSeconds = maxSeconds;
         this.maxSeconds = Math.max(20, Math.min(maxSeconds, MAX_DEMO_DURATION_SECONDS));
         this.callControl = callControl;
         this.http = http;
@@ -134,7 +136,7 @@ public class TwilioCertificationCommandCallLauncher {
     }
 
     boolean durationWithinDemoLimit() {
-        return maxSeconds <= MAX_DEMO_DURATION_SECONDS;
+        return requestedMaxSeconds <= MAX_DEMO_DURATION_SECONDS;
     }
 
     private void scheduleSafetyHangup(String callSid) {
