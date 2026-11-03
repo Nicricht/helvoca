@@ -109,6 +109,7 @@ class PostgresRowLevelSecurityIntegrationTest {
     @Test
     void geminiWebSocketCallbacksPersistWithinPinnedTenantOnExecutorThreads() throws Exception {
         UUID callId = insertProjectionCall(businessA);
+        ownerJdbc.update("UPDATE call_session SET direction = 'INBOUND', status = 'COMPLETED' WHERE id = ?", callId);
         RealtimeCallContext context = new RealtimeCallContext(
                 callId, businessA, null, "+56911111111", "+56999999999", "MZ-rls-" + UUID.randomUUID());
         VoiceAiSession session = geminiProvider.createSession(
@@ -133,23 +134,25 @@ class PostgresRowLevelSecurityIntegrationTest {
 
         assertEquals(TenantDatabaseContext.Mode.DENIED, modeAfterCallbacks,
                 "the callback executor must not retain tenant scope after processing");
-        assertEquals(1L, ownerJdbc.queryForObject(
-                "SELECT COUNT(*) FROM call_session WHERE id = ? AND ai_setup_completed_at IS NOT NULL",
-                Long.class, callId),
-                "Gemini setup milestone must persist for the bound call");
-        assertEquals(1L, ownerJdbc.queryForObject(
-                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ? AND speaker = 'USER'",
-                Long.class, callId),
-                "the asynchronous Gemini transcript must persist for the bound tenant");
-        assertEquals(1L, databaseContext.callAsTenant(businessA, () -> runtimeJdbc.queryForObject(
-                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
-                Long.class, callId)));
-        assertEquals(0L, databaseContext.callAsTenant(businessB, () -> runtimeJdbc.queryForObject(
-                "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
-                Long.class, callId)),
-                "another tenant must not see the transcript");
-        assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessB,
-                () -> transcripts.append(callId, "USER", "foreign tenant write")));
+        org.junit.jupiter.api.Assertions.assertAll(
+                "Gemini callback tenant persistence",
+                () -> assertEquals(1L, ownerJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_session WHERE id = ? AND ai_setup_completed_at IS NOT NULL",
+                        Long.class, callId),
+                        "Gemini setup milestone must persist for the bound call"),
+                () -> assertEquals(1L, ownerJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_transcript WHERE call_id = ? AND speaker = 'USER'",
+                        Long.class, callId),
+                        "the asynchronous Gemini transcript must persist for the bound tenant"),
+                () -> assertEquals(1L, databaseContext.callAsTenant(businessA, () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
+                        Long.class, callId))),
+                () -> assertEquals(0L, databaseContext.callAsTenant(businessB, () -> runtimeJdbc.queryForObject(
+                        "SELECT COUNT(*) FROM call_transcript WHERE call_id = ?",
+                        Long.class, callId)),
+                        "another tenant must not see the transcript"),
+                () -> assertThrows(DataAccessException.class, () -> databaseContext.runAsTenant(businessB,
+                        () -> transcripts.append(callId, "USER", "foreign tenant write"))));
     }
 
     @Test
