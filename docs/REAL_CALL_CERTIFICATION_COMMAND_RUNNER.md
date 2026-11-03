@@ -333,3 +333,15 @@ The owner expressly retains one `PLATFORM_ADMIN` for V1. The existing two-human 
 - **No phone calls are enabled merely by deploying or registering.** Route and runner remain separately disabled until signed Twilio ingress, independent callback/phone attestation, voice/Gemini readiness, consent, verified carrier-side 180-second limit, aggregate Twilio+Gemini <= USD 5 hard cap, <=2 call attempts and a STOP plan pass in the isolated tenant. Do not touch the unrelated 2512 number or activate globally. After the one authorized call, record the real CallSid, terminal outcome, persisted fictional booking and actual spend, then turn temporary switches OFF.
 
 **Current acceptance:** Code is in DRAFT PR #853 and not merged or deployed. PostgreSQL/CI for the final new implementation have not been reported terminal-green in this section. Webhooks for …6780, runtime credentials, aggregate hard cost cap and any real CallSid remain independently unverified. The correct state is `NO-GO` for the live call until these precise gates are closed.
+
+## Startup runner callback URL selection · 2026-11-03
+
+The startup runner has two internal direction values for its Twilio voice URL:
+
+- `inbound-certification` selects `/webhooks/v1/twilio/inbound-certification`.
+- `outbound-test` (including unknown or absent direction values after normalization) selects `/webhooks/v1/twilio/outbound-test`.
+- Both paths retain the separate `/webhooks/v1/twilio/status` status callback and the configured provider-side `TimeLimit`.
+
+The regression test `TwilioCertificationStartupRunnerTest.createCallUsesInboundCertificationWebhookForInboundDirection` captures the form body at a mocked `HttpClient` boundary and asserts the inbound URL. The neighboring outbound contract test asserts the authenticated request, status callback, ringing timeout and 180-second provider limit. These are local provider-contract tests only: the mock does not contact Twilio, enable the inbound webhook, prove carrier acceptance, start Gemini, or establish a real call.
+
+This note records URL-selection behavior and test scope; it does **not** change the operator procedure or authorize any flag change. Keep the startup runner, certification ingress, Aurora DEMO route and Gemini flags OFF unless a separate release authorization and all existing gates are satisfied. No further Aurora call is part of this test work.
