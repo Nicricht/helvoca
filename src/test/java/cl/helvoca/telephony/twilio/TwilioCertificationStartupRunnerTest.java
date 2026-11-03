@@ -102,6 +102,19 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
+    void createCallUsesInboundCertificationWebhookForInboundDirection() throws Exception {
+        HttpClient http = mock(HttpClient.class);
+        AtomicReference<HttpRequest> capturedRequest = new AtomicReference<>();
+        stubProviderResponse(http, 201, "{\"sid\":\"" + CALL_SID + "\"}", capturedRequest);
+
+        assertEquals(CALL_SID, invokeCreateCall(runnerWithHttp(http, "inbound-certification")));
+
+        String body = publishedBody(capturedRequest.get());
+        assertTrue(body.contains(
+                "Url=https%3A%2F%2Faurora.example%2Fwebhooks%2Fv1%2Ftwilio%2Finbound-certification"));
+    }
+
+    @Test
     void createCallRejectsNonSuccessfulProviderResponsesWithoutLeakingProviderBody() throws Exception {
         for (int status : new int[]{100, 503}) {
             HttpClient http = mock(HttpClient.class);
@@ -200,9 +213,13 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     private static TwilioCertificationStartupRunner runnerWithHttp(HttpClient http) throws Exception {
+        return runnerWithHttp(http, "outbound-test");
+    }
+
+    private static TwilioCertificationStartupRunner runnerWithHttp(HttpClient http, String direction) throws Exception {
         TwilioCertificationStartupRunner runner = new TwilioCertificationStartupRunner(
                 false, ACCOUNT_SID, AUTH_TOKEN, FROM, TO, BASE_URL, TO, "+15550000000",
-                180, "outbound-test", "", "", mock(TwilioCallControl.class));
+                180, direction, "", "", mock(TwilioCallControl.class));
         Field httpField = TwilioCertificationStartupRunner.class.getDeclaredField("http");
         httpField.setAccessible(true);
         httpField.set(runner, http);
