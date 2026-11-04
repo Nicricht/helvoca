@@ -270,4 +270,21 @@ class TwilioCertificationCommandStoreTest {
                 "11111111-1111-1111-1111-111111111111",
                 "CA0123456789abcdef0123456789abcdef"));
     }
+
+    @Test
+    void genericClaimQueryExcludesChatGptAuroraCommands() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
+                .thenReturn(List.of());
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertTrue(store.claimNext().isEmpty());
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any());
+        assertTrue(sql.getValue().contains("requested_by NOT LIKE 'chatgpt-aurora:%'"),
+                "the generic certification worker must never claim ChatGPT-scoped call commands");
+    }
+
 }
