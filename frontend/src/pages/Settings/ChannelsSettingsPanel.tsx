@@ -876,7 +876,8 @@ export function ChannelsSettingsPanel({
                       className="button primary"
                       type="button"
                       disabled={!coexistenceSession || coexistenceSession.wabaId !== selectedWaba
-                        || coexistenceSession.phoneNumberId !== selectedMetaPhone}
+                        || (coexistenceSession.phoneNumberId != null
+                          && coexistenceSession.phoneNumberId !== selectedMetaPhone)}
                       onClick={finalizeCoexistencePhone}
                     >
                       Verificar y preparar coexistencia
