@@ -13,14 +13,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
 @Component
 public class TwilioCertificationCommandCallLauncher {
-    static final int MAX_DEMO_DURATION_SECONDS = 180;
     private static final Pattern E164 = Pattern.compile("^\\+[1-9][0-9]{7,14}$");
 
     private final TwilioProperties twilio;
@@ -28,9 +24,6 @@ public class TwilioCertificationCommandCallLauncher {
     private final String to;
     private final String allowedTo;
     private final String forbiddenTo;
-    private final int maxSeconds;
-    private final int requestedMaxSeconds;
-    private final TwilioCallControl callControl;
     private final HttpClient http;
 
     @Autowired
@@ -39,10 +32,8 @@ public class TwilioCertificationCommandCallLauncher {
             @Value("${TWILIO_TEST_FROM:}") String from,
             @Value("${TWILIO_TEST_TO:}") String to,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedTo,
-            @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
-            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:180}") int maxSeconds,
-            TwilioCallControl callControl) {
-        this(twilio, from, to, allowedTo, forbiddenTo, maxSeconds, callControl,
+            @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo) {
+        this(twilio, from, to, allowedTo, forbiddenTo,
                 HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build());
     }
 
@@ -52,17 +43,12 @@ public class TwilioCertificationCommandCallLauncher {
             String to,
             String allowedTo,
             String forbiddenTo,
-            int maxSeconds,
-            TwilioCallControl callControl,
             HttpClient http) {
         this.twilio = twilio;
         this.from = from;
         this.to = to;
         this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
-        this.requestedMaxSeconds = maxSeconds;
-        this.maxSeconds = Math.max(20, Math.min(maxSeconds, MAX_DEMO_DURATION_SECONDS));
-        this.callControl = callControl;
         this.http = http;
     }
 
@@ -87,8 +73,7 @@ public class TwilioCertificationCommandCallLauncher {
                 + "&" + form("StatusCallbackEvent", "ringing")
                 + "&" + form("StatusCallbackEvent", "answered")
                 + "&" + form("StatusCallbackEvent", "completed")
-                + "&" + form("Timeout", "25")
-                + "&" + form("TimeLimit", Integer.toString(maxSeconds));
+                + "&" + form("Timeout", "25");
 
         String basic = Base64.getEncoder().encodeToString(
                 (twilio.getAccountSid().trim() + ":" + twilio.getAuthToken().trim())
@@ -111,7 +96,6 @@ public class TwilioCertificationCommandCallLauncher {
         if (!TwilioCertificationCommandStore.validCallSid(callSid)) {
             throw new IllegalStateException("Twilio create call returned no valid CallSid");
         }
-        scheduleSafetyHangup(callSid);
         return callSid;
     }
 
@@ -133,22 +117,6 @@ public class TwilioCertificationCommandCallLauncher {
                 && E164.matcher(to.trim()).matches()
                 && TwilioCertificationStartupRunner.isAllowedTarget(to, allowedTo)
                 && !TwilioCertificationStartupRunner.isForbiddenTarget(to, forbiddenTo);
-    }
-
-    boolean durationWithinDemoLimit() {
-        return requestedMaxSeconds <= MAX_DEMO_DURATION_SECONDS;
-    }
-
-    private void scheduleSafetyHangup(String callSid) {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "twilio-certification-command-hangup");
-            t.setDaemon(true);
-            return t;
-        });
-        scheduler.schedule(() -> {
-            callControl.hangup(twilio.getAccountSid().trim(), callSid);
-            scheduler.shutdown();
-        }, maxSeconds, TimeUnit.SECONDS);
     }
 
     private static String form(String key, String value) {
