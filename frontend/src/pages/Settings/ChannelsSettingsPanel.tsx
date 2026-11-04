@@ -451,7 +451,8 @@ export function ChannelsSettingsPanel({
     if (!selectedWaba || !selectedMetaPhone || metaActionLock.current) return;
     if (existingBusinessApp && (!coexistenceSession
       || coexistenceSession.wabaId !== selectedWaba
-      || coexistenceSession.phoneNumberId !== selectedMetaPhone)) {
+      || (coexistenceSession.phoneNumberId != null
+        && coexistenceSession.phoneNumberId !== selectedMetaPhone))) {
       setMetaMessage("Meta todavía no confirmó la coexistencia de este número. No se realizará ningún registro.");
       return;
     }
@@ -462,7 +463,9 @@ export function ChannelsSettingsPanel({
       if (result.state !== "PHONE_NUMBER_VALIDATED") throw new Error("Meta phone validation failed");
       setValidatedMetaPhone(true);
       setPin("");
-      setMetaMessage("Número validado. Ingresa un PIN de seis dígitos para finalizar.");
+      setMetaMessage(existingBusinessApp
+        ? "Número validado. La comprobación final conservará WhatsApp Business en el celular."
+        : "Número validado. Ingresa un PIN de seis dígitos para finalizar.");
     } catch (error) {
       setValidatedMetaPhone(false);
       setMetaMessage(errorMessage(error, "No pudimos validar ese número."));
