@@ -362,3 +362,12 @@ The startup runner has two internal direction values for its Twilio voice URL:
 The regression test `TwilioCertificationStartupRunnerTest.createCallUsesInboundCertificationWebhookForInboundDirection` captures the form body at a mocked `HttpClient` boundary and asserts the inbound URL. The neighboring outbound contract test asserts the authenticated request, status callback and ringing timeout while verifying that no provider-side `TimeLimit` is sent. These are local provider-contract tests only: the mock does not contact Twilio, enable the inbound webhook, prove carrier acceptance, start Gemini, or establish a real call.
 
 This note records URL-selection behavior and test scope; it does **not** change the operator procedure or authorize any flag change. Keep the startup runner, certification ingress, Aurora DEMO route and Gemini flags OFF unless a separate release authorization and all existing gates are satisfied. No further Aurora call is part of this test work.
+
+
+## Startup runner scheduler coverage follow-up · 2026-11-04
+
+The exact-HEAD differential Java coverage report identified one uncovered executable line and one uncovered synthetic method in the delayed startup-runner success task (`TwilioCertificationStartupRunner.java`). The report was `323/324` changed executable lines and `92/93` changed methods, with all changed branches covered.
+
+A package-visible kickoff-executor factory now makes the delayed task deterministic in tests. `TwilioCertificationStartupRunnerTest.startupKickoffLogsCreatedCallAndShutsDownSchedulerAfterSuccessfulCall` captures and invokes the scheduled task synchronously using a mocked Twilio HTTP response, then verifies the HTTP boundary and executor shutdown. `kickoffExecutorCreatesDaemonWorkerThread` exercises the default scheduler factory and its daemon-thread behavior.
+
+These are local tests only. They do not make a real Twilio request, enable a runner, place a call, or change the Aurora environment. Exact-HEAD CI must still prove the differential line, branch and method gates at 100%.
