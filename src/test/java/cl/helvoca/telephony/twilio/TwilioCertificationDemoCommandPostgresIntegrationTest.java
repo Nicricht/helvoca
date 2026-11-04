@@ -27,7 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 class TwilioCertificationDemoCommandPostgresIntegrationTest {
     @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
+            System.getProperty("helvoca.test.postgres.image", "postgres:18-alpine"));
 
     @DynamicPropertySource
     static void configure(DynamicPropertyRegistry r) {
@@ -134,6 +135,13 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
     void genericWorkerNeverClaimsChatGptAuroraScopedCommand() {
         UUID demo = UUID.randomUUID();
         JdbcTemplate owner = new JdbcTemplate(migrationDataSource);
+        owner.update("""
+                UPDATE twilio_certification_command
+                   SET status = 'FAILED',
+                       failure_reason = 'isolated test reset',
+                       completed_at = CURRENT_TIMESTAMP
+                 WHERE status = 'PENDING'
+                """);
         owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Synthetic ChatGPT isolation','DEMO')", demo);
         String runId = "chatgpt-aurora-" + UUID.randomUUID();
         String actor = "chatgpt-aurora:" + UUID.randomUUID();
@@ -145,5 +153,39 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
 
         assertEquals("PENDING", scope.callAsSystem(() -> commands.find(runId).orElseThrow().status()));
     }
+
+
+    @Test
+    void dedicatedWorkerClaimsOnlyChatGptCommandsAndRevocationCancelsOnlyPendingTenantCommands() {
+        UUID demo = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        JdbcTemplate owner = new JdbcTemplate(migrationDataSource);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Synthetic ChatGPT tenant','DEMO')", demo);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Other ChatGPT tenant','DEMO')", other);
+
+        String chatGptRun = "chatgpt-aurora-" + UUID.randomUUID();
+        String ordinaryRun = "ordinary-run-" + UUID.randomUUID();
+        String pendingChatGptRun = "chatgpt-aurora-" + UUID.randomUUID();
+        String otherTenantChatGptRun = "chatgpt-aurora-" + UUID.randomUUID();
+        scope.runAsSystem(() -> {
+            assertTrue(commands.enqueue(chatGptRun, "chatgpt-aurora:" + UUID.randomUUID(), demo));
+            assertTrue(commands.enqueue(ordinaryRun, "platform-admin", demo));
+            assertTrue(commands.enqueue(pendingChatGptRun, "chatgpt-aurora:" + UUID.randomUUID(), demo));
+            assertTrue(commands.enqueue(otherTenantChatGptRun, "chatgpt-aurora:" + UUID.randomUUID(), other));
+        });
+
+        var claimed = scope.callAsSystem(commands::claimNextForChatGptAurora).orElseThrow();
+        assertEquals(chatGptRun, claimed.runId());
+        assertEquals("PENDING", scope.callAsSystem(() -> commands.find(ordinaryRun).orElseThrow().status()));
+        assertTrue(scope.callAsSystem(() -> commands.findForChatGptAurora(chatGptRun, demo)).isPresent());
+        assertTrue(scope.callAsSystem(() -> commands.findForChatGptAurora(ordinaryRun, demo)).isEmpty());
+        assertTrue(scope.callAsSystem(() -> commands.findForChatGptAurora(chatGptRun, other)).isEmpty());
+
+        assertEquals(1, scope.callAsSystem(() -> commands.cancelPendingChatGptAurora(demo)));
+        assertEquals("FAILED", scope.callAsSystem(() -> commands.find(pendingChatGptRun).orElseThrow().status()));
+        assertEquals("PENDING", scope.callAsSystem(() -> commands.find(otherTenantChatGptRun).orElseThrow().status()));
+        assertEquals("CLAIMED", scope.callAsSystem(() -> commands.find(chatGptRun).orElseThrow().status()));
+    }
+
 
 }
