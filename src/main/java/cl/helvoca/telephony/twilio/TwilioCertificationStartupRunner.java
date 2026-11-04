@@ -111,11 +111,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             return;
         }
 
-        ScheduledExecutorService kickoff = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "twilio-certification-kickoff");
-            t.setDaemon(true);
-            return t;
-        });
+        ScheduledExecutorService kickoff = createKickoffExecutor();
         log.info(
                 "TWILIO_CERTIFICATION_CALL armed; direction={} provider_override={} voice_override={} starting in {} seconds after deployment cutover",
                 direction,
@@ -139,6 +135,14 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 kickoff.shutdown();
             }
         }, START_DELAY_SECONDS, TimeUnit.SECONDS);
+    }
+
+    ScheduledExecutorService createKickoffExecutor() {
+        return Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "twilio-certification-kickoff");
+            t.setDaemon(true);
+            return t;
+        });
     }
 
     private String createCall() throws Exception {
