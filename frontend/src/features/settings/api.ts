@@ -191,6 +191,7 @@ export interface MetaWhatsAppStatus {
 export interface MetaWhatsAppBootstrap {
   enabled: boolean;
   available: boolean;
+  coexistenceAvailable?: boolean;
   appId?: string | null;
   configId?: string | null;
   graphApiVersion?: string | null;
@@ -549,6 +550,15 @@ export function finalizeMetaPhoneNumber(wabaId: string, phoneNumberId: string, p
     method: "POST",
     body: JSON.stringify({ wabaId, phoneNumberId, pin })
   });
+}
+
+export function stageMetaCoexistence(wabaId: string, phoneNumberId: string) {
+  return apiRequest<MetaPhoneFinalizeResult>(
+    "/api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/coexistence/stage", {
+      method: "POST",
+      body: JSON.stringify({ wabaId, phoneNumberId })
+    }
+  );
 }
 
 export function getMetaCertificationReadiness() {
