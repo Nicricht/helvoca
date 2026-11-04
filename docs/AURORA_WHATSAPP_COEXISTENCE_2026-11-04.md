@@ -8,10 +8,17 @@
 - No usar números de voz …6780 / ajeno …2512 ni el contacto distinto …2585.
 - No confundir antigüedad informada con elegibilidad aprobada por Meta. Meta puede requerir actividad reciente y rechazar el número.
 
+## Requisitos Meta actuales (verificados 2026-11-04)
+
+- Embedded Signup v2/v3 terminó su fecha de retiro el **15-oct-2026**. La configuración de producción para nuevas conexiones debe ser Embedded Signup **v4** (Facebook Login for Business / WhatsApp Embedded Signup), no reutilizar un config_id antiguo.
+- El selector de coexistencia para Business App sigue siendo `featureType: whatsapp_business_app_onboarding`. El flujo v4 puede omitir `phone_number_id` en el evento final; la UI conserva el WABA de la sesión y luego debe encontrar el número en el descubrimiento de ese WABA y verificarlo contra Graph y allowlist.
+- La configuración v4 se crea en Meta App Dashboard: Facebook Login for Business → Configurations → WhatsApp Embedded Signup; productos WhatsApp Cloud API, asset WhatsApp accounts, permisos `whatsapp_business_management` y `whatsapp_business_messaging`; usar un system-user token en el lado servidor. La configuración v4 entrega un nuevo config_id. El código nunca debe recibir app secret/system-user token en el navegador.
+- La app debe estar aprobada para los permisos y en modo Live, y la empresa debe estar autorizada como Tech Provider/Solution Partner según el onboarding que se habilite.
+
 ## Diseño implementado en el PR de preparación
 
 - La pantalla `ChannelsSettingsPanel` ofrece coexistencia como caso distinto del registro tradicional.
-- `FB.login` usa `featureType: whatsapp_business_app_onboarding` y captura solo el evento `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` desde origen Meta, nunca un `FINISH` genérico.
+- `FB.login` usa `featureType: whatsapp_business_app_onboarding` y captura solo el evento `FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING` desde origen Meta, nunca un `FINISH` genérico. El teléfono del evento es opcional; cuando falta, el WABA se enlaza a la sesión y el número se selecciona desde su lista, con comprobación posterior contra Meta y allowlist.
 - El endpoint `POST /api/v1/channels/whatsapp/meta/embedded-signup/waba/phone-number/coexistence/stage` requiere sesión `BUSINESS_ADMIN`, tenant allowlisted y teléfono exacto allowlisted.
 - El backend consulta a Meta **sin mutación** `GET /{phone_number_id}?fields=display_phone_number,is_on_biz_app,platform_type`. Solo acepta `is_on_biz_app=true` y `platform_type=CLOUD_API`, comprueba el número contra allowlist y pertenencia a WABA antes de crear/vincular un registro Helvoca, siempre disabled.
 - La ruta coexistencia **nunca** llama a `/{phone_number_id}/register` ni pide PIN de registro.
@@ -46,7 +53,7 @@ El titular debe realizar el Embedded Signup con su Meta Business Portfolio, conf
 
 ## Estado en este checkpoint
 
-`CODE_PROPOSED_DRAFT`; `CI=NOT_VERIFIED`; `DEPLOYMENT=NOT_PERFORMED`; `META_BUSINESS_APP_ELIGIBILITY=NOT_VERIFIED`; `META_AUTHENTICATED_SESSION=UNAVAILABLE`; `SENDER_LINKED=NO_EVIDENCE`; `REAL_DELIVERY=NOT_TESTED`.
+`CODE_PROPOSED_DRAFT`; `CI=NOT_VERIFIED`; `META_V4_CONFIG=NOT_CREATED_OR_NOT_PROVIDED`; `DEPLOYMENT=NOT_PERFORMED`; `META_BUSINESS_APP_ELIGIBILITY=NOT_VERIFIED`; `META_AUTHENTICATED_SESSION=UNAVAILABLE`; `SENDER_LINKED=NO_EVIDENCE`; `REAL_DELIVERY=NOT_TESTED`.
 
 Referencias para contrato de Meta:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users
