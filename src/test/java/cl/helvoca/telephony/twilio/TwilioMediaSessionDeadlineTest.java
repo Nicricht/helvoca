@@ -13,6 +13,17 @@ import static org.mockito.Mockito.*;
 class TwilioMediaSessionDeadlineTest {
 
     @Test
+    void configuredConstructorDisablesDeadlineAtZeroAndEnablesEmergencyOverrideWhenPositive() {
+        TwilioMediaSessionDeadline disabled = new TwilioMediaSessionDeadline(0);
+        assertNull(disabled.schedule(() -> fail("zero must disable the wall-clock deadline")));
+        disabled.stop();
+
+        TwilioMediaSessionDeadline emergency = new TwilioMediaSessionDeadline(30);
+        assertNotNull(emergency.schedule(() -> { }));
+        emergency.stop();
+    }
+
+    @Test
     void schedulesAtConfiguredBoundWithoutExecutingEarly() {
         ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
         @SuppressWarnings("unchecked")
