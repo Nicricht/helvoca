@@ -2,6 +2,14 @@
 
 RecepVoz supports a persistent, fail-closed command runner for authorized real-call certification. As of the DEMO tenant binding change, an unbound command cannot be claimed.
 
+## Coverage follow-up · 2026-11-04
+
+The first exact-HEAD CI run after removing the 180-second application cutoff passed Fast Gate, Golden Journey, system integration and PostgreSQL compatibility, but differential Java coverage reported two uncovered branch outcomes in the optional emergency media-deadline paths. Regression tests were added for both:
+- The Spring-configured `TwilioMediaSessionDeadline(int)` constructor at disabled (`0`) and enabled emergency-override values.
+- A WebSocket closing synchronously during AI startup while the deadline is disabled, exercising the null-deadline cancellation branch.
+
+The next exact-HEAD CI run is authoritative for whether these branches are now fully covered. Do not declare QA complete until the protected Full Gate and differential Java coverage finish successfully.
+
 ## Current call-duration policy (2026-11-04)
 
 - The command runner and one-shot startup runner do not send Twilio `TimeLimit` and do not schedule a hangup based on elapsed call time.
