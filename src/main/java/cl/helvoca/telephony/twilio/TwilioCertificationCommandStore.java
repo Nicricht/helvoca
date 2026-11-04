@@ -52,17 +52,22 @@ public class TwilioCertificationCommandStore {
                        expires_at, provider_call_sid, completed_at, failure_reason
                   FROM twilio_certification_command
                  WHERE run_id = ?
-                """, (rs, rowNum) -> new CommandStatus(
-                        rs.getString("run_id"),
-                        rs.getString("status"),
-                        rs.getString("requested_by"),
-                        instant(rs.getTimestamp("requested_at")),
-                        instant(rs.getTimestamp("claimed_at")),
-                        instant(rs.getTimestamp("expires_at")),
-                        rs.getString("provider_call_sid"),
-                        instant(rs.getTimestamp("completed_at")),
-                        rs.getString("failure_reason")),
-                runId.trim());
+                """, TwilioCertificationCommandStore::commandStatus, runId.trim());
+        return rows.stream().findFirst();
+    }
+
+    public Optional<CommandStatus> findForChatGptAurora(String runId, UUID businessId) {
+        if (!validRunId(runId) || !runId.trim().startsWith("chatgpt-aurora-") || businessId == null) {
+            return Optional.empty();
+        }
+        List<CommandStatus> rows = jdbc.query("""
+                SELECT run_id, status, requested_by, requested_at, claimed_at,
+                       expires_at, provider_call_sid, completed_at, failure_reason
+                  FROM twilio_certification_command
+                 WHERE run_id = ?
+                   AND business_id = ?
+                   AND requested_by LIKE 'chatgpt-aurora:%'
+                """, TwilioCertificationCommandStore::commandStatus, runId.trim(), businessId);
         return rows.stream().findFirst();
     }
 
@@ -78,13 +83,25 @@ public class TwilioCertificationCommandStore {
     }
 
     public Optional<ClaimedCommand> claimNext() {
+        return claimNextForActorScope(false);
+    }
+
+    public Optional<ClaimedCommand> claimNextForChatGptAurora() {
+        return claimNextForActorScope(true);
+    }
+
+    private Optional<ClaimedCommand> claimNextForActorScope(boolean chatGptAuroraOnly) {
         String token = UUID.randomUUID().toString();
-        List<ClaimedCommand> rows = jdbc.query("""
+        String actorPredicate = chatGptAuroraOnly
+                ? "c.requested_by LIKE 'chatgpt-aurora:%'"
+                : "c.requested_by NOT LIKE 'chatgpt-aurora:%'";
+        String sql = """
                 WITH next_command AS (
                     SELECT c.run_id, c.business_id
                     FROM twilio_certification_command c
                     WHERE c.status = 'PENDING'
                       AND c.business_id IS NOT NULL
+                      AND %s
                     ORDER BY c.requested_at, c.run_id
                     FOR UPDATE OF c SKIP LOCKED
                     LIMIT 1
@@ -98,13 +115,27 @@ public class TwilioCertificationCommandStore {
                 WHERE c.run_id = n.run_id
                   AND c.status = 'PENDING'
                 RETURNING c.run_id, c.business_id
-                """,
+                """.formatted(actorPredicate);
+        List<ClaimedCommand> rows = jdbc.query(sql,
                 (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
                         rs.getObject(2, UUID.class)),
                 token,
                 TOKEN_TTL.toSeconds());
         if (rows.isEmpty()) return Optional.empty();
         return Optional.of(rows.getFirst());
+    }
+
+    public int cancelPendingChatGptAurora(UUID businessId) {
+        if (businessId == null) return 0;
+        return jdbc.update("""
+                UPDATE twilio_certification_command
+                   SET status = 'FAILED',
+                       failure_reason = 'ChatGPT integration key revoked before call',
+                       completed_at = CURRENT_TIMESTAMP
+                 WHERE business_id = ?
+                   AND requested_by LIKE 'chatgpt-aurora:%'
+                   AND status = 'PENDING'
+                """, businessId);
     }
 
     public boolean consumeIngressToken(String token, String callSid, UUID businessId) {
@@ -169,6 +200,19 @@ public class TwilioCertificationCommandStore {
 
     static boolean validCallSid(String value) {
         return value != null && CALL_SID.matcher(value.trim()).matches();
+    }
+
+    private static CommandStatus commandStatus(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        return new CommandStatus(
+                rs.getString("run_id"),
+                rs.getString("status"),
+                rs.getString("requested_by"),
+                instant(rs.getTimestamp("requested_at")),
+                instant(rs.getTimestamp("claimed_at")),
+                instant(rs.getTimestamp("expires_at")),
+                rs.getString("provider_call_sid"),
+                instant(rs.getTimestamp("completed_at")),
+                rs.getString("failure_reason"));
     }
 
     private static Instant instant(Timestamp value) {
