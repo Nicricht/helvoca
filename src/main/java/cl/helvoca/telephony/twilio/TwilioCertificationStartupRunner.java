@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  *
  * It exists so a deliberately authorized production test can be initiated
  * from Railway without requiring a human to click Twilio Console. Outbound
- * Every real certification call is bounded by an automatic safety hangup.
+ * Calls remain active until the caller or conversation flow ends them.
  * The target must also match the explicitly configured allowlist value.
  */
 @Component
@@ -51,14 +51,12 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     private final String publicBaseUrl;
     private final String allowedTo;
     private final String forbiddenTo;
-    private final int maxSeconds;
     private final String direction;
     private final boolean providerOverrideValid;
     private final String providerOverride;
     private final boolean voiceOverrideValid;
     private final String voiceOverride;
     private final boolean providerVoiceCombinationValid;
-    private final TwilioCallControl callControl;
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(8))
             .build();
@@ -72,11 +70,9 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             @Value("${TWILIO_PUBLIC_BASE_URL:}") String publicBaseUrl,
             @Value("${TWILIO_CERTIFICATION_ALLOWED_TO:}") String allowedTo,
             @Value("${TWILIO_CERTIFICATION_FORBIDDEN_TO:}") String forbiddenTo,
-            @Value("${TWILIO_CERTIFICATION_MAX_SECONDS:180}") int maxSeconds,
             @Value("${TWILIO_CERTIFICATION_DIRECTION:outbound-test}") String direction,
             @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}") String providerOverride,
-            @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}") String voiceOverride,
-            TwilioCallControl callControl) {
+            @Value("${TWILIO_CERTIFICATION_VOICE_OVERRIDE:}") String voiceOverride) {
         this.enabled = enabled;
         this.accountSid = accountSid;
         this.authToken = authToken;
@@ -85,7 +81,6 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.publicBaseUrl = publicBaseUrl;
         this.allowedTo = allowedTo;
         this.forbiddenTo = forbiddenTo;
-        this.maxSeconds = Math.max(20, Math.min(maxSeconds, TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS));
         this.direction = normalizeDirection(direction);
         this.providerOverrideValid = validProviderOverride(providerOverride, this.direction);
         this.providerOverride = VoiceCallRouter.normalizeCertificationProviderOverride(providerOverride);
@@ -93,7 +88,6 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         this.voiceOverride = VoiceBakeOffCatalog.normalize(voiceOverride);
         this.providerVoiceCombinationValid =
                 validProviderVoiceCombination(providerOverride, voiceOverride, this.direction);
-        this.callControl = callControl;
     }
 
     @Override
@@ -131,15 +125,13 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
             try {
                 String callSid = createCall();
                 log.info(
-                        "TWILIO_CERTIFICATION_CALL CREATED call={} direction={} provider_override={} voice_override={} from={} to={} max_seconds={}",
+                        "TWILIO_CERTIFICATION_CALL CREATED call={} direction={} provider_override={} voice_override={} from={} to={}",
                         callSid,
                         direction,
                         providerOverride == null ? "none" : providerOverride,
                         voiceOverride == null ? "none" : voiceOverride,
                         mask(from),
-                        mask(to),
-                        maxSeconds);
-                scheduleSafetyHangup(callSid);
+                        mask(to));
             } catch (Exception e) {
                 log.error("TWILIO_CERTIFICATION_CALL FAILED direction={} reason={}", direction, rootMessage(e));
             } finally {
@@ -155,7 +147,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 : "/webhooks/v1/twilio/outbound-test");
         String statusUrl = base + "/webhooks/v1/twilio/status";
 
-        String body = callBody(to.trim(), from.trim(), voiceUrl, statusUrl, maxSeconds);
+        String body = callBody(to.trim(), from.trim(), voiceUrl, statusUrl);
 
         String basic = Base64.getEncoder().encodeToString(
                 (accountSid.trim() + ":" + authToken.trim()).getBytes(StandardCharsets.UTF_8));
@@ -176,19 +168,6 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         String sid = json.optString("sid", "");
         if (!sid.startsWith("CA")) throw new IllegalStateException("Twilio create call returned no CallSid");
         return sid;
-    }
-
-    private void scheduleSafetyHangup(String callSid) {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "twilio-certification-hangup");
-            t.setDaemon(true);
-            return t;
-        });
-        scheduler.schedule(() -> {
-            boolean ended = callControl.hangup(accountSid.trim(), callSid);
-            log.info("TWILIO_CERTIFICATION_CALL SAFETY_HANGUP call={} accepted={}", callSid, ended);
-            scheduler.shutdown();
-        }, maxSeconds, TimeUnit.SECONDS);
     }
 
     private boolean validConfiguration() {
@@ -234,11 +213,6 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
         return !("openai-live".equals(normalizedProvider) && hasVoiceOverride);
     }
 
-    static boolean shouldScheduleSafetyHangup(String direction) {
-        String normalized = normalizeDirection(direction);
-        return OUTBOUND_TEST.equals(normalized) || INBOUND_CERTIFICATION.equals(normalized);
-    }
-
     static boolean isAllowedTarget(String target, String allowedTarget) {
         return target != null
                 && allowedTarget != null
@@ -254,7 +228,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
     }
 
     // Package-visible to verify Twilio form encoding without triggering provider calls.
-    static String callBody(String to, String from, String voiceUrl, String statusUrl, int maxSeconds) {
+    static String callBody(String to, String from, String voiceUrl, String statusUrl) {
         return form("To", to)
                 + "&" + form("From", from)
                 + "&" + form("Url", voiceUrl)
@@ -265,8 +239,7 @@ public class TwilioCertificationStartupRunner implements ApplicationRunner {
                 + "&" + form("StatusCallbackEvent", "ringing")
                 + "&" + form("StatusCallbackEvent", "answered")
                 + "&" + form("StatusCallbackEvent", "completed")
-                + "&" + form("Timeout", "25")
-                + "&" + form("TimeLimit", Integer.toString(maxSeconds));
+                + "&" + form("Timeout", "25");
     }
 
     static String form(String key, String value) {
