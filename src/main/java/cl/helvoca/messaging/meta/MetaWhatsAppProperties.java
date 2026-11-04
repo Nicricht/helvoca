@@ -12,6 +12,8 @@ public class MetaWhatsAppProperties {
     private String graphBaseUrl = "https://graph.facebook.com";
     private String verifyToken = "";
     private String appSecret = "";
+    // Deliberately opt-in: standard /register can disconnect an existing Business App.
+    private boolean standardRegistrationEnabled = false;
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
@@ -75,6 +77,14 @@ public class MetaWhatsAppProperties {
 
     public boolean hasAppSecret() {
         return !getAppSecret().isBlank();
+    }
+
+    public boolean isStandardRegistrationEnabled() {
+        return standardRegistrationEnabled;
+    }
+
+    public void setStandardRegistrationEnabled(boolean enabled) {
+        this.standardRegistrationEnabled = enabled;
     }
 
     public boolean isEmbeddedSignupEnabled() {
