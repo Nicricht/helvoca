@@ -120,19 +120,12 @@ class TwilioCertificationCommandCallLauncherTest {
 
 
     @Test
-    void providerEnforcesConfiguredCallDurationSeparatelyFromRingingTimeout() throws Exception {
-        assertProviderTimeLimit(75, 75);
-        assertProviderTimeLimit(180, 180);
-        assertProviderTimeLimit(10, 20);
-        assertProviderTimeLimit(300, 180);
-    }
-
-    private static void assertProviderTimeLimit(int configuredSeconds, int expectedSeconds) throws Exception {
+    void outboundCallDoesNotSetProviderTimeLimit() throws Exception {
         AtomicReference<HttpRequest> observedRequest = new AtomicReference<>();
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(201);
-        when(response.body()).thenReturn("{\"sid\":\"" + CALL_SID + "\"}");
+        when(response.body()).thenReturn("{\\"sid\\":\\"" + CALL_SID + "\\"}");
         when(http.send(any(HttpRequest.class),
                 org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any()))
                 .thenAnswer(invocation -> {
@@ -140,23 +133,15 @@ class TwilioCertificationCommandCallLauncherTest {
                     return response;
                 });
 
-        TwilioCertificationCommandCallLauncher launcher = new TwilioCertificationCommandCallLauncher(
-                properties(), "+14355652512", "+56966939611", "+56966939611",
-                "+56975856664", configuredSeconds, mock(TwilioCallControl.class), http);
-
-        assertEquals(configuredSeconds <= TwilioCertificationCommandCallLauncher.MAX_DEMO_DURATION_SECONDS,
-                launcher.durationWithinDemoLimit(),
-                "Worker must reject a configured duration above the DEMO maximum before calling Twilio");
-
+        TwilioCertificationCommandCallLauncher launcher = launcher(
+                properties(), "+56966939611", "+56966939611", "+56975856664", http);
         assertEquals(CALL_SID, launcher.launch(TOKEN));
-        HttpRequest request = observedRequest.get();
-        assertNotNull(request);
-        assertEquals("POST", request.method());
-        String body = publishedBody(request);
-        assertTrue(Arrays.asList(body.split("&")).contains("TimeLimit=" + expectedSeconds),
-                "Twilio must independently enforce the bounded conversation duration");
+
+        String body = publishedBody(observedRequest.get());
         assertTrue(Arrays.asList(body.split("&")).contains("Timeout=25"),
-                "Ringing timeout is not a conversation time limit");
+                "Ringing timeout remains separate from conversation duration");
+        assertFalse(body.contains("TimeLimit="),
+                "The application must not impose a provider-side call duration limit");
     }
 
     private static String publishedBody(HttpRequest request) throws Exception {
@@ -201,8 +186,6 @@ class TwilioCertificationCommandCallLauncherTest {
                 to,
                 allowedTo,
                 forbiddenTo,
-                150,
-                mock(TwilioCallControl.class),
                 http);
     }
 
