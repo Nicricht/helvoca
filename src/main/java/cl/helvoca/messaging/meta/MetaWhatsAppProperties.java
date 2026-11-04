@@ -14,6 +14,9 @@ public class MetaWhatsAppProperties {
     private String appSecret = "";
     // Deliberately opt-in: standard /register can disconnect an existing Business App.
     private boolean standardRegistrationEnabled = false;
+    private boolean coexistenceEnabled = false;
+    private String coexistenceAllowedBusinessId = "";
+    private String coexistenceAllowedPhone = "";
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
@@ -85,6 +88,30 @@ public class MetaWhatsAppProperties {
 
     public void setStandardRegistrationEnabled(boolean enabled) {
         this.standardRegistrationEnabled = enabled;
+    }
+
+    public boolean isCoexistenceEnabled() {
+        return coexistenceEnabled;
+    }
+
+    public void setCoexistenceEnabled(boolean enabled) {
+        this.coexistenceEnabled = enabled;
+    }
+
+    public String getCoexistenceAllowedBusinessId() {
+        return clean(coexistenceAllowedBusinessId);
+    }
+
+    public void setCoexistenceAllowedBusinessId(String businessId) {
+        this.coexistenceAllowedBusinessId = businessId;
+    }
+
+    public String getCoexistenceAllowedPhone() {
+        return clean(coexistenceAllowedPhone);
+    }
+
+    public void setCoexistenceAllowedPhone(String phone) {
+        this.coexistenceAllowedPhone = phone;
     }
 
     public boolean isEmbeddedSignupEnabled() {
