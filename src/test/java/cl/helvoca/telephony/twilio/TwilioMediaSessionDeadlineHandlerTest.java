@@ -110,6 +110,20 @@ class TwilioMediaSessionDeadlineHandlerTest {
     }
 
     @Test
+    void disabledAbsoluteDeadlineKeepsBoundedCallActiveWithoutSchedulingHangup() throws Exception {
+        handler = new TwilioMediaStreamHandler(signer, providers, health, lifecycle, control,
+                databaseContext, binding, new TwilioMediaSessionDeadline(0, scheduler));
+
+        validStart();
+
+        verify(ai).start();
+        verifyNoInteractions(scheduler, control);
+        handler.afterConnectionClosed(socket, CloseStatus.NORMAL);
+        verify(ai).close();
+        verifyNoInteractions(control);
+    }
+
+    @Test
     void acceptedSignedCallSchedulesRealCutoffAndKillsCarrierAndAiOnce() throws Exception {
         validStart();
         assertNotNull(expiry);

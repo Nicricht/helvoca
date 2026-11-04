@@ -30,7 +30,7 @@ class TwilioCertificationCommandWorkerTest {
     }
 
     @Test
-    void demoDurationLimitFailureStopsBeforeCarrierCall() throws Exception {
+    void certifiedDemoCommandLaunchesWithoutAnApplicationDurationLimit() throws Exception {
         var store = mock(TwilioCertificationCommandStore.class);
         var launcher = mock(TwilioCertificationCommandCallLauncher.class);
         var binding = mock(TwilioCertificationDemoBindingGate.class);
@@ -38,34 +38,16 @@ class TwilioCertificationCommandWorkerTest {
                 "aurora-demo-20261019-002", "22222222-2222-2222-2222-222222222222", UUID.randomUUID());
         when(store.claimNext()).thenReturn(Optional.of(command));
         when(binding.allows(command.businessId())).thenReturn(true);
+        when(launcher.launch(command.callbackToken())).thenReturn("CA" + "b".repeat(32));
         var worker = new TwilioCertificationCommandWorker(true, store, launcher,
                 new TenantDatabaseContext(), binding);
 
         worker.poll();
 
-        verify(launcher).durationWithinDemoLimit();
-        verify(launcher, never()).launch(anyString());
-        verify(store).markFailed(command.runId(), "certification DEMO duration exceeds 180 seconds");
-    }
-
-    @Test
-    void certifiedDemoAndBoundedDurationLaunchesOnce() throws Exception {
-        var store = mock(TwilioCertificationCommandStore.class);
-        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
-        var binding = mock(TwilioCertificationDemoBindingGate.class);
-        var command = new TwilioCertificationCommandStore.ClaimedCommand(
-                "aurora-demo-20261019-003", "33333333-3333-3333-3333-333333333333", UUID.randomUUID());
-        when(store.claimNext()).thenReturn(Optional.of(command));
-        when(binding.allows(command.businessId())).thenReturn(true);
-        when(launcher.durationWithinDemoLimit()).thenReturn(true);
-        when(launcher.launch(command.callbackToken())).thenReturn("CA" + "a".repeat(32));
-        var worker = new TwilioCertificationCommandWorker(true, store, launcher,
-                new TenantDatabaseContext(), binding);
-
-        worker.poll();
-
+        verify(binding).allows(command.businessId());
         verify(launcher).launch(command.callbackToken());
-        verify(store).recordProviderCall(command.runId(), command.callbackToken(), "CA" + "a".repeat(32));
+        verify(store).recordProviderCall(command.runId(), command.callbackToken(), "CA" + "b".repeat(32));
+        verify(store, never()).markFailed(anyString(), anyString());
     }
 
     @Test

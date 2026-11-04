@@ -61,13 +61,13 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
-    void startupRunnerSendsThreeMinuteProviderLimitSeparatelyFromRingingTimeout() {
+    void startupRunnerDoesNotSendAnApplicationDurationLimit() {
         String body = TwilioCertificationStartupRunner.callBody(
                 "+56912345678", "+15551234567",
                 "https://example.test/voice", "https://example.test/status", 180);
 
         assertTrue(body.contains("Timeout=25"));
-        assertTrue(body.contains("TimeLimit=180"));
+        assertFalse(body.contains("TimeLimit="));
     }
 
     @Test
@@ -98,7 +98,7 @@ class TwilioCertificationStartupRunnerTest {
         assertTrue(body.contains(
                 "StatusCallback=https%3A%2F%2Faurora.example%2Fwebhooks%2Fv1%2Ftwilio%2Fstatus"));
         assertTrue(body.contains("Timeout=25"));
-        assertTrue(body.contains("TimeLimit=180"));
+        assertFalse(body.contains("TimeLimit="));
     }
 
     @Test
