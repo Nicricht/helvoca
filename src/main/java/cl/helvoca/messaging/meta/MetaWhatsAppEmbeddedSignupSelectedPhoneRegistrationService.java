@@ -42,6 +42,11 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService {
             String wabaId,
             String phoneNumberId,
             String pin) {
+        // An existing WhatsApp Business App number must use the coexistence path,
+        // never the ordinary Cloud API registration flow.
+        if (!metaProperties.isStandardRegistrationEnabled()) {
+            throw new ConflictException("META_STANDARD_REGISTRATION_DISABLED");
+        }
         MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult validated =
                 validationService.validate(wabaId, phoneNumberId);
 
