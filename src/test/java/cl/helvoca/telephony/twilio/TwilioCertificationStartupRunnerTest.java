@@ -112,7 +112,7 @@ class TwilioCertificationStartupRunnerTest {
         fired.set(false);
         try {
             HttpClient http = mock(HttpClient.class);
-            stubProviderResponse(http, 201, "{\\"sid\\":\\"" + CALL_SID + "\\"}", new AtomicReference<>());
+        stubProviderResponse(http, 201, "{\"sid\":\"" + CALL_SID + "\"}", new AtomicReference<>());
             ScheduledExecutorService kickoff = mock(ScheduledExecutorService.class);
             AtomicReference<Runnable> scheduledTask = new AtomicReference<>();
             doAnswer(invocation -> {
