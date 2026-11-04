@@ -14,8 +14,11 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -99,6 +102,64 @@ class TwilioCertificationStartupRunnerTest {
                 "StatusCallback=https%3A%2F%2Faurora.example%2Fwebhooks%2Fv1%2Ftwilio%2Fstatus"));
         assertTrue(body.contains("Timeout=25"));
         assertFalse(body.contains("TimeLimit="));
+    }
+
+    @Test
+    void startupKickoffLogsCreatedCallAndShutsDownSchedulerAfterSuccessfulCall() throws Exception {
+        Field firedField = TwilioCertificationStartupRunner.class.getDeclaredField("FIRED");
+        firedField.setAccessible(true);
+        AtomicBoolean fired = (AtomicBoolean) firedField.get(null);
+        fired.set(false);
+        try {
+            HttpClient http = mock(HttpClient.class);
+            stubProviderResponse(http, 201, "{\\"sid\\":\\"" + CALL_SID + "\\"}", new AtomicReference<>());
+            ScheduledExecutorService kickoff = mock(ScheduledExecutorService.class);
+            AtomicReference<Runnable> scheduledTask = new AtomicReference<>();
+            doAnswer(invocation -> {
+                scheduledTask.set(invocation.getArgument(0));
+                return null;
+            }).when(kickoff).schedule(any(Runnable.class), eq(10L), eq(TimeUnit.SECONDS));
+
+            TwilioCertificationStartupRunner runner = new TwilioCertificationStartupRunner(
+                    true, "AC" + "0".repeat(32), AUTH_TOKEN, FROM, TO, BASE_URL, TO, "+15550000000",
+                    "outbound-test", "", "") {
+                @Override
+                ScheduledExecutorService createKickoffExecutor() {
+                    return kickoff;
+                }
+            };
+            setHttpClient(runner, http);
+
+            runner.run(null);
+
+            assertNotNull(scheduledTask.get(), "The one-shot call task must be scheduled");
+            scheduledTask.get().run();
+
+            verify(http).send(any(HttpRequest.class),
+                    org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<String>>any());
+            verify(kickoff).shutdown();
+        } finally {
+            fired.set(false);
+        }
+    }
+
+    @Test
+    void kickoffExecutorCreatesDaemonWorkerThread() throws Exception {
+        TwilioCertificationStartupRunner runner = runnerWithHttp(mock(HttpClient.class));
+        ScheduledExecutorService kickoff = runner.createKickoffExecutor();
+        CountDownLatch completed = new CountDownLatch(1);
+        AtomicBoolean daemon = new AtomicBoolean(false);
+        try {
+            kickoff.execute(() -> {
+                daemon.set(Thread.currentThread().isDaemon());
+                completed.countDown();
+            });
+
+            assertTrue(completed.await(2, TimeUnit.SECONDS));
+            assertTrue(daemon.get());
+        } finally {
+            kickoff.shutdownNow();
+        }
     }
 
     @Test
@@ -209,10 +270,15 @@ class TwilioCertificationStartupRunnerTest {
         TwilioCertificationStartupRunner runner = new TwilioCertificationStartupRunner(
                 false, ACCOUNT_SID, AUTH_TOKEN, FROM, TO, BASE_URL, TO, "+15550000000",
                 direction, "", "");
+        setHttpClient(runner, http);
+        return runner;
+    }
+
+    private static void setHttpClient(TwilioCertificationStartupRunner runner, HttpClient http)
+            throws Exception {
         Field httpField = TwilioCertificationStartupRunner.class.getDeclaredField("http");
         httpField.setAccessible(true);
         httpField.set(runner, http);
-        return runner;
     }
 
     private static String invokeCreateCall(TwilioCertificationStartupRunner runner) throws Exception {
