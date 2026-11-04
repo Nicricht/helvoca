@@ -21,6 +21,9 @@ public class MetaWhatsAppEmbeddedSignupBootstrapService {
                 available,
                 available ? metaProperties.getEmbeddedSignupAppId() : null,
                 available ? metaProperties.getEmbeddedSignupConfigId() : null,
-                metaProperties.getGraphApiVersion());
+                metaProperties.getGraphApiVersion(),
+                available && metaProperties.isCoexistenceEnabled()
+                        && !metaProperties.getCoexistenceAllowedPhone().isBlank()
+                        && !metaProperties.getCoexistenceAllowedBusinessId().isBlank());
     }
 }
