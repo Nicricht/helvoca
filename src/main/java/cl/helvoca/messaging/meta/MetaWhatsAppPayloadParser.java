@@ -112,6 +112,10 @@ final class MetaWhatsAppPayloadParser {
             JsonNode changes = entry.path("changes");
             if (!changes.isArray()) continue;
             for (JsonNode change : changes) {
+                // Coexistence sends app echoes, history and state updates in this
+                // envelope. They must NEVER enter the AI as customer messages.
+                String field = text(change.path("field"));
+                if (field != null && !"messages".equals(field)) continue;
                 JsonNode value = change.path("value");
                 if (value.isObject()) values.add(value);
             }
