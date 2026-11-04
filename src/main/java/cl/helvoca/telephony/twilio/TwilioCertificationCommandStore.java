@@ -83,18 +83,20 @@ public class TwilioCertificationCommandStore {
     }
 
     public Optional<ClaimedCommand> claimNext() {
-        return claimNextForActorScope(false);
+        return claimNextForActorScope(false, null);
     }
 
-    public Optional<ClaimedCommand> claimNextForChatGptAurora() {
-        return claimNextForActorScope(true);
+    public Optional<ClaimedCommand> claimNextForChatGptAurora(UUID businessId) {
+        if (businessId == null) return Optional.empty();
+        return claimNextForActorScope(true, businessId);
     }
 
-    private Optional<ClaimedCommand> claimNextForActorScope(boolean chatGptAuroraOnly) {
+    private Optional<ClaimedCommand> claimNextForActorScope(boolean chatGptAuroraOnly, UUID businessId) {
         String token = UUID.randomUUID().toString();
         String actorPredicate = chatGptAuroraOnly
                 ? "c.requested_by LIKE 'chatgpt-aurora:%'"
                 : "c.requested_by NOT LIKE 'chatgpt-aurora:%'";
+        String businessPredicate = chatGptAuroraOnly ? "AND c.business_id = ?" : "";
         String sql = """
                 WITH next_command AS (
                     SELECT c.run_id, c.business_id
@@ -102,6 +104,7 @@ public class TwilioCertificationCommandStore {
                     WHERE c.status = 'PENDING'
                       AND c.business_id IS NOT NULL
                       AND %s
+                      %s
                     ORDER BY c.requested_at, c.run_id
                     FOR UPDATE OF c SKIP LOCKED
                     LIMIT 1
@@ -115,12 +118,16 @@ public class TwilioCertificationCommandStore {
                 WHERE c.run_id = n.run_id
                   AND c.status = 'PENDING'
                 RETURNING c.run_id, c.business_id
-                """.formatted(actorPredicate);
-        List<ClaimedCommand> rows = jdbc.query(sql,
-                (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
-                        rs.getObject(2, UUID.class)),
-                token,
-                TOKEN_TTL.toSeconds());
+                """.formatted(actorPredicate, businessPredicate);
+        List<ClaimedCommand> rows = chatGptAuroraOnly
+                ? jdbc.query(sql,
+                        (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
+                                rs.getObject(2, UUID.class)),
+                        businessId, token, TOKEN_TTL.toSeconds())
+                : jdbc.query(sql,
+                        (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
+                                rs.getObject(2, UUID.class)),
+                        token, TOKEN_TTL.toSeconds());
         if (rows.isEmpty()) return Optional.empty();
         return Optional.of(rows.getFirst());
     }
