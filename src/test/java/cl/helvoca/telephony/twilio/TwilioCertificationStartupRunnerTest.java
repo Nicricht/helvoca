@@ -61,13 +61,13 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
-    void startupRunnerSendsThreeMinuteProviderLimitSeparatelyFromRingingTimeout() {
+    void startupRunnerDoesNotSetProviderCallDurationLimit() {
         String body = TwilioCertificationStartupRunner.callBody(
                 "+56912345678", "+15551234567",
-                "https://example.test/voice", "https://example.test/status", 180);
+                "https://example.test/voice", "https://example.test/status");
 
         assertTrue(body.contains("Timeout=25"));
-        assertTrue(body.contains("TimeLimit=180"));
+        assertFalse(body.contains("TimeLimit="));
     }
 
     @Test
@@ -98,7 +98,7 @@ class TwilioCertificationStartupRunnerTest {
         assertTrue(body.contains(
                 "StatusCallback=https%3A%2F%2Faurora.example%2Fwebhooks%2Fv1%2Ftwilio%2Fstatus"));
         assertTrue(body.contains("Timeout=25"));
-        assertTrue(body.contains("TimeLimit=180"));
+        assertFalse(body.contains("TimeLimit="));
     }
 
     @Test
@@ -188,14 +188,14 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
-    void outboundTestAlwaysKeepsSafetyHangup() {
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("outbound-test"));
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("unexpected"));
-    }
+    void outboundAndInboundCallsHaveNoArtificialProviderDuration() {
+        String outbound = TwilioCertificationStartupRunner.callBody(
+                TO, FROM, "https://example.test/outbound", "https://example.test/status");
+        String inbound = TwilioCertificationStartupRunner.callBody(
+                TO, FROM, "https://example.test/inbound", "https://example.test/status");
 
-    @Test
-    void inboundCertificationKeepsSafetyHangup() {
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("inbound-certification"));
+        assertFalse(outbound.contains("TimeLimit="));
+        assertFalse(inbound.contains("TimeLimit="));
     }
 
     @Test
@@ -219,7 +219,7 @@ class TwilioCertificationStartupRunnerTest {
     private static TwilioCertificationStartupRunner runnerWithHttp(HttpClient http, String direction) throws Exception {
         TwilioCertificationStartupRunner runner = new TwilioCertificationStartupRunner(
                 false, ACCOUNT_SID, AUTH_TOKEN, FROM, TO, BASE_URL, TO, "+15550000000",
-                180, direction, "", "", mock(TwilioCallControl.class));
+                direction, "", "");
         Field httpField = TwilioCertificationStartupRunner.class.getDeclaredField("http");
         httpField.setAccessible(true);
         httpField.set(runner, http);
