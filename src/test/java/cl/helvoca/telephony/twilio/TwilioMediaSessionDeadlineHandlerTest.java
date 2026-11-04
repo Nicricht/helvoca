@@ -124,6 +124,22 @@ class TwilioMediaSessionDeadlineHandlerTest {
     }
 
     @Test
+    void socketClosingDuringStartupWithDeadlineDisabledCoversNullDeadlineCancellationPath() throws Exception {
+        handler = new TwilioMediaStreamHandler(signer, providers, health, lifecycle, control,
+                databaseContext, binding, new TwilioMediaSessionDeadline(0, scheduler));
+        doAnswer(invocation -> {
+            handler.afterConnectionClosed(socket, CloseStatus.NORMAL);
+            return null;
+        }).when(ai).start();
+
+        validStart();
+
+        verify(ai).start();
+        verify(ai).close();
+        verifyNoInteractions(scheduler, control);
+    }
+
+    @Test
     void acceptedSignedCallSchedulesRealCutoffAndKillsCarrierAndAiOnce() throws Exception {
         validStart();
         assertNotNull(expiry);
