@@ -104,6 +104,9 @@ export function ChannelsSettingsPanel({
   const [selectedMetaPhone, setSelectedMetaPhone] = useState("");
   const [validatedMetaPhone, setValidatedMetaPhone] = useState(false);
   const [pin, setPin] = useState("");
+  // Fail closed for numbers that already use the WhatsApp Business mobile app.
+  // The standard register endpoint is NOT a verified coexistence onboarding path.
+  const [existingBusinessApp, setExistingBusinessApp] = useState(true);
   const metaActionLock = useRef(false);
 
   const provisioningStatus = useQuery({
@@ -313,6 +316,10 @@ export function ChannelsSettingsPanel({
 
   async function beginMetaSignup() {
     if (!canManage || metaActionLock.current) return;
+    if (existingBusinessApp) {
+      setMetaMessage("Este número ya utiliza WhatsApp Business. La conexión mediante coexistencia aún no está certificada. No se iniciará el registro tradicional ni se desconectará la aplicación.");
+      return;
+    }
     const bootstrap = metaBootstrap.data;
     if (!bootstrap?.available || !bootstrap.appId || !bootstrap.configId || !bootstrap.graphApiVersion) {
       setMetaMessage("La conexión guiada con Meta no está disponible en este entorno.");
@@ -415,6 +422,11 @@ export function ChannelsSettingsPanel({
   }
 
   async function finalizeMetaPhone() {
+    if (existingBusinessApp) {
+      setPin("");
+      setMetaMessage("Registro bloqueado: el número usa WhatsApp Business. Se requiere coexistencia verificada y autorización del titular.");
+      return;
+    }
     if (!selectedWaba || !selectedMetaPhone || !validatedMetaPhone || !/^[0-9]{6}$/.test(pin)) {
       setMetaMessage("El PIN debe tener exactamente seis dígitos.");
       return;
@@ -685,9 +697,37 @@ export function ChannelsSettingsPanel({
 
             {canManage && !metaStatus.data?.configured && (
               <div className={styles.metaFlow}>
+                <label className={styles.field}>
+                  <span>
+                    <input
+                      type="checkbox"
+                      checked={existingBusinessApp}
+                      onChange={event => {
+                        setExistingBusinessApp(event.target.checked);
+                        setMetaMessage("");
+                        setSdkReady(false);
+                        setWabas([]);
+                        setSelectedWaba("");
+                        setMetaPhones([]);
+                        setSelectedMetaPhone("");
+                        setValidatedMetaPhone(false);
+                        setPin("");
+                      }}
+                    />
+                    {" "}El número ya utiliza WhatsApp Business y quiero conservarlo
+                  </span>
+                </label>
+                {existingBusinessApp && (
+                  <p role="status">
+                    La coexistencia con WhatsApp Business requiere una integración específica
+                    y autorización en Meta. El registro tradicional está bloqueado para
+                    proteger la cuenta y su historial.
+                  </p>
+                )}
                 <button
                   className="button secondary"
                   type="button"
+                  disabled={existingBusinessApp}
                   onClick={beginMetaSignup}
                 >
                   {sdkReady ? "Continuar con Meta" : "Conectar WhatsApp"}
