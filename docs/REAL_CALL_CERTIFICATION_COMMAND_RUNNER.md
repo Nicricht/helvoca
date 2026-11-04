@@ -1,3 +1,14 @@
+## Current duration policy (2026-11-04, supersedes the former 180-second certification cap)
+
+The application-level artificial call cutoff is removed:
+- The command launcher no longer sends Twilio `TimeLimit`.
+- The command launcher no longer schedules an application-side safety hangup.
+- The optional startup runner also no longer sends `TimeLimit` or schedules a timed hangup.
+- `Timeout=25` remains solely as the unanswered-call ringing timeout; it does not limit a connected conversation.
+- The certification worker no longer rejects a command because a configured duration exceeds 180 seconds.
+
+The application therefore does not end an answered call merely because 180 seconds elapsed. Calls end through the normal caller hangup or the conversation's explicit completion flow. This does not override any independent maximum imposed by Twilio, carrier policy, account configuration, or an external emergency stop. Billing and spend controls remain separate and must not be disabled. No automatic redials are introduced.
+
 # Real-call certification command runner
 
 RecepVoz supports a persistent, fail-closed command runner for authorized real-call certification. As of the DEMO tenant binding change, an unbound command cannot be claimed.
