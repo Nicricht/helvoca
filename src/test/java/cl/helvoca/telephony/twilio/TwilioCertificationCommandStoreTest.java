@@ -287,4 +287,57 @@ class TwilioCertificationCommandStoreTest {
                 "the generic certification worker must never claim ChatGPT-scoped call commands");
     }
 
+
+    @Test
+    void dedicatedClaimQueryOnlySelectsChatGptAuroraCommands() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
+                .thenReturn(List.of());
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+
+        assertTrue(store.claimNextForChatGptAurora().isEmpty());
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any());
+        assertTrue(sql.getValue().contains("requested_by LIKE 'chatgpt-aurora:%'"));
+    }
+
+    @Test
+    void chatGptRunLookupIsPinnedToBusinessAndActorPrefix() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.CommandStatus>>any(),
+                any(Object[].class))).thenReturn(List.of());
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+        UUID businessId = UUID.randomUUID();
+
+        assertTrue(store.findForChatGptAurora("chatgpt-aurora-20261104T120000Z-abc123", businessId).isEmpty());
+        assertTrue(store.findForChatGptAurora("platform-run-20261104-001", businessId).isEmpty());
+        assertTrue(store.findForChatGptAurora("chatgpt-aurora-20261104T120000Z-abc123", null).isEmpty());
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(),
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.CommandStatus>>any(),
+                eq("chatgpt-aurora-20261104T120000Z-abc123"), eq(businessId));
+        assertTrue(sql.getValue().contains("business_id = ?"));
+        assertTrue(sql.getValue().contains("requested_by LIKE 'chatgpt-aurora:%'"));
+    }
+
+    @Test
+    void revocationCancellationOnlyTargetsPendingChatGptCommandsForBusiness() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        when(jdbc.update(anyString(), any(Object[].class))).thenReturn(2);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+        UUID businessId = UUID.randomUUID();
+
+        assertEquals(2, store.cancelPendingChatGptAurora(businessId));
+        assertEquals(0, store.cancelPendingChatGptAurora(null));
+
+        org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).update(sql.capture(), eq(businessId));
+        assertTrue(sql.getValue().contains("requested_by LIKE 'chatgpt-aurora:%'"));
+        assertTrue(sql.getValue().contains("status = 'PENDING'"));
+    }
+
 }
