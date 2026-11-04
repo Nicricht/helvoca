@@ -142,9 +142,23 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         verifyNoInteractions(audit);
     }
 
+    @Test
+    void standardRegistrationIsDisabledByDefaultBeforeAnyProviderCall() {
+        var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
+                validation, registration, new MetaWhatsAppProperties());
+
+        ConflictException error = assertThrows(ConflictException.class,
+                () -> service.register("12345678", "123456789", "123456"));
+        assertEquals("META_STANDARD_REGISTRATION_DISABLED", error.getMessage());
+        verifyNoInteractions(validation, registration);
+    }
+
     private static MetaWhatsAppProperties readyProperties() {
         MetaWhatsAppProperties meta = new MetaWhatsAppProperties();
         meta.setEmbeddedSignupSystemUserAccessToken("system-user-secret");
+        meta.setStandardRegistrationEnabled(true);
         return meta;
     }
 }
