@@ -129,4 +129,21 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
             pool.shutdownNow();
         }
     }
+
+    @Test
+    void genericWorkerNeverClaimsChatGptAuroraScopedCommand() {
+        UUID demo = UUID.randomUUID();
+        JdbcTemplate owner = new JdbcTemplate(migrationDataSource);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Synthetic ChatGPT isolation','DEMO')", demo);
+        String runId = "chatgpt-aurora-" + UUID.randomUUID();
+        String actor = "chatgpt-aurora:" + UUID.randomUUID();
+
+        assertTrue(scope.callAsSystem(() -> commands.enqueue(runId, actor, demo)));
+
+        // The generic worker may claim another older command, but never this integration-owned command.
+        scope.callAsSystem(commands::claimNext);
+
+        assertEquals("PENDING", scope.callAsSystem(() -> commands.find(runId).orElseThrow().status()));
+    }
+
 }
