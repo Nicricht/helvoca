@@ -71,7 +71,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
                              TenantDatabaseContext databaseContext,
                              TwilioCallBindingGuard bindingGuard) {
         this(routeSigner, providers, health, lifecycle, callControl, databaseContext,
-                bindingGuard, new TwilioMediaSessionDeadline(600), null);
+                bindingGuard, new TwilioMediaSessionDeadline(0, null), null);
     }
 
     TwilioMediaStreamHandler(TwilioMediaRouteSigner routeSigner,
@@ -222,10 +222,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             state.ai = ai;
             state.started = true;
             ai.start();
-            // Enforced on wall-clock even when the caller sends no media frames.
-            // This must be scheduled only after an authenticated, bound start.
+            // Optional emergency wall-clock cutoff; disabled by default.
+            // It can only be armed after an authenticated, tenant-bound start.
             state.deadlineTask = deadline.schedule(() -> expireSession(socket, state));
-            if (state.closed.get()) state.deadlineTask.cancel(false);
+            if (state.closed.get() && state.deadlineTask != null) state.deadlineTask.cancel(false);
             if (pilotStopMonitor != null) {
                 // Reconcile PAUSE from PostgreSQL even when this instance has
                 // no incoming frames or the operator used another replica.
@@ -284,7 +284,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     }
 
     private void stopPausedCall(WebSocketSession socket, StreamState state) {
-        // Exactly one winner against disconnect, carrier STOP and hard deadline.
+        // Exactly one winner against disconnect, carrier STOP and optional emergency deadline.
         if (!state.closed.compareAndSet(false, true)) return;
         log.warn("PILOT_INFLIGHT_VOICE_STOP_REQUESTED call={}", state.callSid);
         try {
@@ -306,7 +306,7 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
     private void expireSession(WebSocketSession socket, StreamState state) {
         // A carrier stop or disconnect wins the race without any late hangup.
         if (!state.closed.compareAndSet(false, true)) return;
-        log.warn("Twilio media session reached the configured wall-clock limit call={}", state.callSid);
+        log.warn("Twilio media session reached the configured emergency wall-clock limit call={}", state.callSid);
         try {
             // A deadline is armed only after creating this verified Twilio
             // transport. A concurrent normal close wins the CAS above.

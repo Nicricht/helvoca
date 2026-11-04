@@ -18,7 +18,7 @@ This harness compares provider-native Gemini voices without changing the tenant'
 - The harness runs only through the explicit one-shot outbound certification path.
 - The destination must match `TWILIO_CERTIFICATION_ALLOWED_TO`.
 - The forbidden target check remains active.
-- Every call keeps the automatic safety hangup.
+- No application-level elapsed-time hangup is scheduled. Caller hangup, the model `end_call` and the explicit operator STOP remain available; the Twilio provider maximum still applies.
 - The candidate is signed into the Twilio Media Stream route, so changing it in transit invalidates the route.
 - A bake-off call is pinned to Gemini and cannot fall back to another voice provider.
 - Normal inbound calls keep the tenant's configured production voice.
@@ -43,7 +43,7 @@ Keep normal production flags disabled, then set:
 TWILIO_CERTIFICATION_VOICE_OVERRIDE=Laomedeia
 TWILIO_CERTIFICATION_CALL_ON_STARTUP=true
 TWILIO_CERTIFICATION_DIRECTION=outbound-test
-TWILIO_CERTIFICATION_MAX_SECONDS=180
+# No application-level call-duration cap is configured.
 ```
 
 For this retest, audition **Laomedeia first** and **Sadachbia second** using the same script. This override affects only the outbound audition; do not replace the tenant production voice until the owner has listened and selected a winner.
@@ -111,7 +111,7 @@ Only `gemini` and `openai-live` are accepted. Unknown values fail closed. A prov
 
 A Gemini-specific voice candidate such as `Sulafat` cannot be combined with the OpenAI pin. For a provider comparison, use the tenant's normal voice profile. RecepVoz resolves that profile to the provider-specific voice automatically.
 
-The call target allowlist, forbidden-target check, explicit startup opt-in, one-shot run gate and automatic safety hangup remain mandatory.
+The call target allowlist, forbidden-target check, explicit startup opt-in and one-shot run gate remain mandatory. No application-level `TimeLimit` or scheduled hangup is applied.
 
 ### Comparison scorecard
 

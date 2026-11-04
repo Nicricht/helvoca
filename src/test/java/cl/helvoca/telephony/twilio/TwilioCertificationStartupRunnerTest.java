@@ -64,14 +64,14 @@ class TwilioCertificationStartupRunnerTest {
     void startupRunnerDoesNotSendAnApplicationDurationLimit() {
         String body = TwilioCertificationStartupRunner.callBody(
                 "+56912345678", "+15551234567",
-                "https://example.test/voice", "https://example.test/status", 180);
+                "https://example.test/voice", "https://example.test/status");
 
         assertTrue(body.contains("Timeout=25"));
         assertFalse(body.contains("TimeLimit="));
     }
 
     @Test
-    void createCallSendsAuthenticatedBoundedTwilioRequestAndReturnsCallSid() throws Exception {
+    void createCallSendsAuthenticatedRequestWithoutApplicationDurationLimitAndReturnsCallSid() throws Exception {
         HttpClient http = mock(HttpClient.class);
         AtomicReference<HttpRequest> capturedRequest = new AtomicReference<>();
         stubProviderResponse(http, 201, "{\"sid\":\"" + CALL_SID + "\"}", capturedRequest);
@@ -188,17 +188,6 @@ class TwilioCertificationStartupRunnerTest {
     }
 
     @Test
-    void outboundTestAlwaysKeepsSafetyHangup() {
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("outbound-test"));
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("unexpected"));
-    }
-
-    @Test
-    void inboundCertificationKeepsSafetyHangup() {
-        assertTrue(TwilioCertificationStartupRunner.shouldScheduleSafetyHangup("inbound-certification"));
-    }
-
-    @Test
     void certificationTargetMustMatchExplicitAllowlist() {
         assertTrue(TwilioCertificationStartupRunner.isAllowedTarget("+56911111111", "+56911111111"));
         assertFalse(TwilioCertificationStartupRunner.isAllowedTarget("+56922222222", "+56911111111"));
@@ -219,7 +208,7 @@ class TwilioCertificationStartupRunnerTest {
     private static TwilioCertificationStartupRunner runnerWithHttp(HttpClient http, String direction) throws Exception {
         TwilioCertificationStartupRunner runner = new TwilioCertificationStartupRunner(
                 false, ACCOUNT_SID, AUTH_TOKEN, FROM, TO, BASE_URL, TO, "+15550000000",
-                180, direction, "", "", mock(TwilioCallControl.class));
+                direction, "", "");
         Field httpField = TwilioCertificationStartupRunner.class.getDeclaredField("http");
         httpField.setAccessible(true);
         httpField.set(runner, http);
