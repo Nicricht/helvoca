@@ -110,7 +110,7 @@ export function ChannelsSettingsPanel({
   const [existingBusinessApp, setExistingBusinessApp] = useState(true);
   const [coexistenceSession, setCoexistenceSession] = useState<{
     wabaId: string;
-    phoneNumberId: string;
+    phoneNumberId?: string;
   } | null>(null);
   const metaActionLock = useRef(false);
 
@@ -132,10 +132,14 @@ export function ChannelsSettingsPanel({
       if (payload.type !== "WA_EMBEDDED_SIGNUP" || !existingBusinessApp) return;
       if (payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"
         && /^[0-9]{5,30}$/.test(payload.data?.waba_id ?? "")
-        && /^[0-9]{5,30}$/.test(payload.data?.phone_number_id ?? "")) {
+        && (!payload.data?.phone_number_id
+          || /^[0-9]{5,30}$/.test(payload.data.phone_number_id))) {
+        // Meta may omit phone_number_id in the v4 completion event. The
+        // selected WABA is still bound to the session; after discovery the
+        // backend proves the exact allowlisted E.164 number against Graph.
         setCoexistenceSession({
           wabaId: payload.data!.waba_id!,
-          phoneNumberId: payload.data!.phone_number_id!
+          phoneNumberId: payload.data?.phone_number_id || undefined
         });
       } else if (payload.event === "CANCEL" || payload.event === "ERROR") {
         setCoexistenceSession(null);
@@ -505,7 +509,8 @@ export function ChannelsSettingsPanel({
     if (!existingBusinessApp || metaActionLock.current || !validatedMetaPhone
       || !selectedWaba || !selectedMetaPhone || !coexistenceSession
       || coexistenceSession.wabaId !== selectedWaba
-      || coexistenceSession.phoneNumberId !== selectedMetaPhone) {
+      || (coexistenceSession.phoneNumberId != null
+        && coexistenceSession.phoneNumberId !== selectedMetaPhone)) {
       setMetaMessage("Falta la confirmación de Meta para conectar la cuenta existente.");
       return;
     }
