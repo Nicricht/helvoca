@@ -44,7 +44,6 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
         var wabaAuthorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
 
         doNothing().when(wabaAuthorization).requireAuthorized("1906385232743451");
-        doNothing().when(wabaAuthorization).requireAuthorized("1906385232743451");
         when(sharedWabas.list("112233445566778", "system-user-secret"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSharedWabaPage(
                         List.of(new MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba(
