@@ -119,6 +119,48 @@ class MetaWhatsAppEmbeddedSignupBootstrapServiceTest {
         assertNull(response.configId());
     }
 
+
+    @Test
+    void partialPhoneOnlyAllowlistAlsoBlocksSelfService() {
+        MetaWhatsAppProperties meta = readyProperties();
+        meta.setCoexistenceEnabled(true);
+        meta.setCoexistenceSelfServiceEnabled(true);
+        meta.setCoexistenceAllowedPhone("+56950730447");
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        assertFalse(new MetaWhatsAppEmbeddedSignupBootstrapService(meta, tenant)
+                .bootstrap().coexistenceAvailable());
+    }
+
+    @Test
+    void invalidPilotPhoneAndUnavailableTenantNeverExposeCoexistence() {
+        MetaWhatsAppProperties meta = readyProperties();
+        meta.setCoexistenceEnabled(true);
+        meta.setCoexistenceAllowedBusinessId(UUID.randomUUID().toString());
+        meta.setCoexistenceAllowedPhone("not-e164");
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenReturn(UUID.randomUUID());
+        assertFalse(new MetaWhatsAppEmbeddedSignupBootstrapService(meta, tenant)
+                .bootstrap().coexistenceAvailable());
+        meta.setCoexistenceAllowedPhone("+56950730447");
+        when(tenant.requireBusinessId()).thenThrow(new IllegalStateException("tenant context unavailable"));
+        assertFalse(new MetaWhatsAppEmbeddedSignupBootstrapService(meta, tenant)
+                .bootstrap().coexistenceAvailable());
+    }
+
+    @Test
+    void selfServiceRequiresAnAuthenticatedTenantAndAnExplicitEnablement() {
+        MetaWhatsAppProperties meta = readyProperties();
+        meta.setCoexistenceEnabled(true);
+        TenantProvider tenant = mock(TenantProvider.class);
+        when(tenant.requireBusinessId()).thenThrow(new IllegalStateException("tenant unavailable"));
+        assertFalse(new MetaWhatsAppEmbeddedSignupBootstrapService(meta, tenant)
+                .bootstrap().coexistenceAvailable());
+        meta.setCoexistenceSelfServiceEnabled(true);
+        assertFalse(new MetaWhatsAppEmbeddedSignupBootstrapService(meta, tenant)
+                .bootstrap().coexistenceAvailable());
+    }
+
     private static MetaWhatsAppProperties readyProperties() {
         MetaWhatsAppProperties meta = new MetaWhatsAppProperties();
         meta.setEmbeddedSignupEnabled(true);

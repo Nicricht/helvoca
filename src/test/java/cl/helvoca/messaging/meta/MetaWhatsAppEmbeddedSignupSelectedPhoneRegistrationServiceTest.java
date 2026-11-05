@@ -222,6 +222,48 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         verifyNoInteractions(validation, registration);
     }
 
+
+    @Test
+    void refusesRegistrationWhenTheReadOnlyBusinessAppGuardIsUnavailable() {
+        var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        MetaWhatsAppProperties meta = readyProperties();
+        when(validation.validate("1906385232743451", "1913623884432103")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
+                        "PHONE_NUMBER_VALIDATED", "1913623884432103",
+                        "+56 9 3333 4444", "Aurora", "GREEN", "VERIFIED"));
+        var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
+                validation, registration, meta, null, null, null);
+        ConflictException error = assertThrows(ConflictException.class, () -> service.register(
+                "1906385232743451", "1913623884432103", "123456"));
+        assertEquals("META_PHONE_BUSINESS_APP_STATUS_UNAVAILABLE", error.getMessage());
+        verifyNoInteractions(registration);
+    }
+
+    @Test
+    void skipsAuditWhenEitherOptionalAuditDependencyIsAbsent() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        var status = mock(MetaWhatsAppCoexistencePhoneStatusClient.class);
+        var tenant = mock(TenantProvider.class);
+        var audit = mock(AuditService.class);
+        when(validation.validate("1906385232743451", "1913623884432103")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
+                        "PHONE_NUMBER_VALIDATED", "1913623884432103",
+                        "+56 9 3333 4444", "Aurora", "GREEN", "VERIFIED"));
+        when(status.isOnBusinessApp("1913623884432103", "system-user-secret")).thenReturn(false);
+        when(registration.register("1913623884432103", "system-user-secret", "123456"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupRegisterPhoneResult(true));
+        var withoutAudit = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
+                validation, registration, meta, status, tenant, null);
+        assertTrue(withoutAudit.register("1906385232743451", "1913623884432103", "123456").registered());
+        var withoutTenant = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
+                validation, registration, meta, status, null, audit);
+        assertTrue(withoutTenant.register("1906385232743451", "1913623884432103", "123456").registered());
+        verifyNoInteractions(audit);
+    }
+
     private static MetaWhatsAppProperties readyProperties() {
         MetaWhatsAppProperties meta = new MetaWhatsAppProperties();
         meta.setEmbeddedSignupSystemUserAccessToken("system-user-secret");
