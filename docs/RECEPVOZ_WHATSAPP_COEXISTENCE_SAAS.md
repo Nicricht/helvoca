@@ -18,7 +18,7 @@ Personal WhatsApp accounts are not the target of this flow. Meta decides whether
    - **I already use WhatsApp Business on my phone:** start the Coexistence Embedded Signup flow.
    - **I have a new number for the WhatsApp Business Platform:** use the separate standard onboarding path, only when that path is explicitly enabled and safe for the selected number.
 3. The business owner completes Meta authorization and confirms the flow on the phone when Meta requests it.
-4. RecepVoz discovers the WABA phone numbers, verifies WABA membership, and performs a read-only Meta status check.
+4. The browser sends the WABA ID reported by Meta's Embedded Signup session alongside the one-time authorization code. The backend exchanges the code, uses the resulting customer-scoped token to read that exact WABA, confirms that the WABA is also shared with the RecepVoz provider portfolio, and persists the WABA-to-tenant binding. It returns only that authorized WABA, never the provider's full shared-WABA list.
 5. For Coexistence, the backend requires Meta to confirm `is_on_biz_app=true` and `platform_type=CLOUD_API`, then verifies the displayed E.164 number.
 6. RecepVoz stages the sender **disabled**. A separate readiness/certification and activation step is required before any customer-facing message is sent.
 7. Once activated, inbound messages are routed to the correct tenant, the AI responds using that business's own profile/services/knowledge, and supported operations are persisted through the existing WhatsApp tools.
@@ -44,9 +44,12 @@ Voice and WhatsApp remain separate transports. They share business data and cust
 ## Tenant isolation and safety requirements
 
 - Every onboarding action requires an authenticated `BUSINESS_ADMIN` and the current `business_id`.
-- A WABA and selected phone must be discovered/validated against Meta using the server-side provider credentials.
+- The WABA ID from the Meta session must be readable with the customer-scoped token produced by that same authorization code.
+- The selected WABA must also be present in the provider's shared-WABA inventory; the customer token proof and provider-side share check must both pass.
+- The WABA-to-tenant binding is persisted in the tenant's Meta WhatsApp configuration. Every later assignment, subscription, phone discovery, validation, and staging request must match that binding.
 - Meta readback must confirm Coexistence before any local sender record is created or linked.
 - A phone number already owned by another RecepVoz tenant is rejected. The unique phone-number constraint and tenant ownership check remain authoritative.
+- A tenant cannot select an arbitrary WABA from the provider portfolio: authorization is tied to the WABA reported by the current Meta session and proven readable by that customer's exchanged token.
 - The coexistence staging path never calls Meta's standard `/{phone_number_id}/register` endpoint and never requests a registration PIN.
 - The staged sender remains disabled. No inbound/outbound traffic is enabled by staging alone.
 - Webhook signatures, tenant resolution, idempotency, durable jobs, delivery callbacks, and existing outbound external-effect guards remain mandatory.
@@ -98,6 +101,6 @@ References:
 
 ## Current implementation checkpoint
 
-This branch extends the Aurora coexistence preparation with a tenant-scoped self-service gate. The feature remains OFF by default. The existing Aurora exact tenant/phone allowlist remains supported and takes precedence over self-service.
+This branch extends the Aurora coexistence preparation with a tenant-scoped self-service gate and a persisted WABA-to-tenant authorization check. The feature remains OFF by default. The existing Aurora exact tenant/phone allowlist remains supported and takes precedence over self-service. The authorization code is bound to the WABA reported by Meta; the exchanged customer token must read that WABA, and subsequent provider-side operations must match the WABA persisted for the authenticated tenant.
 
 This is code preparation only. It does not enable Meta credentials, change Railway variables, deploy, activate a sender, send a WhatsApp message, or alter `main`. Exact-HEAD CI and provider-console approval are still required.
