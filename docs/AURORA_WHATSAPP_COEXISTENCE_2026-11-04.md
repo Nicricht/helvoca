@@ -74,3 +74,8 @@ The DRAFT branch now also prepares the same coexistence flow for future SaaS ten
 - Existing Aurora tenant/phone allowlisting remains available and takes precedence over SaaS self-service.
 
 This remains a DRAFT code change. No Meta account, credential, Railway variable, webhook, sender, or live message was changed. Do not enable the self-service flag until Meta partner/app approval and exact-HEAD CI are verified.
+
+
+## QA follow-up · 2026-11-05
+
+The integrated Golden Journey compile identified two stale test call sites from the earlier tenant-scoped Twilio command-store change. The production method now requires an explicit business UUID. The unit test now supplies and asserts the tenant predicate, and the PostgreSQL integration test passes the demo tenant explicitly. These are test-only call-site corrections; no Twilio runtime behavior or external calls were changed.
