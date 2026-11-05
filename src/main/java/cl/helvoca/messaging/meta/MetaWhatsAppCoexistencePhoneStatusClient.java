@@ -32,6 +32,46 @@ public class MetaWhatsAppCoexistencePhoneStatusClient {
         this.http = http;
     }
 
+    /**
+     * Read-only guard for the ordinary registration path. If Meta cannot
+     * explicitly report the Business App flag, callers must fail closed.
+     */
+    public boolean isOnBusinessApp(String phoneNumberId, String accessToken) {
+        if (phoneNumberId == null || !phoneNumberId.matches("[0-9]{5,30}")) {
+            throw new IllegalArgumentException("Invalid Meta phone number id");
+        }
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalStateException("Meta access token unavailable");
+        }
+        URI uri = URI.create(properties.graphApiRoot() + "/" + phoneNumberId
+                + "?fields=is_on_biz_app");
+        HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(12))
+                .header("Authorization", "Bearer " + accessToken.trim())
+                .header("Accept", "application/json")
+                .GET().build();
+        try {
+            HttpResponse<String> response =
+                    http.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IllegalStateException("Meta Business App status HTTP "
+                        + response.statusCode());
+            }
+            JSONObject json = new JSONObject(response.body() == null ? "{}" : response.body());
+            if (!phoneNumberId.equals(json.optString("id", "")) || !json.has("is_on_biz_app")) {
+                throw new IllegalStateException("Meta Business App status readback incomplete");
+            }
+            return json.optBoolean("is_on_biz_app", false);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Meta Business App status readback interrupted", e);
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException("Meta Business App status readback failed", e);
+        }
+    }
+
     public Status read(String phoneNumberId, String accessToken) {
         if (phoneNumberId == null || !phoneNumberId.matches("[0-9]{5,30}")) {
             throw new IllegalArgumentException("Invalid Meta phone number id");
