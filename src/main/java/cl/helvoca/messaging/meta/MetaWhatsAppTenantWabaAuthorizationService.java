@@ -31,21 +31,20 @@ public class MetaWhatsAppTenantWabaAuthorizationService {
     public void authorize(String rawWabaId) {
         UUID businessId = tenantProvider.requireBusinessId();
         String wabaId = requireWabaId(rawWabaId);
-        String credentialRef = credentials.requireReference();
-
         MetaWhatsAppTenantConfig config = configs.findById(businessId)
                 .orElseGet(MetaWhatsAppTenantConfig::new);
 
         String existingWabaId = clean(config.getWabaId());
+        if (config.isEnabled()) {
+            // Never silently disable or replace a live sender during onboarding.
+            if (wabaId.equals(existingWabaId)) return;
+            throw new ConflictException("META_WHATSAPP_ACTIVE_CONFIG_REQUIRES_DEACTIVATION");
+        }
         if (existingWabaId != null && !existingWabaId.equals(wabaId)) {
             throw new ConflictException("META_WHATSAPP_TENANT_ALREADY_BOUND_TO_ANOTHER_WABA");
         }
 
-        // Reauthorization of the same already-active WABA must not interrupt service.
-        if (config.isEnabled() && wabaId.equals(existingWabaId)) {
-            return;
-        }
-
+        String credentialRef = credentials.requireReference();
         config.setBusinessId(businessId);
         config.setWabaId(wabaId);
         config.setCredentialRef(credentialRef);
