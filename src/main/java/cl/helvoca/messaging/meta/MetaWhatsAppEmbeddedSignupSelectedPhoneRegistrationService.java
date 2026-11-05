@@ -34,13 +34,6 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService {
         this.auditService = auditService;
     }
 
-    MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
-            MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService validationService,
-            MetaWhatsAppEmbeddedSignupRegisterPhoneClient registerPhoneClient,
-            MetaWhatsAppProperties metaProperties) {
-        this(validationService, registerPhoneClient, metaProperties, null, null, null);
-    }
-
     public MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult register(
             String wabaId,
             String phoneNumberId,
