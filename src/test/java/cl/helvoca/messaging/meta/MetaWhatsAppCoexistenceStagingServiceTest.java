@@ -102,11 +102,106 @@ class MetaWhatsAppCoexistenceStagingServiceTest {
                         && request.wabaId().equals(WABA)));
     }
 
+    @Test
+    void selfServiceStagesAnEligibleBusinessAppNumberForAnotherTenantAfterProviderProof() {
+        UUID businessId = UUID.randomUUID();
+        UUID phoneRecordId = UUID.randomUUID();
+        var props = selfServiceProperties();
+        var readiness = ready();
+        var status = mock(MetaWhatsAppCoexistencePhoneStatusClient.class);
+        var validator = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var config = mock(MetaWhatsAppTenantConfigurationService.class);
+        var tenants = mock(TenantProvider.class);
+        when(tenants.requireBusinessId()).thenReturn(businessId);
+        when(status.read(PHONE_ID, "test-system-token"))
+                .thenReturn(new MetaWhatsAppCoexistencePhoneStatusClient.Status(
+                        true, "CLOUD_API", "+56 9 5073 0447"));
+        when(validator.validate(WABA, PHONE_ID))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult(
+                        "PHONE_NUMBER_VALIDATED", PHONE_ID,
+                        "+56 9 5073 0447", "Independent Business", "GREEN", "VERIFIED"));
+        when(credentials.requireReference()).thenReturn("EMBEDDED_SIGNUP_SYSTEM_USER");
+        when(resolver.resolve(PHONE)).thenReturn(phoneRecordId);
+        when(config.replace(any(MetaWhatsAppTenantConfigurationRequest.class)))
+                .thenReturn(new MetaWhatsAppTenantConfigurationResponse(
+                        phoneRecordId, "META_WHATSAPP_CLOUD", PHONE_ID, WABA,
+                        "EMBEDDED_SIGNUP_SYSTEM_USER", false));
+
+        var service = new MetaWhatsAppCoexistenceStagingService(
+                props, readiness, status, validator, resolver, credentials, config, tenants);
+        var result = service.stage(WABA, PHONE_ID);
+
+        assertEquals("COEXISTENCE_VERIFIED_AND_STAGED", result.state());
+        assertEquals(phoneRecordId, result.phoneRecordId());
+        assertFalse(result.enabled());
+        verify(config).replace(argThat(request ->
+                request.phoneRecordId().equals(phoneRecordId)
+                        && request.providerPhoneNumberId().equals(PHONE_ID)
+                        && request.wabaId().equals(WABA)));
+    }
+
+    @Test
+    void partialPilotAllowlistNeverFallsBackToTenantSelfService() {
+        var props = selfServiceProperties();
+        props.setCoexistenceAllowedBusinessId(UUID.randomUUID().toString());
+        var readiness = mock(MetaWhatsAppEmbeddedSignupReadinessService.class);
+        var status = mock(MetaWhatsAppCoexistencePhoneStatusClient.class);
+        var validator = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var config = mock(MetaWhatsAppTenantConfigurationService.class);
+        var tenants = mock(TenantProvider.class);
+        when(tenants.requireBusinessId()).thenReturn(UUID.randomUUID());
+
+        var service = new MetaWhatsAppCoexistenceStagingService(
+                props, readiness, status, validator, resolver, credentials, config, tenants);
+        var error = assertThrows(ConflictException.class,
+                () -> service.stage(WABA, PHONE_ID));
+
+        assertEquals("META_COEXISTENCE_NOT_AUTHORIZED_FOR_TENANT", error.getMessage());
+        verifyNoInteractions(readiness, status, validator, resolver, credentials, config);
+    }
+
+    @Test
+    void pilotAllowlistStillRejectsAnyDifferentProviderPhone() {
+        UUID businessId = UUID.randomUUID();
+        var props = enabledProperties(businessId);
+        var readiness = ready();
+        var status = mock(MetaWhatsAppCoexistencePhoneStatusClient.class);
+        var validator = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
+        var resolver = mock(MetaWhatsAppEmbeddedSignupPhoneRecordResolverService.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var config = mock(MetaWhatsAppTenantConfigurationService.class);
+        var tenants = mock(TenantProvider.class);
+        when(tenants.requireBusinessId()).thenReturn(businessId);
+        when(status.read(PHONE_ID, "test-system-token"))
+                .thenReturn(new MetaWhatsAppCoexistencePhoneStatusClient.Status(
+                        true, "CLOUD_API", "+56 9 9999 9999"));
+
+        var service = new MetaWhatsAppCoexistenceStagingService(
+                props, readiness, status, validator, resolver, credentials, config, tenants);
+        var error = assertThrows(ConflictException.class,
+                () -> service.stage(WABA, PHONE_ID));
+
+        assertEquals("META_COEXISTENCE_WRONG_PHONE", error.getMessage());
+        verifyNoInteractions(validator, resolver, credentials, config);
+    }
+
     private static MetaWhatsAppProperties enabledProperties(UUID tenantId) {
         var props = new MetaWhatsAppProperties();
         props.setCoexistenceEnabled(true);
         props.setCoexistenceAllowedBusinessId(tenantId.toString());
         props.setCoexistenceAllowedPhone(PHONE);
+        props.setEmbeddedSignupSystemUserAccessToken("test-system-token");
+        return props;
+    }
+
+    private static MetaWhatsAppProperties selfServiceProperties() {
+        var props = new MetaWhatsAppProperties();
+        props.setCoexistenceEnabled(true);
+        props.setCoexistenceSelfServiceEnabled(true);
         props.setEmbeddedSignupSystemUserAccessToken("test-system-token");
         return props;
     }
