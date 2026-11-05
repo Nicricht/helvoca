@@ -55,6 +55,14 @@ public class MetaWhatsAppEmbeddedSignupBootstrapService {
                 return false;
             }
         }
-        return metaProperties.isCoexistenceSelfServiceEnabled();
+        if (tenantProvider == null || !metaProperties.isCoexistenceSelfServiceEnabled()) {
+            return false;
+        }
+        try {
+            tenantProvider.requireBusinessId();
+            return true;
+        } catch (RuntimeException unavailableTenant) {
+            return false;
+        }
     }
 }
