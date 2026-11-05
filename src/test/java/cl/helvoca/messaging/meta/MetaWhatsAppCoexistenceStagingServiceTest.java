@@ -224,6 +224,8 @@ class MetaWhatsAppCoexistenceStagingServiceTest {
                 props, ready(), status, validator, resolver, credentials, config, tenants);
         assertThrows(IllegalArgumentException.class, () -> service.stage(WABA, "bad-phone-id"));
         assertThrows(IllegalArgumentException.class, () -> service.stage("bad-waba-id", PHONE_ID));
+        assertThrows(IllegalArgumentException.class, () -> service.stage(WABA, null));
+        assertThrows(IllegalArgumentException.class, () -> service.stage(null, PHONE_ID));
         verifyNoInteractions(status, validator, resolver, credentials, config);
     }
 
