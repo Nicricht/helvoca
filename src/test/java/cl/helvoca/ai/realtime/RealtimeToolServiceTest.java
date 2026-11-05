@@ -136,6 +136,276 @@ class RealtimeToolServiceTest {
     }
 
     @Test
+    void listAvailableSlotsRejectsRequestedWeekdayThatDoesNotMatchBusinessLocalDate() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        LocalDate requestedDate = LocalDate.of(2026, 11, 13); // Friday
+        ZoneId zone = ZoneId.of("America/Santiago");
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-weekday");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "list_available_slots",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("date", requestedDate.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        assertTrue(result.getJSONObject("error").getString("message").contains("viernes"));
+        verifyNoInteractions(schedule);
+    }
+
+    @Test
+    void listAvailableSlotsRejectsUnknownRequestedWeekday() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-weekday-invalid");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "list_available_slots",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("date", "2026-11-12")
+                        .put("requestedWeekday", "FUNDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_REQUESTED_WEEKDAY", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(schedule, services, businesses);
+    }
+
+    @Test
+    void checkAvailabilityRejectsRequestedWeekdayMismatchBeforeCheckingSchedule() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        ZoneId zone = ZoneId.of("America/Santiago");
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-check-weekday");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("startAt", startAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(schedule, bookings, services);
+    }
+
+    @Test
+    void createBookingRejectsRequestedWeekdayMismatchBeforePersisting() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        ZoneId zone = ZoneId.of("America/Santiago");
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-create-weekday");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "create_booking",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("startAt", startAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(bookings, calls, customers, schedule, services);
+    }
+
+    @Test
+    void rescheduleBookingRejectsRequestedWeekdayMismatchBeforeMutation() {
+        UUID businessId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+        ZoneId zone = ZoneId.of("America/Santiago");
+        Instant newStartAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-reschedule-weekday");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", bookingId.toString())
+                        .put("newStartAt", newStartAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(bookings, calls, customers, schedule, services);
+    }
+
+    @Test
+    void checkAvailabilityUsesBusinessLocalWeekdayAcrossUtcMidnight() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        ZoneId zone = ZoneId.of("America/Santiago");
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 12), LocalTime.of(23, 0), zone).toInstant();
+
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), isNull())).thenReturn(0L);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-local-weekday");
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "check_booking_availability",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("startAt", startAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertTrue(result.getJSONObject("data").getBoolean("available"));
+        assertTrue(result.getJSONObject("data").getString("localStart").contains("2026-11-12T23:00"));
+    }
+
+    @Test
+    void buildInstructionsRequireBackendValidationForCustomerRequestedWeekday() {
+        UUID businessId = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business("America/Santiago")));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-instructions-weekday");
+        String instructions = tools.buildInstructions(context);
+
+        assertTrue(instructions.contains("requestedWeekday"));
+        assertTrue(instructions.contains("Nunca calcules el día de la semana de memoria"));
+    }
+
+    @Test
+    void businessInformationExposesBusinessLocalDateAndWeekday() {
+        UUID businessId = UUID.randomUUID();
+        ZoneId zone = ZoneId.of("America/Santiago");
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        CustomerRepository customers = mock(CustomerRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, customers, services, knowledge, bookings, calls, schedule,
+                mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-business-info");
+        JSONObject result = new JSONObject(tools.execute(context, "get_business_information", "{}"));
+        JSONObject data = result.getJSONObject("data");
+        LocalDate localDate = LocalDate.parse(data.getString("localDate"));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(localDate.getDayOfWeek().name(), data.getString("dayOfWeek"));
+        assertEquals(zone.getId(), data.getString("timezone"));
+    }
+
+    @Test
     void listAvailableSlotsReturnsNextRealAlternativesWithoutDayByDayToolLoop() {
         UUID businessId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
