@@ -59,3 +59,18 @@ Referencias para contrato de Meta:
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users
 - https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/version-4
 - https://www.twilio.com/docs/whatsapp/migrate-numbers-and-senders
+
+
+## SaaS coexistence hardening follow-up · 2026-11-05
+
+The DRAFT branch now also prepares the same coexistence flow for future SaaS tenants, without enabling it:
+
+- `META_WHATSAPP_COEXISTENCE_SELF_SERVICE_ENABLED=false` is a separate operator gate and defaults OFF.
+- The WABA ID reported by the Meta Embedded Signup session accompanies the one-time authorization code.
+- The backend exchanges the code and proves that the resulting customer-scoped token can read that exact WABA.
+- The selected WABA must also be present in RecepVoz's provider-side shared-WABA inventory.
+- Only the proven WABA is returned to the browser; the provider's full shared-WABA list is not exposed.
+- The WABA ID is persisted in the current tenant's `business_meta_whatsapp_config`. Subsequent system-user assignment, app subscription, phone discovery, validation and staging require an exact match to that tenant binding.
+- Existing Aurora tenant/phone allowlisting remains available and takes precedence over SaaS self-service.
+
+This remains a DRAFT code change. No Meta account, credential, Railway variable, webhook, sender, or live message was changed. Do not enable the self-service flag until Meta partner/app approval and exact-HEAD CI are verified.
