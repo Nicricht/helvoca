@@ -115,7 +115,7 @@ No convertir mejoras opcionales de CRM en requisito para el primer piloto.
 
 ### Fase 4 — Dominio y presencia pública
 
-**Estado:** <badge>DONE · 2026-11-05</badge>
+**Estado:** DONE · 2026-11-05
 
 - Cloudflare: CNAME `www → h8rnmpcx.up.railway.app` en DNS only; TXT `_railway-verify.www` coincide con el valor solicitado por Railway.
 - Railway confirma ambos dominios `VERIFIED` y TLS `VALID`; el CNAME de www está `PROPAGATED`.
