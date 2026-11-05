@@ -295,7 +295,7 @@ class TwilioCertificationCommandStoreTest {
                 .thenReturn(List.of());
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
 
-        assertTrue(store.claimNextForChatGptAurora().isEmpty());
+        assertTrue(store.claimNextForChatGptAurora(businessId).isEmpty());
 
         org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(sql.capture(),
