@@ -2,6 +2,8 @@
 
 **Creado:** 2026-10-13 · **Tablero vivo y único:** [Issue #823](https://github.com/Nicricht/helvoca/issues/823) · **Estado inicial:** EN EJECUCIÓN, NO-GO para voz comercial nueva.
 
+> **RUTA VIGENTE · 2026-11-05:** para continuar el proyecto, seguir [ROADMAP ÚNICA DE EJECUCIÓN · RECEPVOZ](ROADMAP_UNICA_RECEPVOZ_2026-11-05.md) y el último checkpoint del [Issue #823](https://github.com/Nicricht/helvoca/issues/823). El checkpoint fechado 2026-10-18 que sigue queda como **histórico**, no como lista de tareas actual. No repetir pruebas ni despliegues ya acreditados.
+
 ## Checkpoint rector · 2026-10-18 UTC: evidencia antes de declarar pendientes
 
 **Última revisión documentada, no estado perpetuo:** cada nueva sesión debe reconsultar [PR #846](https://github.com/Nicricht/helvoca/pull/846), su HEAD y CI del último commit, los comentarios recientes de [Issue #823](https://github.com/Nicricht/helvoca/issues/823), `AGENTS.md` y Railway/proveedor cuando corresponda. La tabla de 2026-10-16 que sigue se conserva **solo como historia**; sus antiguos SHA, pendientes y prioridades no sustituyen este checkpoint. Ninguna línea autoriza despliegue, merge, cargos, llamadas, cambios LIVE, nuevos recursos ni ejecución de tests externos.
