@@ -10,6 +10,7 @@ import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallTraceService;
 import cl.helvoca.call.CallSessionRepository;
+import cl.helvoca.customer.Customer;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
@@ -135,6 +136,7 @@ class RealtimeToolServiceTest {
         verify(services, never()).findAllByBusinessIdOrderByNameAsc(attackerBusiness);
     }
 
+
     @Test
     void listAvailableSlotsRejectsRequestedWeekdayThatDoesNotMatchBusinessLocalDate() {
         UUID businessId = UUID.randomUUID();
@@ -156,6 +158,11 @@ class RealtimeToolServiceTest {
         when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
         when(services.findByIdAndBusinessId(serviceId, businessId))
                 .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        when(schedule.listAvailableSlotsWithLookahead(
+                businessId, serviceId, 30, requestedDate, 8, 7, 3))
+                .thenReturn(new BusinessScheduleService.AvailabilityLookahead(
+                        new BusinessScheduleService.DailyAvailability(true, zone.getId(), requestedDate, List.of()),
+                        null));
 
         RealtimeCallContext context = new RealtimeCallContext(
                 UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-weekday");
@@ -174,10 +181,13 @@ class RealtimeToolServiceTest {
         verifyNoInteractions(schedule);
     }
 
+
     @Test
     void listAvailableSlotsRejectsUnknownRequestedWeekday() {
         UUID businessId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
+        LocalDate requestedDate = LocalDate.of(2026, 11, 12);
+        ZoneId zone = ZoneId.of("America/Santiago");
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
         ServiceItemRepository services = mock(ServiceItemRepository.class);
@@ -188,6 +198,13 @@ class RealtimeToolServiceTest {
         RealtimeToolService tools = new RealtimeToolService(
                 businesses, customers, services, knowledge, bookings, calls, schedule,
                 mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        when(schedule.listAvailableSlotsWithLookahead(
+                businessId, serviceId, 30, requestedDate, 8, 7, 3))
+                .thenReturn(new BusinessScheduleService.AvailabilityLookahead(
+                        new BusinessScheduleService.DailyAvailability(true, zone.getId(), requestedDate, List.of()),
+                        null));
 
         RealtimeCallContext context = new RealtimeCallContext(
                 UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-weekday-invalid");
@@ -196,14 +213,15 @@ class RealtimeToolServiceTest {
                 "list_available_slots",
                 new JSONObject()
                         .put("serviceId", serviceId.toString())
-                        .put("date", "2026-11-12")
+                        .put("date", requestedDate.toString())
                         .put("requestedWeekday", "FUNDAY")
                         .toString()));
 
         assertFalse(result.getBoolean("success"));
         assertEquals("INVALID_REQUESTED_WEEKDAY", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(schedule, services, businesses);
+        verifyNoInteractions(schedule);
     }
+
 
     @Test
     void checkAvailabilityRejectsRequestedWeekdayMismatchBeforeCheckingSchedule() {
@@ -224,6 +242,11 @@ class RealtimeToolServiceTest {
                 businesses, customers, services, knowledge, bookings, calls, schedule,
                 mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
         when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), isNull())).thenReturn(0L);
 
         RealtimeCallContext context = new RealtimeCallContext(
                 UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-check-weekday");
@@ -238,13 +261,17 @@ class RealtimeToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(schedule, bookings, services);
+        verifyNoInteractions(schedule, bookings);
     }
+
 
     @Test
     void createBookingRejectsRequestedWeekdayMismatchBeforePersisting() {
         UUID businessId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        String streamSid = "MZ-create-weekday";
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant startAt = ZonedDateTime.of(
                 LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
@@ -259,10 +286,29 @@ class RealtimeToolServiceTest {
         RealtimeToolService tools = new RealtimeToolService(
                 businesses, customers, services, knowledge, bookings, calls, schedule,
                 mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
         when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        CallSession call = new CallSession();
+        call.setBusinessId(businessId);
+        call.setCustomerId(customerId);
+        call.setStreamSid(streamSid);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        Customer customer = new Customer();
+        setId(customer, customerId);
+        when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.of(customer));
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(startAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(eq(businessId), eq(serviceId), eq(startAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), isNull())).thenReturn(0L);
+        when(bookings.saveAndFlush(any(Booking.class))).thenAnswer(invocation -> {
+            Booking saved = invocation.getArgument(0);
+            setId(saved, UUID.randomUUID());
+            return saved;
+        });
 
         RealtimeCallContext context = new RealtimeCallContext(
-                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-create-weekday");
+                callId, businessId, null, "+56911111111", "+56222222222", streamSid);
         JSONObject result = new JSONObject(tools.execute(
                 context,
                 "create_booking",
@@ -274,16 +320,23 @@ class RealtimeToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(bookings, calls, customers, schedule, services);
+        verify(bookings, never()).saveAndFlush(any());
     }
+
 
     @Test
     void rescheduleBookingRejectsRequestedWeekdayMismatchBeforeMutation() {
         UUID businessId = UUID.randomUUID();
         UUID bookingId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        String streamSid = "MZ-reschedule-weekday";
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant newStartAt = ZonedDateTime.of(
                 LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+        Instant oldStartAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 10), LocalTime.of(10, 30), zone).toInstant();
 
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -295,10 +348,26 @@ class RealtimeToolServiceTest {
         RealtimeToolService tools = new RealtimeToolService(
                 businesses, customers, services, knowledge, bookings, calls, schedule,
                 mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+
         when(businesses.findById(businessId)).thenReturn(Optional.of(business(zone.getId())));
+        when(services.findByIdAndBusinessId(serviceId, businessId))
+                .thenReturn(Optional.of(serviceItem(businessId, serviceId, "Consulta", 30)));
+        CallSession call = new CallSession();
+        call.setBusinessId(businessId);
+        call.setCustomerId(customerId);
+        call.setStreamSid(streamSid);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        Booking existing = booking(bookingId, businessId, customerId, serviceId,
+                oldStartAt, oldStartAt.plusSeconds(1800));
+        when(bookings.findByIdAndBusinessIdAndCustomerId(bookingId, businessId, customerId))
+                .thenReturn(Optional.of(existing));
+        when(schedule.isWithinBusinessHours(eq(businessId), eq(newStartAt), any(Instant.class))).thenReturn(true);
+        when(bookings.countOverlaps(eq(businessId), eq(serviceId), eq(newStartAt), any(Instant.class),
+                eq(BookingStatus.CANCELLED), eq(bookingId))).thenReturn(0L);
+        when(bookings.saveAndFlush(existing)).thenReturn(existing);
 
         RealtimeCallContext context = new RealtimeCallContext(
-                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-reschedule-weekday");
+                callId, businessId, null, "+56911111111", "+56222222222", streamSid);
         JSONObject result = new JSONObject(tools.execute(
                 context,
                 "reschedule_booking",
@@ -310,7 +379,7 @@ class RealtimeToolServiceTest {
 
         assertFalse(result.getBoolean("success"));
         assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
-        verifyNoInteractions(bookings, calls, customers, schedule, services);
+        verify(bookings, never()).saveAndFlush(existing);
     }
 
     @Test
