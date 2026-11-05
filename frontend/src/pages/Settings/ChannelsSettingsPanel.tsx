@@ -112,6 +112,7 @@ export function ChannelsSettingsPanel({
     wabaId: string;
     phoneNumberId?: string;
   } | null>(null);
+  const metaSignupWabaIdRef = useRef<string | null>(null);
   const metaActionLock = useRef(false);
 
   useEffect(() => {
@@ -129,21 +130,28 @@ export function ChannelsSettingsPanel({
         event?: string;
         data?: { waba_id?: string; phone_number_id?: string };
       };
-      if (payload.type !== "WA_EMBEDDED_SIGNUP" || !existingBusinessApp) return;
-      if (payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"
-        && /^[0-9]{5,30}$/.test(payload.data?.waba_id ?? "")
-        && (!payload.data?.phone_number_id
-          || /^[0-9]{5,30}$/.test(payload.data.phone_number_id))) {
-        // Meta may omit phone_number_id in the v4 completion event. The
-        // selected WABA is still bound to the session; after discovery the
-        // backend proves the exact allowlisted E.164 number against Graph.
-        setCoexistenceSession({
-          wabaId: payload.data!.waba_id!,
-          phoneNumberId: payload.data?.phone_number_id || undefined
-        });
+      if (payload.type !== "WA_EMBEDDED_SIGNUP") return;
+      const wabaId = payload.data?.waba_id ?? "";
+      const phoneNumberId = payload.data?.phone_number_id;
+      const validWabaId = /^[0-9]{5,30}$/.test(wabaId);
+      const validPhoneId = !phoneNumberId || /^[0-9]{5,30}$/.test(phoneNumberId);
+
+      if ((payload.event === "FINISH"
+          || payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING")
+        && validWabaId && validPhoneId) {
+        // Bind the authorization code to the WABA reported by Meta. The
+        // backend independently proves this customer's code can read it.
+        metaSignupWabaIdRef.current = wabaId;
+        if (payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
+          setCoexistenceSession({
+            wabaId,
+            phoneNumberId: phoneNumberId || undefined
+          });
+        }
       } else if (payload.event === "CANCEL" || payload.event === "ERROR") {
+        metaSignupWabaIdRef.current = null;
         setCoexistenceSession(null);
-        setMetaMessage("Meta no completó la autorización de coexistencia.");
+        setMetaMessage("Meta no completó la autorización de WhatsApp.");
       }
     }
     window.addEventListener("message", onMetaSession);
@@ -362,6 +370,7 @@ export function ChannelsSettingsPanel({
       return;
     }
     setCoexistenceSession(null);
+    metaSignupWabaIdRef.current = null;
     const bootstrap = metaBootstrap.data;
     if (!bootstrap?.available || !bootstrap.appId || !bootstrap.configId || !bootstrap.graphApiVersion) {
       setMetaMessage("La conexión guiada con Meta no está disponible en este entorno.");
@@ -389,10 +398,14 @@ export function ChannelsSettingsPanel({
           return;
         }
         try {
-          const handoff = await exchangeMetaAuthorizationCode(code);
+          const wabaId = metaSignupWabaIdRef.current;
+          if (!wabaId) {
+            throw new Error("Meta no confirmó el WABA de esta autorización. Reinicia la conexión y vuelve a intentarlo.");
+          }
+          const handoff = await exchangeMetaAuthorizationCode(code, wabaId);
           if (!handoff.accepted) throw new Error("Meta authorization rejected");
           setWabas(handoff.wabas ?? []);
-          setSelectedWaba("");
+          setSelectedWaba(handoff.wabas?.[0]?.id ?? "");
           setMetaPhones([]);
           setSelectedMetaPhone("");
           setValidatedMetaPhone(false);
