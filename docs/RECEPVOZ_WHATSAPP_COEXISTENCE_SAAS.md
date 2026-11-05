@@ -51,6 +51,7 @@ Voice and WhatsApp remain separate transports. They share business data and cust
 - A phone number already owned by another RecepVoz tenant is rejected. The unique phone-number constraint and tenant ownership check remain authoritative.
 - A tenant cannot select an arbitrary WABA from the provider portfolio: authorization is tied to the WABA reported by the current Meta session and proven readable by that customer's exchanged token.
 - The coexistence staging path never calls Meta's standard `/{phone_number_id}/register` endpoint and never requests a registration PIN.
+- The standard registration path performs a read-only Meta `is_on_biz_app` check immediately before `/register`. If Meta reports `true`, it rejects the operation and requires Coexistence. If the status cannot be read or is incomplete, it fails closed without registering the number.
 - The staged sender remains disabled. No inbound/outbound traffic is enabled by staging alone.
 - Webhook signatures, tenant resolution, idempotency, durable jobs, delivery callbacks, and existing outbound external-effect guards remain mandatory.
 - `smb_message_echoes`, history synchronization events, and other non-`messages` webhook fields must not be treated as new customer messages or answered by the AI.
