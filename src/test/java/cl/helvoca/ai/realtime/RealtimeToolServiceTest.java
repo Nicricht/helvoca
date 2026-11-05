@@ -446,7 +446,7 @@ class RealtimeToolServiceTest {
         String instructions = tools.buildInstructions(context);
 
         assertTrue(instructions.contains("requestedWeekday"));
-        assertTrue(instructions.contains("Nunca calcules el día de la semana de memoria"));
+        assertTrue(instructions.contains("Nunca calcules ni infieras el día de la semana de memoria"));
     }
 
     @Test

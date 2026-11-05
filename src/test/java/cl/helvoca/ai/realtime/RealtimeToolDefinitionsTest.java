@@ -43,6 +43,8 @@ class RealtimeToolDefinitionsTest {
         assertParameterExists(tools, "check_booking_availability", "requestedWeekday");
         assertParameterExists(tools, "create_booking", "requestedWeekday");
         assertParameterExists(tools, "reschedule_booking", "requestedWeekday");
+        assertDescriptionContains(tools, "get_business_information", "fecha local actual");
+        assertDescriptionContains(tools, "get_business_information", "día de la semana");
         assertDescriptionContains(tools, "list_available_slots", "dayOfWeek");
         assertDescriptionContains(tools, "create_booking", "nunca lo calcules");
         assertDescriptionContains(tools, "reschedule_booking", "nunca lo calcules");

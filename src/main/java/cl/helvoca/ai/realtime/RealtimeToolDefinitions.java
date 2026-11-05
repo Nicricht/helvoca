@@ -8,7 +8,7 @@ public final class RealtimeToolDefinitions {
 
     public static JSONArray all() {
         return new JSONArray()
-                .put(function("get_business_information", "Obtiene nombre, idioma y zona horaria del negocio.", object()))
+                .put(function("get_business_information", "Obtiene nombre, idioma, zona horaria, fecha local actual y día de la semana calculados en la zona horaria del negocio.", object()))
                 .put(function("list_services", "Lista servicios activos, precios y duración. Úsala antes de cualquier operación de reserva si todavía no tienes un serviceId real del catálogo.", object()))
                 .put(function("search_knowledge", "Busca información oficial configurada por el negocio.",
                         object().put("properties", new JSONObject().put("query", string("Texto a buscar")))
