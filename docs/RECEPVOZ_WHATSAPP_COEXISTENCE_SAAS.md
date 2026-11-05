@@ -24,6 +24,19 @@ Personal WhatsApp accounts are not the target of this flow. Meta decides whether
 7. Once activated, inbound messages are routed to the correct tenant, the AI responds using that business's own profile/services/knowledge, and supported operations are persisted through the existing WhatsApp tools.
 8. The owner can continue one-to-one use of the WhatsApp Business mobile app. App-originated echoes must never trigger another AI reply.
 
+## Phase 1 scope and explicit exclusions
+
+The first release is deliberately focused on live customer messages:
+
+- **Supported inbound:** text messages and supported audio/voice notes, with audio transcription before the AI turn.
+- **Supported response:** AI text replies through Meta Cloud API, plus the existing tenant-scoped business information, knowledge, customer, booking, rescheduling, cancellation, and request tools.
+- **Not included in Phase 1:** importing prior chat history, reading the business owner's entire WhatsApp inbox, interpreting inbound images/video/documents, or automatically ingesting messages the owner manually sends from the Business App.
+- **Echo safety:** messages echoed from the Business App are ignored so the AI does not answer its own outbound messages or create duplicate turns.
+
+Therefore, “read WhatsApp” in Phase 1 means receiving and understanding new inbound customer messages after the number is connected, not scanning all historic conversations on the phone. If the business owner handles a conversation manually in the mobile app, that manual reply is not automatically added to the AI's conversation context in this phase.
+
+Before a broad public rollout, evaluate and implement Meta's applicable history synchronization and app-state webhook requirements as a separate acceptance scope. Do not imply that old conversations have been imported or that all WhatsApp media types are supported.
+
 ## Shared receptionist behavior
 
 The WhatsApp channel reuses the tenant's AI agent identity, language, greeting, business instructions, knowledge, service catalog, hours, customer identity, bookings, and request handling.
