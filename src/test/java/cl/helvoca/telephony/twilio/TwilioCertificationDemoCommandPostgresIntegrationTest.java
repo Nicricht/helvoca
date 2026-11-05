@@ -174,7 +174,7 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
             assertTrue(commands.enqueue(otherTenantChatGptRun, "chatgpt-aurora:" + UUID.randomUUID(), other));
         });
 
-        var claimed = scope.callAsSystem(commands::claimNextForChatGptAurora).orElseThrow();
+        var claimed = scope.callAsSystem(() -> commands.claimNextForChatGptAurora(demo)).orElseThrow();
         assertEquals(chatGptRun, claimed.runId());
         assertEquals("PENDING", scope.callAsSystem(() -> commands.find(ordinaryRun).orElseThrow().status()));
         assertTrue(scope.callAsSystem(() -> commands.findForChatGptAurora(chatGptRun, demo)).isPresent());
