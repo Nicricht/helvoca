@@ -141,24 +141,34 @@ test.describe('React replacement for legacy Home capabilities', () => {
   test('business admin can inspect filter and export Audit from optional Home history', async ({ page }) => {
     await seed(page, ['BUSINESS_ADMIN'], ['ORDERS_READ', 'AUDIT_READ']);
     let auditUrl = '';
-    let exportUrl = '';
-    let exportCalls = 0;
+
+    // downloadAuthenticated uses native window.fetch(), so intercept it inside
+    // the isolated browser while preserving the real Blob/download behavior.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.__auditExportRequests = [];
+      window.fetch = (resource, options) => {
+        const value = typeof resource === 'string' ? resource : resource.url;
+        const parsed = new URL(value, location.origin);
+        if (parsed.pathname === '/api/v1/audit/export') {
+          window.__auditExportRequests.push(parsed.search);
+          return Promise.resolve(new Response(new Blob(['action,resource\\nBOOKING_UPDATE,BOOKING'], {
+            type: 'text/csv'
+          }), {
+            status: 200,
+            headers: {
+              'content-type': 'text/csv',
+              'content-disposition': 'attachment; filename="auditoria.csv"'
+            }
+          }));
+        }
+        return originalFetch(resource, options);
+      };
+    });
 
     await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
     await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
     await page.route('**/api/v1/audit**', route => {
-      const url = new URL(route.request().url());
-      if (url.pathname.endsWith('/export')) {
-        exportUrl = route.request().url();
-        exportCalls += 1;
-        return route.fulfill({
-          status: 200,
-          contentType: 'text/csv',
-          headers: { 'content-disposition': 'attachment; filename="auditoria.csv"' },
-          body: 'action,resource\nBOOKING_UPDATE,BOOKING'
-        });
-      }
-
       auditUrl = route.request().url();
       return route.fulfill(json([
         {
@@ -189,9 +199,14 @@ test.describe('React replacement for legacy Home capabilities', () => {
     await page.getByRole('button', { name: /aplicar filtros/i }).click();
     await expect.poll(() => auditUrl).toContain('actor=Carolina');
 
+    const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: /exportar auditoría csv/i }).click();
-    await expect.poll(() => exportCalls).toBe(1);
-    expect(new URL(exportUrl).pathname).toBe('/api/v1/audit/export');
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe('auditoria.csv');
+    const exportSearch = await page.evaluate(() => window.__auditExportRequests[0]);
+    const exportParams = new URLSearchParams(exportSearch);
+    expect(exportParams.get('format')).toBe('csv');
+    expect(exportParams.get('actor')).toBe('Carolina');
   });
 
   test('operator can see requests in Home but cannot open admin-only Audit', async ({ page }) => {
