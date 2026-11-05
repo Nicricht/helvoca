@@ -752,16 +752,32 @@ public class RealtimeToolService {
     }
 
     private JSONObject requestedWeekdayError(LocalDate localDate, JSONObject args) {
-        String requestedWeekday = optional(args, "requestedWeekday");
+        String requestedWeekday = requestedWeekdayArgument(args);
         if (requestedWeekday == null) return null;
         return compareRequestedWeekday(localDate, requestedWeekday);
     }
 
-    private JSONObject requestedWeekdayError(UUID businessId, Instant value, JSONObject args) {
-        String requestedWeekday = optional(args, "requestedWeekday");
+    protected JSONObject requestedWeekdayError(UUID businessId, Instant value, JSONObject args) {
+        String requestedWeekday = requestedWeekdayArgument(args);
         if (requestedWeekday == null) return null;
         ZoneId zone = ZoneId.of(requireBusiness(businessId).getTimezone());
         return compareRequestedWeekday(value.atZone(zone).toLocalDate(), requestedWeekday);
+    }
+
+    protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args) {
+        if (!args.has("requestedWeekday")) return null;
+        String rawStartAt = args.optString("startAt", null);
+        if (rawStartAt == null || rawStartAt.isBlank()) return null;
+        try {
+            return requestedWeekdayError(businessId, instant(rawStartAt), args);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static String requestedWeekdayArgument(JSONObject args) {
+        if (!args.has("requestedWeekday")) return null;
+        return args.isNull("requestedWeekday") ? "" : args.optString("requestedWeekday", "");
     }
 
     private static JSONObject compareRequestedWeekday(LocalDate localDate, String requestedWeekday) {

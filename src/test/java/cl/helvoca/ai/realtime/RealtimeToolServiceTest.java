@@ -224,6 +224,48 @@ class RealtimeToolServiceTest {
 
 
     @Test
+    void listAvailableSlotsRejectsPresentBlankOrNullRequestedWeekday() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
+                schedule, mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-weekday-blank");
+
+        for (Object requestedWeekday : List.of(" ", JSONObject.NULL)) {
+            JSONObject result = new JSONObject(tools.execute(
+                    context,
+                    "list_available_slots",
+                    new JSONObject()
+                            .put("serviceId", serviceId.toString())
+                            .put("date", "2026-11-13")
+                            .put("requestedWeekday", requestedWeekday)
+                            .toString()));
+
+            assertFalse(result.getBoolean("success"));
+            assertEquals("INVALID_REQUESTED_WEEKDAY", result.getJSONObject("error").getString("code"));
+        }
+        verifyNoInteractions(schedule);
+    }
+
+    @Test
+    void requestedWeekdayStartAtGuardLeavesMissingOrMalformedDatesToTheWorkflow() {
+        RealtimeToolService tools = service();
+        UUID businessId = UUID.randomUUID();
+
+        assertNull(tools.requestedWeekdayError(businessId, new JSONObject()));
+        assertNull(tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", "FRIDAY")));
+        assertNull(tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("startAt", " ")));
+        assertNull(tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("startAt", "not-an-instant")));
+    }
+
+    @Test
     void checkAvailabilityRejectsRequestedWeekdayMismatchBeforeCheckingSchedule() {
         UUID businessId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();

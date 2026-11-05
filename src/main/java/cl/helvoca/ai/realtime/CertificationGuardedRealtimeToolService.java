@@ -307,6 +307,12 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                 return invalid.toString();
             }
 
+            JSONObject weekdayError = requestedWeekdayError(context.businessId(), args);
+            if (weekdayError != null) {
+                trace.recordTool(context.businessId(), context.callId(), toolName, weekdayError, elapsedMs(startedNanos));
+                return weekdayError.toString();
+            }
+
             UUID customerId = call == null ? null : call.getCustomerId();
             if (customerId == null && context.callerNumber() != null && !context.callerNumber().isBlank()) {
                 customerId = customers.findFirstByBusinessIdAndPhone(context.businessId(), context.callerNumber())

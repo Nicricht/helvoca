@@ -31,5 +31,5 @@ jobs:
       - name: Verify booked-and-cancelled same entity, 12 technical checks and tenant-safe PostgreSQL 16
         run: >-
           mvn --batch-mode --no-transfer-progress
-          -Dtest=CallCertificationBookingEvidencePhase8Test,CallCertificationStatusServiceEvidenceTest,CallCertificationServiceTest,RealtimeToolServiceTest,RealtimeToolDefinitionsTest,TwilioMediaStreamStartupRecoveryPhase7Test,TwilioMediaStreamHandlerTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest
+          -Dtest=CallCertificationBookingEvidencePhase8Test,CallCertificationStatusServiceEvidenceTest,CallCertificationServiceTest,RealtimeToolServiceTest,RealtimeToolDefinitionsTest,CertificationGuardedRealtimeToolServiceTest,TwilioMediaStreamStartupRecoveryPhase7Test,TwilioMediaStreamHandlerTest,TwilioTenantBindingIntegrationTest,PostgresRowLevelSecurityIntegrationTest
           test
