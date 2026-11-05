@@ -37,6 +37,18 @@ class RealtimeToolDefinitionsTest {
     }
 
     @Test
+    void calendarToolsExposeRequestedWeekdayForBackendValidation() {
+        JSONArray tools = RealtimeToolDefinitions.all();
+        assertParameterExists(tools, "list_available_slots", "requestedWeekday");
+        assertParameterExists(tools, "check_booking_availability", "requestedWeekday");
+        assertParameterExists(tools, "create_booking", "requestedWeekday");
+        assertParameterExists(tools, "reschedule_booking", "requestedWeekday");
+        assertDescriptionContains(tools, "list_available_slots", "dayOfWeek");
+        assertDescriptionContains(tools, "create_booking", "nunca lo calcules");
+        assertDescriptionContains(tools, "reschedule_booking", "nunca lo calcules");
+    }
+
+    @Test
     void whatsappVerificationRequiresExplicitSameNumberConfirmation() {
         JSONArray tools = RealtimeToolDefinitions.all();
         for (int i = 0; i < tools.length(); i++) {
@@ -77,6 +89,17 @@ class RealtimeToolDefinitionsTest {
             assertTrue(description.contains("list_services"));
             assertTrue(serviceDescription.contains("list_services"));
             assertTrue(serviceDescription.toLowerCase().contains("nunca invent"));
+            return;
+        }
+        throw new AssertionError("Tool not found: " + name);
+    }
+
+    private static void assertParameterExists(JSONArray tools, String name, String parameter) {
+        for (int i = 0; i < tools.length(); i++) {
+            JSONObject tool = tools.getJSONObject(i);
+            if (!name.equals(tool.getString("name"))) continue;
+            assertTrue(tool.getJSONObject("parameters").getJSONObject("properties").has(parameter),
+                    () -> name + " should expose " + parameter);
             return;
         }
         throw new AssertionError("Tool not found: " + name);

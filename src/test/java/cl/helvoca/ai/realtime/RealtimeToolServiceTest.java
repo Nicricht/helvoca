@@ -421,6 +421,8 @@ class RealtimeToolServiceTest {
 
         assertTrue(result.getBoolean("success"));
         assertTrue(result.getJSONObject("data").getBoolean("available"));
+        assertEquals("2026-11-12", result.getJSONObject("data").getString("localDate"));
+        assertEquals("THURSDAY", result.getJSONObject("data").getString("dayOfWeek"));
         assertTrue(result.getJSONObject("data").getString("localStart").contains("2026-11-12T23:00"));
     }
 
@@ -528,7 +530,10 @@ class RealtimeToolServiceTest {
         assertTrue(data.isNull("unavailabilityReasonCode"));
         assertTrue(data.getString("customerSafeExplanation").contains("causa no está informada"));
         assertEquals(nextDate.toString(), data.getString("nextAvailableDate"));
+        assertEquals(requestedDate.getDayOfWeek().name(), data.getString("dayOfWeek"));
         assertEquals(1, data.getJSONArray("nextAvailableSlots").length());
+        assertEquals(nextDate.getDayOfWeek().name(),
+                data.getJSONArray("nextAvailableSlots").getJSONObject(0).getString("dayOfWeek"));
         assertEquals(slot.startAt().toString(),
                 data.getJSONArray("nextAvailableSlots").getJSONObject(0).getString("startAt"));
 

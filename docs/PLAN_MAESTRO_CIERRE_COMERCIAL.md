@@ -1,5 +1,16 @@
 # PLAN MAESTRO ÚNICO DE CIERRE COMERCIAL · HELVOCA / RECEPVOZ V1
 
+## Checkpoint de continuidad · 2026-11-05 · Fase 1 de voz · PR #857 DRAFT
+
+- **Brecha reproducida:** la llamada real del 2026-11-04 mostró una discrepancia entre el día de semana solicitado y la fecha usada por el asistente. Los handlers de agenda aceptaban ISO-8601 sin contrastar un día solicitado.
+- **TDD RED:** [Phase 8 offline run #42029853646](https://github.com/Nicricht/helvoca/actions/runs/42029853646), HEAD `8834023525e9e3c6a327e696f429bd32f725f294`: 96 pruebas, 6 fallos de comportamiento esperados y 1 error por falta de `localDate` en información del negocio. La prueba de conversión local America/Santiago a través de medianoche UTC pasó.
+- **Cambio en curso:** validar `requestedWeekday` antes de listar, comprobar, crear o reprogramar; devolver `localDate`/`dayOfWeek` en zona horaria del negocio; exponer el día en los slots y respuestas de agenda; reforzar las instrucciones y el esquema de herramientas.
+- **Cancelación:** no modificar el requisito de cancelación explícita de la certificación. En la llamada anterior no se solicitó cancelar; la limpieza automática retiró la reserva de prueba, pero no equivale a una cancelación ejecutada por el asistente.
+- **Alcance de seguridad:** sin migración de base de datos, sin tocar reservas existentes, sin llamadas, mensajes, pagos, cambios de secretos, Railway ni despliegues. PR #857 permanece DRAFT; `main` y producción intactos.
+- **Estado:** `VOICE_DATE_GUARD=IN_PROGRESS`, `LIVE_CALL_CERTIFIED=false`, `PROD_DEPLOY=NO-GO`, `WHATSAPP=EXTERNAL_PREREQUISITES_PENDING`.
+- **Siguiente puerta:** Phase 8 offline GREEN, Fast Gate y Full Gate sobre el HEAD final, cobertura diferencial Java 100% y revisión adversarial. Cualquier llamada posterior requiere autorización separada.
+
+
 **Creado:** 2026-10-13 · **Tablero vivo y único:** [Issue #823](https://github.com/Nicricht/helvoca/issues/823) · **Estado inicial:** EN EJECUCIÓN, NO-GO para voz comercial nueva.
 
 ## Checkpoint rector · 2026-10-18 UTC: evidencia antes de declarar pendientes
