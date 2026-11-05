@@ -145,7 +145,7 @@ test.describe('React replacement for legacy Home capabilities', () => {
 
     await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
     await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
-    await page.route(/\/api\/v1\/audit(?:\/export)?(?:\?.*)?$/, route => {
+    await page.route('**/api/v1/audit**', route => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith('/export')) {
         exportCalls += 1;
