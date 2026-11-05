@@ -92,7 +92,10 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
                 validation,
                 registration,
-                readyProperties());
+                readyProperties(),
+                null,
+                null,
+                null);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
@@ -211,7 +214,7 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
         var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
         var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
         var service = new MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
-                validation, registration, new MetaWhatsAppProperties());
+                validation, registration, new MetaWhatsAppProperties(), null, null, null);
 
         ConflictException error = assertThrows(ConflictException.class,
                 () -> service.register("12345678", "123456789", "123456"));
