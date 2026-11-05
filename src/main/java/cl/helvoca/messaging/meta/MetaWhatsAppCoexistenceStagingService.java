@@ -115,11 +115,8 @@ public class MetaWhatsAppCoexistenceStagingService {
     private boolean coexistencePhoneAllowed(String providerPhone) {
         String allowedBusinessId = properties.getCoexistenceAllowedBusinessId();
         String allowedPhone = properties.getCoexistenceAllowedPhone();
-        boolean hasBusinessAllowlist = !allowedBusinessId.isBlank();
-        boolean hasPhoneAllowlist = !allowedPhone.isBlank();
-
-        if (hasBusinessAllowlist != hasPhoneAllowlist) return false;
-        if (hasBusinessAllowlist) return allowedPhone.equals(providerPhone);
+        // stage() already rejects partial allowlists before contacting Meta.
+        if (!allowedBusinessId.isBlank()) return allowedPhone.equals(providerPhone);
         return properties.isCoexistenceSelfServiceEnabled();
     }
 }
