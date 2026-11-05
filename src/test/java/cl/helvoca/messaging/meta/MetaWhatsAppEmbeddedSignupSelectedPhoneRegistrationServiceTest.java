@@ -109,6 +109,7 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
     void failsClosedWhenMetaDoesNotConfirmRegistration() {
         var validation = mock(MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService.class);
         var registration = mock(MetaWhatsAppEmbeddedSignupRegisterPhoneClient.class);
+        var coexistenceStatus = mock(MetaWhatsAppCoexistencePhoneStatusClient.class);
         var tenantProvider = mock(TenantProvider.class);
         var audit = mock(AuditService.class);
         MetaWhatsAppProperties meta = readyProperties();
@@ -121,6 +122,8 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
                         "RecepVoz Demo",
                         "GREEN",
                         "VERIFIED"));
+        when(coexistenceStatus.isOnBusinessApp("1913623884432103", "system-user-secret"))
+                .thenReturn(false);
         when(registration.register(
                 "1913623884432103",
                 "system-user-secret",
@@ -131,6 +134,7 @@ class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationServiceTest {
                 validation,
                 registration,
                 meta,
+                coexistenceStatus,
                 tenantProvider,
                 audit);
 
