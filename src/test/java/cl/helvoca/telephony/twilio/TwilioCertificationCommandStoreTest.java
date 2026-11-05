@@ -294,6 +294,7 @@ class TwilioCertificationCommandStoreTest {
         when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
                 .thenReturn(List.of());
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+        UUID businessId = UUID.randomUUID();
 
         assertTrue(store.claimNextForChatGptAurora(businessId).isEmpty());
 
