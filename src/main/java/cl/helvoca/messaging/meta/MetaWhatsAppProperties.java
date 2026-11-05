@@ -17,6 +17,8 @@ public class MetaWhatsAppProperties {
     private boolean coexistenceEnabled = false;
     private String coexistenceAllowedBusinessId = "";
     private String coexistenceAllowedPhone = "";
+    // Global opt-in for tenant-scoped self-service coexistence onboarding.
+    private boolean coexistenceSelfServiceEnabled = false;
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
@@ -112,6 +114,14 @@ public class MetaWhatsAppProperties {
 
     public void setCoexistenceAllowedPhone(String phone) {
         this.coexistenceAllowedPhone = phone;
+    }
+
+    public boolean isCoexistenceSelfServiceEnabled() {
+        return coexistenceSelfServiceEnabled;
+    }
+
+    public void setCoexistenceSelfServiceEnabled(boolean enabled) {
+        this.coexistenceSelfServiceEnabled = enabled;
     }
 
     public boolean isEmbeddedSignupEnabled() {
