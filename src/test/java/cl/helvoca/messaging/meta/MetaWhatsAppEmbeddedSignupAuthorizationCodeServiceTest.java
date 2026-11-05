@@ -336,6 +336,42 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
     }
 
     @Test
+    void selectsMatchingWabaAfterAnUnrelatedEntryOnTheSamePage() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        when(exchange.exchange("code")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(validDebug());
+        when(shared.list("112233445566778", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(
+                        List.of(
+                                new MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba(
+                                        WABA_ID, "Unrelated WABA", "USD", "1", null),
+                                new MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba(
+                                        OTHER_WABA_ID, "Selected WABA", "CLP", "74", null)),
+                        null));
+        when(assigned.fetch(OTHER_WABA_ID, "112233445566778", "system-user-secret"))
+                .thenReturn(new MetaWhatsAppEmbeddedSignupAssignedUsersResult(List.of()));
+
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, null);
+        var response = service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", OTHER_WABA_ID));
+
+        assertTrue(response.accepted());
+        assertEquals(OTHER_WABA_ID, response.wabas().getFirst().id());
+        assertFalse(response.wabas().getFirst().systemUserAssigned());
+        verify(shared).list("112233445566778", "system-user-secret");
+        verify(authorization).authorize(OTHER_WABA_ID);
+    }
+
+    @Test
     void rejectsRepeatedSharedWabaPaginationCursor() {
         MetaWhatsAppProperties meta = readyProperties();
         var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
