@@ -524,10 +524,10 @@ export function getMetaWhatsAppBootstrap() {
   return apiRequest<MetaWhatsAppBootstrap>("/api/v1/channels/whatsapp/meta/embedded-signup/bootstrap");
 }
 
-export function exchangeMetaAuthorizationCode(code: string) {
+export function exchangeMetaAuthorizationCode(code: string, wabaId: string) {
   return apiRequest<MetaAuthorizationResult>("/api/v1/channels/whatsapp/meta/embedded-signup/authorization-code", {
     method: "POST",
-    body: JSON.stringify({ code })
+    body: JSON.stringify({ code, wabaId })
   });
 }
 
