@@ -1,0 +1,285 @@
+{
+  "business": {
+    "name": "Mercado del Patio",
+    "phone": "+56 9 5555 1122",
+    "instagram": "@mercadodelpatio",
+    "currencySymbol": "$",
+    "currencyCode": null
+  },
+  "products": [
+    {
+      "name": "Tostadas de palta + huevo pochado",
+      "price": 5900,
+      "category": "Desayunos y Brunch",
+      "availability": "unknown"
+    },
+    {
+      "name": "Croissant jamón queso",
+      "price": 4800,
+      "category": "Desayunos y Brunch",
+      "availability": "unknown"
+    },
+    {
+      "name": "Shakshuka del patio",
+      "price": 6700,
+      "category": "Desayunos y Brunch",
+      "availability": "unknown"
+    },
+    {
+      "name": "French toast berries",
+      "price": 5500,
+      "category": "Desayunos y Brunch",
+      "availability": "unknown"
+    },
+    {
+      "name": "Omelette caprese",
+      "price": 5300,
+      "category": "Desayunos y Brunch",
+      "availability": "unknown"
+    },
+    {
+      "name": "Bagel salmón cream cheese",
+      "price": 6900,
+      "category": "Desayunos y Brunch",
+      "availability": "unavailable"
+    },
+    {
+      "name": "Hamburguesa patio doble",
+      "price": 8900,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Bowl mediterráneo",
+      "price": 7600,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Pollo thai con arroz jazmín",
+      "price": 8200,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Ensalada césar con pollo",
+      "price": 7100,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Ravioles de zapallo",
+      "price": 8400,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Sándwich mechada italiana",
+      "price": 7900,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown"
+    },
+    {
+      "name": "Lasaña vegetariana",
+      "price": 7800,
+      "category": "Fondos / Almuerzos",
+      "availability": "unknown",
+      "previousPrice": 7200
+    },
+    {
+      "name": "Espresso",
+      "price": 1900,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Americano",
+      "price": 2400,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Cappuccino",
+      "price": 3200,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Latte vainilla",
+      "price": 3700,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Matcha latte",
+      "price": 4100,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Jugo naranja natural",
+      "price": 3500,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Limonada menta jengibre",
+      "price": 3900,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Smoothie berries banana",
+      "price": 4300,
+      "category": "Café y Bebidas",
+      "availability": "unknown",
+      "previousPrice": 4100
+    },
+    {
+      "name": "Té chai helado",
+      "price": 3800,
+      "category": "Café y Bebidas",
+      "availability": "unknown"
+    },
+    {
+      "name": "Cheesecake frutos rojos",
+      "price": 4200,
+      "category": "Postres",
+      "availability": "unknown"
+    },
+    {
+      "name": "Brownie tibio con helado",
+      "price": 4500,
+      "category": "Postres",
+      "availability": "unknown",
+      "hasVisiblePhoto": false
+    },
+    {
+      "name": "Torta de zanahoria",
+      "price": 3600,
+      "category": "Postres",
+      "availability": "unknown"
+    },
+    {
+      "name": "Cookie gigante chocolate",
+      "price": 2900,
+      "category": "Postres",
+      "availability": "unknown"
+    }
+  ],
+  "extras": [
+    {
+      "name": "Palta",
+      "price": 1200
+    },
+    {
+      "name": "Huevo extra",
+      "price": 900
+    },
+    {
+      "name": "Queso cheddar",
+      "price": 800
+    },
+    {
+      "name": "Pollo grillado",
+      "price": 1800
+    },
+    {
+      "name": "Tocino crocante",
+      "price": 1500
+    },
+    {
+      "name": "Leche vegetal",
+      "price": 700
+    },
+    {
+      "name": "Shot extra de espresso",
+      "price": 900
+    },
+    {
+      "name": "Pan sin gluten",
+      "price": 1000
+    }
+  ],
+  "promotions": [
+    {
+      "name": "COMBO ALMUERZO",
+      "price": 11900,
+      "startTime": null,
+      "endTime": null,
+      "conditions": "fondo + bebida + mini postre"
+    },
+    {
+      "name": "HAPPY HOUR DULCE",
+      "price": 4900,
+      "startTime": null,
+      "endTime": null,
+      "conditions": "cappuccino + cookie gigante"
+    },
+    {
+      "name": "PROMO BRUNCH 2x1",
+      "price": null,
+      "days": [
+        "Lunes",
+        "Martes",
+        "Miércoles"
+      ],
+      "startTime": "08:00",
+      "endTime": "11:30",
+      "conditions": null
+    },
+    {
+      "name": "MARTES VEGGIE",
+      "discountPercent": 15,
+      "days": [
+        "Martes"
+      ],
+      "startTime": null,
+      "endTime": null,
+      "eligibleProducts": [
+        "Bowl mediterráneo",
+        "Ravioles de zapallo"
+      ]
+    }
+  ],
+  "businessHours": [
+    {
+      "days": [
+        "Lunes",
+        "Martes",
+        "Miércoles",
+        "Jueves",
+        "Viernes"
+      ],
+      "open": "08:00",
+      "close": "20:30"
+    },
+    {
+      "days": [
+        "Sábado"
+      ],
+      "open": "09:00",
+      "close": "21:00"
+    },
+    {
+      "days": [
+        "Domingo"
+      ],
+      "open": "09:30",
+      "close": "18:00"
+    }
+  ],
+  "faqContains": [
+    "PATIO_GUEST",
+    "terraza",
+    "12:30",
+    "débito",
+    "15-20",
+    "sin gluten"
+  ],
+  "generalNoticesContain": [
+    "gluten",
+    "lácteos",
+    "frutos secos"
+  ]
+}
