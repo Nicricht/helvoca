@@ -149,6 +149,18 @@ class MetaWhatsAppEmbeddedSignupBootstrapServiceTest {
     }
 
     @Test
+    void allowlistedCoexistenceRemainsHiddenWithoutTenantProvider() {
+        MetaWhatsAppProperties meta = readyProperties();
+        meta.setCoexistenceEnabled(true);
+        meta.setCoexistenceAllowedBusinessId(UUID.randomUUID().toString());
+        meta.setCoexistenceAllowedPhone("+56950730447");
+
+        var response = new MetaWhatsAppEmbeddedSignupBootstrapService(meta).bootstrap();
+
+        assertFalse(response.coexistenceAvailable());
+    }
+
+    @Test
     void selfServiceRequiresAnAuthenticatedTenantAndAnExplicitEnablement() {
         MetaWhatsAppProperties meta = readyProperties();
         meta.setCoexistenceEnabled(true);
