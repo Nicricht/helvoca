@@ -326,7 +326,17 @@ test('Meta embedded signup completes inside React and clears the registration PI
   await page.addInitScript(() => {
     window.FB = {
       init: () => {},
-      login: callback => callback({ authResponse: { code: 'temporary-e2e-code' } })
+      login: callback => {
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: 'https://www.facebook.com',
+        data: {
+          type: 'WA_EMBEDDED_SIGNUP',
+          event: 'FINISH',
+          data: { waba_id: '1906385232743451' }
+        }
+      }));
+      callback({ authResponse: { code: 'temporary-e2e-code' } });
+    }
     };
   });
   await bootReactSettings(page);
@@ -445,7 +455,7 @@ test('Meta embedded signup completes inside React and clears the registration PI
   await page.getByRole('button', { name: 'Conectar WhatsApp' }).click();
   await page.getByRole('button', { name: 'Continuar con Meta' }).click();
 
-  await expect.poll(() => authorizationPayload).toEqual({ code: 'temporary-e2e-code' });
+  await expect.poll(() => authorizationPayload).toEqual({ code: 'temporary-e2e-code', wabaId: '1906385232743451' });
   await expect(page.getByText('Negocio E2E WhatsApp')).toBeVisible();
 
   await page.getByRole('button', { name: /Negocio E2E WhatsApp/ }).click();
