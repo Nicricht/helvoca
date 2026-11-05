@@ -45,23 +45,6 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
         this.auditService = auditService;
     }
 
-    MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-            MetaWhatsAppEmbeddedSignupReadinessService readinessService,
-            MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
-            MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
-            MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient,
-            MetaWhatsAppProperties metaProperties) {
-        this(
-                readinessService,
-                sharedWabaClient,
-                assignedUsersClient,
-                assignSystemUserClient,
-                metaProperties,
-                null,
-                null,
-                null);
-    }
-
     public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult ensureAssigned(String wabaId) {
         if (!readinessService.readiness().readyForEmbeddedSignup()) {
             throw new ConflictException("META_EMBEDDED_SIGNUP_NOT_READY");
