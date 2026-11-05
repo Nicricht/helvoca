@@ -52,17 +52,6 @@ public class MetaWhatsAppEmbeddedSignupAuthorizationCodeService {
         this.auditService = auditService;
     }
 
-    MetaWhatsAppEmbeddedSignupAuthorizationCodeService(
-            MetaWhatsAppEmbeddedSignupReadinessService readinessService,
-            MetaWhatsAppEmbeddedSignupTokenExchangeClient tokenExchangeClient,
-            MetaWhatsAppEmbeddedSignupTokenDebugClient tokenDebugClient,
-            MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
-            MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
-            MetaWhatsAppProperties metaProperties) {
-        this(readinessService, tokenExchangeClient, tokenDebugClient, sharedWabaClient,
-                assignedUsersClient, null, null, metaProperties, null, null);
-    }
-
     public MetaWhatsAppEmbeddedSignupAuthorizationCodeResponse accept(
             MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest request) {
         if (!readinessService.readiness().readyForEmbeddedSignup()) {
