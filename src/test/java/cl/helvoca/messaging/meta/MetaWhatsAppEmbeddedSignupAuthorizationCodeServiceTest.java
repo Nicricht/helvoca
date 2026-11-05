@@ -16,7 +16,6 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
 
     private static final String WABA_ID = "1906385232743451";
     private static final String OTHER_WABA_ID = "1972385232742141";
-    private static final String PHONE_ID = "1913623884432103";
 
     @Test
     void rejectsHandoffWhenEmbeddedSignupIsNotReadyBeforeCallingMeta() {
