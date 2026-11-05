@@ -48,7 +48,7 @@ class RealtimeToolDefinitionsTest {
         assertDescriptionContains(tools, "list_available_slots", "dayOfWeek");
         assertDescriptionContains(tools, "create_booking", "nunca lo calcules");
         assertDescriptionContains(tools, "reschedule_booking", "nunca lo calcules");
-        assertDescriptionContains(tools, "create_booking", "Si el cliente mencionó explícitamente un día de semana");
+        assertDescriptionContains(tools, "create_booking", "si el cliente mencionó explícitamente un día de semana");
         assertDescriptionContains(tools, "create_booking", "Si no mencionó un día, omite requestedWeekday");
         assertDescriptionContains(tools, "reschedule_booking", "Si el cliente mencionó explícitamente un día de semana");
         assertDescriptionContains(tools, "reschedule_booking", "Si no mencionó un día, omite requestedWeekday");

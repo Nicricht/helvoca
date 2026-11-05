@@ -283,6 +283,46 @@ class CertificationGuardedRealtimeToolServiceTest {
     }
 
     @Test
+    void primaryCreateBookingAllowsDateOnlyPhaseOneWhenNoWeekdayWasStated() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        BookingConfirmationWorkflowService workflow = mock(BookingConfirmationWorkflowService.class);
+        setField(f.service, "bookingConfirmationWorkflow", workflow);
+        JSONObject proposal = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("requiresConfirmation", true)
+                        .put("bookingCreated", false))
+                .put("error", JSONObject.NULL);
+        when(workflow.execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class)))
+                .thenReturn(proposal);
+
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject()
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("startAt", startAt.toString())
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertTrue(result.getJSONObject("data").getBoolean("requiresConfirmation"));
+        assertFalse(result.getJSONObject("data").getBoolean("bookingCreated"));
+        verify(workflow).execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class));
+    }
+
+    @Test
     void primaryCreateBookingPhaseTwoStillReachesWorkflowWithoutStartAtOrWeekday() {
         Fixture f = new Fixture();
         f.call.setCertification(false);
