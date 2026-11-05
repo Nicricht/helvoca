@@ -83,6 +83,29 @@ class MetaWhatsAppTenantWabaAuthorizationServiceTest {
     }
 
     @Test
+    void refusesToChangeAnActiveLegacyConfigWithoutWabaBinding() {
+        UUID businessId = UUID.randomUUID();
+        var configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var tenants = mock(TenantProvider.class);
+        var existing = new MetaWhatsAppTenantConfig();
+        existing.setBusinessId(businessId);
+        existing.setCredentialRef("EMBEDDED_SIGNUP_SYSTEM_USER");
+        existing.setEnabled(true);
+        when(tenants.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.of(existing));
+
+        var service = new MetaWhatsAppTenantWabaAuthorizationService(configs, credentials, tenants);
+        ConflictException error = assertThrows(
+                ConflictException.class,
+                () -> service.authorize(WABA));
+
+        assertEquals("META_WHATSAPP_ACTIVE_CONFIG_REQUIRES_DEACTIVATION", error.getMessage());
+        verifyNoInteractions(credentials);
+        verify(configs, never()).saveAndFlush(any());
+    }
+
+    @Test
     void requiresExactPersistedWabaForCurrentTenant() {
         UUID businessId = UUID.randomUUID();
         var configs = mock(MetaWhatsAppTenantConfigRepository.class);
