@@ -1,47 +1,48 @@
-# Excepción temporal de cobertura diferencial Java para PR #855
+# Retirada de la excepción temporal de cobertura diferencial Java para PR #855
 
-**Estado:** activa y temporal para completar la etapa de coexistencia WhatsApp.  
-**Aprobación:** 2026-11-05, por el propietario del repositorio.  
+**Estado:** RETIRADA. El umbral temporal del 80 % ya no está activo.  
+**Retirada:** 2026-11-05, después de conseguir 100 % en líneas, ramas y métodos del delta de PR #855.  
 **Rama:** `feature/aurora-wa-business-coexistence-guard-20261104`  
 **PR de implementación:** [#855](https://github.com/Nicricht/helvoca/pull/855), DRAFT.  
 **PR de validación CI:** [#856](https://github.com/Nicricht/helvoca/pull/856), DRAFT, mismo HEAD y dirigido a `main`.
 
-## Alcance exacto
+## Alcance del control
 
-PR #855 está apilado sobre una rama distinta de `main`. El workflow de CI escucha pull requests dirigidos a `main`, por lo que GitHub ejecuta la validación del mismo HEAD mediante el PR paraguas #856.
+PR #855 está apilado sobre una rama distinta de `main`. El workflow de CI valida el HEAD integrado mediante el PR paraguas #856, que apunta a `main`.
 
-Para que la excepción no cubra también el cambio anterior apilado en PR #853, el paso JaCoCo del PR #856 compara únicamente el delta de PR #855 desde su base:
+Para medir únicamente el delta de PR #855 y no mezclar el trabajo previo de PR #853, el workflow conserva como base de comparación:
 
 `847eb9863bceabbca523985573d85407d2011e7e`
 
-Solo cuando coinciden PR #856, base `main` y la rama exacta de coexistencia, el workflow usa esa base y exige como mínimo:
+**Esta base específica no es una excepción de cobertura.** Los umbrales `DIFF_LINE_COVERAGE`, `DIFF_BRANCH_COVERAGE` y `DIFF_METHOD_COVERAGE` ya no se sobrescriben. El verificador usa sus valores predeterminados de **100 %** para líneas, ramas y métodos. Todos los demás PR también mantienen el 100 %.
 
-- Líneas diferenciales: **80 %**.
-- Ramas diferenciales: **80 %**.
-- Métodos diferenciales: **80 %**.
+## Evidencia histórica de la excepción
 
-Para cualquier otro PR se conserva su propia base y el umbral de **100 %**. Los valores predeterminados de `scripts/ci/check_diff_coverage.py` siguen siendo 100 %. No se modifican los gates de seguridad, aislamiento por tenant, Golden Journey, integración, frontend ni runtime.
+La excepción fue aprobada temporalmente el 2026-11-05 para permitir continuar mientras se cubrían las últimas rutas. No se eliminaron pruebas ni se relajaron los controles de seguridad o aislamiento por tenant.
 
-## Evidencia de cobertura
+La ejecución anterior `42049963831` documentó el déficit que justificó temporalmente el umbral. Esa condición quedó resuelta en la ejecución exacta descrita a continuación.
 
-Fuente: [CI #42049963831](https://github.com/Nicricht/helvoca/actions/runs/42049963831), HEAD evaluado `4d270ae869241d551c1a3bd9fe09ceb435180282`, artefacto `backend-test-diagnostics` (JaCoCo XML y reportes Surefire).
+## Certificación final y retirada
 
-- Pruebas backend: **2.598 ejecutadas, 0 fallos y 0 errores**.
-- El resultado del workflow completo apilado contra `main` fue 672/673 líneas (99,9 %), 416/422 ramas (98,6 %) y 158/158 métodos (100 %).
-- Recalculado el delta específico de PR #855 contra su base `847eb9863bceabbca523985573d85407d2011e7e`: **388/389 líneas (99,7 %), 215/224 ramas (96,0 %) y 55/55 métodos (100 %)**.
-- En el delta de PR #855 queda una línea ejecutable sin cubrir en `MetaWhatsAppEmbeddedSignupAuthorizationCodeService.java:145` y nueve resultados de rama pendientes en ocho ubicaciones.
+Fuente: [GitHub Actions #42070632979](https://github.com/Nicricht/helvoca/actions/runs/42070632979).  
+HEAD certificado: `b581c5ddb88d80fdb6270c46da00404a3bc6919b`.  
+Base de comparación del delta PR #855: `847eb9863bceabbca523985573d85407d2011e7e`.
 
-El fallo original del gate fue exclusivamente por exigir 100 % en todos los indicadores. Las pruebas funcionales del backend no registraron fallos ni errores.
+- Backend: **2.602 pruebas, 0 fallos, 0 errores**.
+- Líneas diferenciales: **305/305 = 100 %**.
+- Ramas diferenciales: **180/180 = 100 %**.
+- Métodos diferenciales: **53/53 = 100 %**.
+- Browser E2E: **630/630 aprobadas**.
+- Fast Gate, Golden Journey, System Integration E2E, Home Frontend Coverage, Inventory Frontend Coverage y compatibilidad runtime histórico: **aprobados**.
 
-## Garantías
+El log JaCoCo del mismo HEAD confirma que la rama pendiente de `MetaWhatsAppTenantWabaAuthorizationService.java` quedó cubierta. Por tanto, se retira la excepción y se vuelve a exigir 100 % sin modificar los valores predeterminados del verificador.
+
+## Garantías y límites
 
 - No se eliminan ni se deshabilitan pruebas.
 - No se rebajan controles de seguridad ni de aislamiento entre negocios.
-- No se cambia lógica de producción, secretos, variables de Railway, webhooks ni configuración de Meta/Twilio.
+- No se modifican secretos, variables de Railway, webhooks ni configuración de Meta/Twilio.
 - No se envían mensajes reales ni se ejecutan llamadas, compras o migraciones.
 - `main` y producción permanecen intactos.
 - PR #855 y PR #856 permanecen abiertos y en DRAFT; no se autoriza merge ni despliegue.
-
-## Retirada obligatoria
-
-Al completar esta etapa de coexistencia, retirar la condición temporal del workflow, restaurar el 100 % para líneas, ramas y métodos, volver a usar la base del PR de validación y ejecutar nuevamente el Full Gate. Esta excepción no debe convertirse en la política permanente de RecepVoz.
+- Esta certificación acredita el código y las pruebas offline. No acredita todavía la aprobación externa de Meta, el webhook de producción ni la entrega real de mensajes WhatsApp.
