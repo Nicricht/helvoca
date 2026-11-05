@@ -179,6 +179,7 @@ app:
       # Existing WhatsApp Business App numbers must never use standard /register.
       standard-registration-enabled: ${META_WHATSAPP_STANDARD_REGISTRATION_ENABLED:false}
       coexistence-enabled: ${META_WHATSAPP_COEXISTENCE_ENABLED:false}
+      coexistence-self-service-enabled: ${META_WHATSAPP_COEXISTENCE_SELF_SERVICE_ENABLED:false}
       coexistence-allowed-business-id: ${META_WHATSAPP_COEXISTENCE_ALLOWED_BUSINESS_ID:}
       coexistence-allowed-phone: ${META_WHATSAPP_COEXISTENCE_ALLOWED_PHONE:}
       inbound:
