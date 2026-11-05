@@ -31,6 +31,27 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
                 () -> service.ensureAssigned("1906385232743451"));
 
         assertEquals("META_EMBEDDED_SIGNUP_NOT_READY", error.getMessage());
+        verifyNoInteractions(sharedWabas, assignedUsers, assign, wabaAuthorization);
+    }
+
+    @Test
+    void rejectsWabaNotAuthorizedForCurrentTenantBeforeProviderLookup() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var assign = mock(MetaWhatsAppEmbeddedSignupAssignSystemUserClient.class);
+        var wabaAuthorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        doThrow(new ConflictException("META_WHATSAPP_WABA_NOT_AUTHORIZED_FOR_TENANT"))
+                .when(wabaAuthorization).requireAuthorized("1906385232743451");
+
+        var service = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
+                readiness, sharedWabas, assignedUsers, assign, meta, wabaAuthorization, null, null);
+        ConflictException error = assertThrows(
+                ConflictException.class,
+                () -> service.ensureAssigned("1906385232743451"));
+
+        assertEquals("META_WHATSAPP_WABA_NOT_AUTHORIZED_FOR_TENANT", error.getMessage());
         verifyNoInteractions(sharedWabas, assignedUsers, assign);
     }
 
