@@ -21,9 +21,10 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
         var sharedWabas = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
         var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
         var assign = mock(MetaWhatsAppEmbeddedSignupAssignSystemUserClient.class);
+        var wabaAuthorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-                readiness, sharedWabas, assignedUsers, assign, meta);
+                readiness, sharedWabas, assignedUsers, assign, meta, wabaAuthorization, null, null);
 
         ConflictException error = assertThrows(
                 ConflictException.class,
@@ -41,6 +42,7 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
         var assignedUsers = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
         var assign = mock(MetaWhatsAppEmbeddedSignupAssignSystemUserClient.class);
 
+        doNothing().when(wabaAuthorization).requireAuthorized("1906385232743451");
         when(sharedWabas.list("112233445566778", "system-user-secret"))
                 .thenReturn(new MetaWhatsAppEmbeddedSignupSharedWabaPage(
                         List.of(new MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba(
@@ -101,7 +103,7 @@ class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentServiceTest {
                                 List.of("MANAGE")))));
 
         var service = new MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-                readiness, sharedWabas, assignedUsers, assign, meta, tenantProvider, audit);
+                readiness, sharedWabas, assignedUsers, assign, meta, wabaAuthorization, tenantProvider, audit);
 
         var result = service.ensureAssigned("1906385232743451");
 
