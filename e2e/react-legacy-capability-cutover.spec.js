@@ -141,13 +141,15 @@ test.describe('React replacement for legacy Home capabilities', () => {
   test('business admin can inspect filter and export Audit from optional Home history', async ({ page }) => {
     await seed(page, ['BUSINESS_ADMIN'], ['ORDERS_READ', 'AUDIT_READ']);
     let auditUrl = '';
+    let exportUrl = '';
     let exportCalls = 0;
 
     await page.route('**/api/v1/commercial/orders', route => route.fulfill(json([])));
     await page.route('**/api/v1/commercial/deliveries', route => route.fulfill(json([])));
-    await page.route(/\/api\/v1\/audit(?:\/export)?(?:\?.*)?$/, route => {
+    await page.route('**/api/v1/audit**', route => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith('/export')) {
+        exportUrl = route.request().url();
         exportCalls += 1;
         return route.fulfill({
           status: 200,
@@ -189,6 +191,7 @@ test.describe('React replacement for legacy Home capabilities', () => {
 
     await page.getByRole('button', { name: /exportar auditoría csv/i }).click();
     await expect.poll(() => exportCalls).toBe(1);
+    expect(new URL(exportUrl).pathname).toBe('/api/v1/audit/export');
   });
 
   test('operator can see requests in Home but cannot open admin-only Audit', async ({ page }) => {
