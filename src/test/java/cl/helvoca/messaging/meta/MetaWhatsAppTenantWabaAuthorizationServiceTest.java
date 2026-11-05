@@ -126,4 +126,35 @@ class MetaWhatsAppTenantWabaAuthorizationServiceTest {
                 () -> service.requireAuthorized(OTHER_WABA));
         assertEquals("META_WHATSAPP_WABA_NOT_AUTHORIZED_FOR_TENANT", error.getMessage());
     }
+    @Test
+    void rejectsMissingOrMalformedWabaIdsBeforeReadingTenantConfiguration() {
+        UUID businessId = UUID.randomUUID();
+        var configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var tenants = mock(TenantProvider.class);
+        when(tenants.requireBusinessId()).thenReturn(businessId);
+        var service = new MetaWhatsAppTenantWabaAuthorizationService(configs, credentials, tenants);
+
+        assertThrows(IllegalArgumentException.class, () -> service.authorize(null));
+        assertThrows(IllegalArgumentException.class, () -> service.authorize("not-numeric"));
+        verifyNoInteractions(configs, credentials);
+    }
+
+    @Test
+    void requireAuthorizedFailsClosedWhenTenantHasNoStoredConfiguration() {
+        UUID businessId = UUID.randomUUID();
+        var configs = mock(MetaWhatsAppTenantConfigRepository.class);
+        var credentials = mock(MetaWhatsAppEmbeddedSignupCredentialReferenceResolver.class);
+        var tenants = mock(TenantProvider.class);
+        when(tenants.requireBusinessId()).thenReturn(businessId);
+        when(configs.findById(businessId)).thenReturn(Optional.empty());
+        var service = new MetaWhatsAppTenantWabaAuthorizationService(configs, credentials, tenants);
+
+        ConflictException error = assertThrows(
+                ConflictException.class, () -> service.requireAuthorized(WABA));
+        assertEquals("META_WHATSAPP_WABA_NOT_AUTHORIZED_FOR_TENANT", error.getMessage());
+        verifyNoInteractions(credentials);
+    }
+
+
 }

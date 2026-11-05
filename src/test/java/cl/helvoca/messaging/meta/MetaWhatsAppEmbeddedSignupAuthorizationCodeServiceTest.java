@@ -209,6 +209,188 @@ class MetaWhatsAppEmbeddedSignupAuthorizationCodeServiceTest {
         verifyNoInteractions(wabaAccess, sharedWabas, assignedUsers, wabaAuthorization);
     }
 
+
+    @Test
+    void rejectsMissingRequestCodeAndInvalidSelectedWabaBeforeExchange() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, null);
+
+        assertThrows(IllegalArgumentException.class, () -> service.accept(null));
+        assertThrows(IllegalArgumentException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest(null, WABA_ID)));
+        assertThrows(IllegalArgumentException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("  ", WABA_ID)));
+        assertThrows(IllegalArgumentException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", null)));
+        assertThrows(IllegalArgumentException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", "not-numeric")));
+        verifyNoInteractions(exchange, debug, shared, assigned, access, authorization);
+    }
+
+    @Test
+    void rejectsWhenTenantWabaProofDependenciesAreUnavailable() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+
+        var missingAccess = service(readiness, exchange, debug, shared, assigned,
+                null, authorization, meta, null, null);
+        assertThrows(ConflictException.class, () -> missingAccess.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var missingAuthorization = service(readiness, exchange, debug, shared, assigned,
+                access, null, meta, null, null);
+        assertThrows(ConflictException.class, () -> missingAuthorization.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+
+        verifyNoInteractions(exchange, debug, shared, assigned, access, authorization);
+    }
+
+    @Test
+    void rejectsDebugTokenWithMissingOrMismatchedAppIdAndMissingScope() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        when(exchange.exchange("code")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, null);
+
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupTokenDebugResult(
+                        true, null, "USER", 1790000000L, 1800000000L,
+                        List.of("whatsapp_business_management"), List.of()));
+        ConflictException missing = assertThrows(ConflictException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+        assertEquals("META_EMBEDDED_SIGNUP_TOKEN_APP_MISMATCH", missing.getMessage());
+
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupTokenDebugResult(
+                        true, "999999999", "USER", 1790000000L, 1800000000L,
+                        List.of("whatsapp_business_management"), List.of()));
+        ConflictException mismatch = assertThrows(ConflictException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+        assertEquals("META_EMBEDDED_SIGNUP_TOKEN_APP_MISMATCH", mismatch.getMessage());
+
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupTokenDebugResult(
+                        true, "123456789", "USER", 1790000000L, 1800000000L,
+                        List.of("business_management"), List.of()));
+        ConflictException scope = assertThrows(ConflictException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+        assertEquals("META_EMBEDDED_SIGNUP_REQUIRED_SCOPE_MISSING", scope.getMessage());
+        verifyNoInteractions(shared, assigned, access, authorization);
+    }
+
+    @Test
+    void findsSelectedWabaOnTheSecondSharedPageAndHandlesOptionalAuditDependencies() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        var audit = mock(AuditService.class);
+        when(exchange.exchange("code")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(validDebug());
+        when(shared.list("112233445566778", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(List.of(), "cursor-page-2"));
+        when(shared.list("112233445566778", "system-user-secret", "cursor-page-2")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(
+                        List.of(new MetaWhatsAppEmbeddedSignupSharedWabaPage.Waba(
+                                WABA_ID, "Selected WABA", "CLP", "74", null)), null));
+        when(assigned.fetch(WABA_ID, "112233445566778", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupAssignedUsersResult(List.of()));
+
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, audit);
+        var response = service.accept(new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID));
+
+        assertTrue(response.accepted());
+        assertFalse(response.wabas().getFirst().systemUserAssigned());
+        verify(shared).list("112233445566778", "system-user-secret");
+        verify(shared).list("112233445566778", "system-user-secret", "cursor-page-2");
+        verify(authorization).authorize(WABA_ID);
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void rejectsRepeatedSharedWabaPaginationCursor() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        when(exchange.exchange("code")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(validDebug());
+        when(shared.list("112233445566778", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(List.of(), "same-cursor"));
+        when(shared.list("112233445566778", "system-user-secret", "same-cursor")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(List.of(), "same-cursor"));
+
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, null);
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+
+        assertTrue(error.getMessage().contains("repeated a cursor"));
+        verifyNoInteractions(assigned, authorization);
+    }
+
+    @Test
+    void stopsSharedWabaPaginationAtTheConfiguredSafetyLimit() {
+        MetaWhatsAppProperties meta = readyProperties();
+        var readiness = new MetaWhatsAppEmbeddedSignupReadinessService(meta);
+        var exchange = mock(MetaWhatsAppEmbeddedSignupTokenExchangeClient.class);
+        var debug = mock(MetaWhatsAppEmbeddedSignupTokenDebugClient.class);
+        var shared = mock(MetaWhatsAppEmbeddedSignupSharedWabaClient.class);
+        var assigned = mock(MetaWhatsAppEmbeddedSignupAssignedUsersClient.class);
+        var access = mock(MetaWhatsAppEmbeddedSignupWabaAccessClient.class);
+        var authorization = mock(MetaWhatsAppTenantWabaAuthorizationService.class);
+        var cursor = new java.util.concurrent.atomic.AtomicInteger();
+        when(exchange.exchange("code")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupToken("oauth-token", "bearer", 3600L));
+        when(debug.debug("oauth-token", "system-user-secret")).thenReturn(validDebug());
+        when(shared.list("112233445566778", "system-user-secret")).thenReturn(
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(List.of(), "cursor-0"));
+        when(shared.list(anyString(), anyString(), anyString())).thenAnswer(invocation ->
+                new MetaWhatsAppEmbeddedSignupSharedWabaPage(
+                        List.of(), "cursor-" + cursor.incrementAndGet()));
+
+        var service = service(readiness, exchange, debug, shared, assigned,
+                access, authorization, meta, null, null);
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> service.accept(
+                new MetaWhatsAppEmbeddedSignupAuthorizationCodeRequest("code", WABA_ID)));
+
+        assertTrue(error.getMessage().contains("exceeded safe limit"));
+        verify(shared, times(99)).list(anyString(), anyString(), anyString());
+    }
+
     private static MetaWhatsAppEmbeddedSignupAuthorizationCodeService service(
             MetaWhatsAppEmbeddedSignupReadinessService readiness,
             MetaWhatsAppEmbeddedSignupTokenExchangeClient exchange,
