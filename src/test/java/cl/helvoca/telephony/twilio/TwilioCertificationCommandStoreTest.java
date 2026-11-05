@@ -291,7 +291,7 @@ class TwilioCertificationCommandStoreTest {
     @Test
     void dedicatedClaimQueryOnlySelectsChatGptAuroraCommands() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any()))
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any(), any()))
                 .thenReturn(List.of());
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
         UUID businessId = UUID.randomUUID();
@@ -300,7 +300,7 @@ class TwilioCertificationCommandStoreTest {
 
         org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(sql.capture(),
-                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any());
+                org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any(), any());
         assertTrue(sql.getValue().contains("requested_by LIKE 'chatgpt-aurora:%'"));
     }
 
