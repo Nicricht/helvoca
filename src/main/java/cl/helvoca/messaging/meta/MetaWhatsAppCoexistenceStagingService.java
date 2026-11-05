@@ -47,9 +47,7 @@ public class MetaWhatsAppCoexistenceStagingService {
         UUID businessId = tenantProvider.requireBusinessId();
         // Require an exact DEMO tenant and an exact pre-approved E.164 number.
         // The flags are deliberately OFF unless configured for the isolated pilot.
-        if (!properties.isCoexistenceEnabled()
-                || !businessId.toString().equals(properties.getCoexistenceAllowedBusinessId())
-                || !properties.getCoexistenceAllowedPhone().matches("^\\+[1-9][0-9]{7,14}$")) {
+        if (!properties.isCoexistenceEnabled() || !coexistenceTenantAllowed(businessId)) {
             throw new ConflictException("META_COEXISTENCE_NOT_AUTHORIZED_FOR_TENANT");
         }
         if (!readiness.readiness().readyForEmbeddedSignup()) {
@@ -69,7 +67,7 @@ public class MetaWhatsAppCoexistenceStagingService {
         }
         String providerPhone = MetaWhatsAppEmbeddedSignupPhoneRecordResolverService
                 .normalizeE164(carrier.displayPhoneNumber());
-        if (!properties.getCoexistenceAllowedPhone().equals(providerPhone)) {
+        if (!coexistencePhoneAllowed(providerPhone)) {
             throw new ConflictException("META_COEXISTENCE_WRONG_PHONE");
         }
 
@@ -99,5 +97,29 @@ public class MetaWhatsAppCoexistenceStagingService {
                 "COEXISTENCE_VERIFIED_AND_STAGED",
                 staged.phoneRecordId(), staged.provider(), staged.providerPhoneNumberId(),
                 staged.wabaId(), staged.credentialRef(), false);
+    }
+
+    private boolean coexistenceTenantAllowed(UUID businessId) {
+        String allowedBusinessId = properties.getCoexistenceAllowedBusinessId();
+        String allowedPhone = properties.getCoexistenceAllowedPhone();
+        boolean hasBusinessAllowlist = !allowedBusinessId.isBlank();
+        boolean hasPhoneAllowlist = !allowedPhone.isBlank();
+
+        // A partial pilot allowlist is a configuration error, never a reason
+        // to fall back to unrestricted tenant self-service.
+        if (hasBusinessAllowlist != hasPhoneAllowlist) return false;
+        if (hasBusinessAllowlist) return businessId.toString().equals(allowedBusinessId);
+        return properties.isCoexistenceSelfServiceEnabled();
+    }
+
+    private boolean coexistencePhoneAllowed(String providerPhone) {
+        String allowedBusinessId = properties.getCoexistenceAllowedBusinessId();
+        String allowedPhone = properties.getCoexistenceAllowedPhone();
+        boolean hasBusinessAllowlist = !allowedBusinessId.isBlank();
+        boolean hasPhoneAllowlist = !allowedPhone.isBlank();
+
+        if (hasBusinessAllowlist != hasPhoneAllowlist) return false;
+        if (hasBusinessAllowlist) return allowedPhone.equals(providerPhone);
+        return properties.isCoexistenceSelfServiceEnabled();
     }
 }
