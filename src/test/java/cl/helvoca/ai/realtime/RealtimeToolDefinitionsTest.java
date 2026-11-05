@@ -48,6 +48,12 @@ class RealtimeToolDefinitionsTest {
         assertDescriptionContains(tools, "list_available_slots", "dayOfWeek");
         assertDescriptionContains(tools, "create_booking", "nunca lo calcules");
         assertDescriptionContains(tools, "reschedule_booking", "nunca lo calcules");
+        assertDescriptionContains(tools, "create_booking", "Si el cliente mencionó explícitamente un día de semana");
+        assertDescriptionContains(tools, "create_booking", "Si no mencionó un día, omite requestedWeekday");
+        assertDescriptionContains(tools, "reschedule_booking", "Si el cliente mencionó explícitamente un día de semana");
+        assertDescriptionContains(tools, "reschedule_booking", "Si no mencionó un día, omite requestedWeekday");
+        assertParameterDescriptionContains(tools, "create_booking", "requestedWeekday", "omitir si no lo mencionó");
+        assertParameterDescriptionContains(tools, "reschedule_booking", "requestedWeekday", "omitir si no mencionó uno");
     }
 
     @Test
@@ -75,6 +81,22 @@ class RealtimeToolDefinitionsTest {
         JSONArray tools = RealtimeToolDefinitions.all();
         assertDescriptionContains(tools, "end_call", "despídete");
         assertDescriptionContains(tools, "end_call", "No la uses por un silencio breve");
+    }
+
+    private static void assertParameterDescriptionContains(
+            JSONArray tools, String name, String parameter, String expected) {
+        for (int i = 0; i < tools.length(); i++) {
+            JSONObject tool = tools.getJSONObject(i);
+            if (!name.equals(tool.getString("name"))) continue;
+            String description = tool.getJSONObject("parameters")
+                    .getJSONObject("properties")
+                    .getJSONObject(parameter)
+                    .getString("description");
+            assertTrue(description.contains(expected),
+                    () -> name + "." + parameter + " should mention " + expected);
+            return;
+        }
+        throw new AssertionError("Tool not found: " + name);
     }
 
     private static void assertCatalogSourced(JSONArray tools, String name) {

@@ -765,14 +765,24 @@ public class RealtimeToolService {
     }
 
     protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args) {
-        if (!args.has("requestedWeekday")) return null;
-        String rawStartAt = args.optString("startAt", null);
-        if (rawStartAt == null || rawStartAt.isBlank()) return null;
+        return requestedWeekdayError(businessId, args, "startAt");
+    }
+
+    protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args, String instantArgument) {
+        String requestedWeekday = requestedWeekdayArgument(args);
+        if (requestedWeekday == null) return null;
+        if (requestedWeekday.isBlank()) return invalidRequestedWeekday();
+
+        String rawInstant = args.optString(instantArgument, null);
+        if (rawInstant == null || rawInstant.isBlank()) return null;
+
+        Instant value;
         try {
-            return requestedWeekdayError(businessId, instant(rawStartAt), args);
+            value = instant(rawInstant);
         } catch (IllegalArgumentException e) {
             return null;
         }
+        return requestedWeekdayError(businessId, value, args);
     }
 
     private static String requestedWeekdayArgument(JSONObject args) {
@@ -785,8 +795,7 @@ public class RealtimeToolService {
         try {
             requested = DayOfWeek.valueOf(requestedWeekday.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            return error("INVALID_REQUESTED_WEEKDAY",
-                    "El día solicitado no es válido. Usa MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY o SUNDAY.");
+            return invalidRequestedWeekday();
         }
         DayOfWeek actual = localDate.getDayOfWeek();
         if (requested == actual) return null;
@@ -796,6 +805,11 @@ public class RealtimeToolService {
         return error("WEEKDAY_DATE_MISMATCH",
                 "La fecha local " + localDate + " corresponde a " + actualName + ", no a " + requestedName
                         + ". Revisa la fecha con el cliente antes de continuar.");
+    }
+
+    private static JSONObject invalidRequestedWeekday() {
+        return error("INVALID_REQUESTED_WEEKDAY",
+                "El día solicitado no es válido. Usa MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY o SUNDAY.");
     }
 
     private static RequestPriority requestPriority(String value) {

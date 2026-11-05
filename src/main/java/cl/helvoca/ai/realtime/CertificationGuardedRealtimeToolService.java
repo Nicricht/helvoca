@@ -236,6 +236,22 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
             return blocked.toString();
         }
 
+        if ("create_booking".equals(toolName)) {
+            JSONObject weekdayError = requestedWeekdayError(context.businessId(), parseArguments(rawArguments));
+            if (weekdayError != null) {
+                trace.recordTool(context.businessId(), context.callId(), toolName, weekdayError, elapsedMs(startedNanos));
+                return weekdayError.toString();
+            }
+        }
+        if ("reschedule_booking".equals(toolName)) {
+            JSONObject weekdayError = requestedWeekdayError(
+                    context.businessId(), parseArguments(rawArguments), "newStartAt");
+            if (weekdayError != null) {
+                trace.recordTool(context.businessId(), context.callId(), toolName, weekdayError, elapsedMs(startedNanos));
+                return weekdayError.toString();
+            }
+        }
+
         BusinessOperation.Type operationType = null;
         if (automationPolicies != null) {
             JSONObject policyBlock = automationPolicies.blockIfAutomationDisabled(context.businessId(), toolName);
@@ -305,12 +321,6 @@ public class CertificationGuardedRealtimeToolService extends RealtimeToolService
                 JSONObject invalid = error("INVALID_ARGUMENT", "Los datos de la reserva no son válidos.");
                 trace.recordTool(context.businessId(), context.callId(), toolName, invalid, elapsedMs(startedNanos));
                 return invalid.toString();
-            }
-
-            JSONObject weekdayError = requestedWeekdayError(context.businessId(), args);
-            if (weekdayError != null) {
-                trace.recordTool(context.businessId(), context.callId(), toolName, weekdayError, elapsedMs(startedNanos));
-                return weekdayError.toString();
             }
 
             UUID customerId = call == null ? null : call.getCustomerId();

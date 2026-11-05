@@ -263,6 +263,19 @@ class RealtimeToolServiceTest {
                 businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("startAt", " ")));
         assertNull(tools.requestedWeekdayError(
                 businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("startAt", "not-an-instant")));
+        assertNull(tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("newStartAt", " "), "newStartAt"));
+        assertNull(tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", "FRIDAY").put("newStartAt", "not-an-instant"),
+                "newStartAt"));
+
+        JSONObject blank = tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", " "));
+        assertEquals("INVALID_REQUESTED_WEEKDAY", blank.getJSONObject("error").getString("code"));
+
+        JSONObject nullValue = tools.requestedWeekdayError(
+                businessId, new JSONObject().put("requestedWeekday", JSONObject.NULL));
+        assertEquals("INVALID_REQUESTED_WEEKDAY", nullValue.getJSONObject("error").getString("code"));
     }
 
     @Test
