@@ -81,6 +81,17 @@ class MetaWhatsAppEmbeddedSignupBootstrapServiceTest {
     }
 
     @Test
+    void doesNotExposeSelfServiceWithoutAuthenticatedTenantContext() {
+        MetaWhatsAppProperties meta = readyProperties();
+        meta.setCoexistenceEnabled(true);
+        meta.setCoexistenceSelfServiceEnabled(true);
+
+        var response = new MetaWhatsAppEmbeddedSignupBootstrapService(meta).bootstrap();
+
+        assertFalse(response.coexistenceAvailable());
+    }
+
+    @Test
     void partialPilotAllowlistBlocksSelfServiceAndDoesNotExposeCoexistence() {
         MetaWhatsAppProperties meta = readyProperties();
         meta.setCoexistenceEnabled(true);
