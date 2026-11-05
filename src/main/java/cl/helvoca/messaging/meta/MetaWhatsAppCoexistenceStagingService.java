@@ -45,8 +45,8 @@ public class MetaWhatsAppCoexistenceStagingService {
     public MetaWhatsAppEmbeddedSignupPhoneStagingResult stage(
             String wabaId, String phoneNumberId) {
         UUID businessId = tenantProvider.requireBusinessId();
-        // Require an exact DEMO tenant and an exact pre-approved E.164 number.
-        // The flags are deliberately OFF unless configured for the isolated pilot.
+        // Require either the exact controlled-pilot tenant/phone pair or the explicit
+        // tenant self-service gate. Both modes remain disabled unless an operator opts in.
         if (!properties.isCoexistenceEnabled() || !coexistenceTenantAllowed(businessId)) {
             throw new ConflictException("META_COEXISTENCE_NOT_AUTHORIZED_FOR_TENANT");
         }
