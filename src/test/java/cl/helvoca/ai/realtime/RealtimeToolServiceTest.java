@@ -138,6 +138,35 @@ class RealtimeToolServiceTest {
 
 
     @Test
+    void listAvailableSlotsReturnsInvalidArgumentWhenServiceDoesNotExist() {
+        UUID businessId = UUID.randomUUID();
+        UUID serviceId = UUID.randomUUID();
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), mock(CustomerRepository.class), services,
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), mock(CallSessionRepository.class),
+                schedule, mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), businessId, null, "+56911111111", "+56222222222", "MZ-service-missing");
+
+        when(services.findByIdAndBusinessId(serviceId, businessId)).thenReturn(Optional.empty());
+
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "list_available_slots",
+                new JSONObject()
+                        .put("serviceId", serviceId.toString())
+                        .put("date", "2026-11-13")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_ARGUMENT", result.getJSONObject("error").getString("code"));
+        assertTrue(result.getJSONObject("error").getString("message").contains("Servicio no encontrado"));
+        verifyNoInteractions(schedule);
+    }
+
+    @Test
     void listAvailableSlotsRejectsRequestedWeekdayThatDoesNotMatchBusinessLocalDate() {
         UUID businessId = UUID.randomUUID();
         UUID serviceId = UUID.randomUUID();
