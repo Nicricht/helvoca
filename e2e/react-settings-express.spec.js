@@ -33,6 +33,86 @@ async function mockSetup(page, roles = ['BUSINESS_ADMIN']) {
 }
 
 test.describe('Settings Express user journey', () => {
+  test('guides each verified backend nextStep to one correct section without saving', async ({ page }) => {
+    const writes = await mockSetup(page);
+    let currentStep = 'CONFIGURE_BUSINESS';
+    await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
+      businessProfileConfigured: true, servicesConfigured: true, scheduleConfigured: true,
+      knowledgeConfigured: true, phoneConfigured: true, humanTransferConfigured: true,
+      readyForCalls: currentStep === 'READY', nextStep: currentStep
+    })));
+
+    const cases = [
+      ['CONFIGURE_BUSINESS', 'Completa los datos del negocio', 'Ir a Negocio', 'Negocio', 'business'],
+      ['ADD_SERVICE', 'Agrega los servicios del negocio', 'Ir a Servicios', 'Servicios', 'services'],
+      ['CONFIGURE_HOURS', 'Define los horarios de atención', 'Ir a Horarios', 'Horarios', 'hours'],
+      ['CONNECT_PHONE_NUMBER', 'Revisa la conexión telefónica', 'Ir a Canales', 'Canales', 'channels'],
+      ['OPTIONAL_HUMAN_TRANSFER', 'Decide si necesitas derivación humana', 'Ir a Negocio', 'Negocio', 'business'],
+      ['OPTIONAL_KNOWLEDGE', 'Agrega preguntas frecuentes si las tienes', 'Ir a Conocimiento', 'Conocimiento', 'knowledge'],
+      ['READY', 'Base configurada: revisa la recepcionista', 'Ir a Recepcionista IA', 'Recepcionista IA', 'receptionist']
+    ];
+
+    for (const [step, title, buttonName, tabName, section] of cases) {
+      currentStep = step;
+      await page.goto('/app/settings');
+      const next = page.getByTestId('settings-next-step');
+      await expect(next).toContainText(title);
+      if (step === 'READY') {
+        await expect(next).toContainText('no certifica llamadas ni WhatsApp reales');
+      }
+      const continueButton = next.getByRole('button', { name: buttonName });
+      await expect(continueButton).toBeVisible();
+      await continueButton.click();
+      await expect(page.getByRole('tab', { name: tabName, exact: true }))
+        .toHaveAttribute('aria-selected', 'true');
+      await expect(page).toHaveURL(new RegExp('section=' + section));
+      expect(writes).toEqual([]);
+    }
+  });
+
+  test('continues by keyboard and never guesses missing or unsupported preparation states', async ({ page }) => {
+    const writes = await mockSetup(page);
+    let nextStep = 'ADD_SERVICE';
+    await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
+      businessProfileConfigured: true, servicesConfigured: false,
+      scheduleConfigured: false, phoneConfigured: false,
+      readyForCalls: false, nextStep
+    })));
+
+    await page.goto('/app/settings');
+    const region = page.getByTestId('settings-next-step');
+    const action = region.getByRole('button', { name: 'Ir a Servicios' });
+    await action.focus();
+    await expect(action).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('tab', { name: 'Servicios' })).toHaveAttribute('aria-selected', 'true');
+    expect(writes).toEqual([]);
+
+    for (const value of ['NOT_RECOGNIZED', null]) {
+      nextStep = value;
+      await page.goto('/app/settings');
+      await expect(region).toContainText('No hay un siguiente paso verificado');
+      await expect(region.getByRole('button')).toHaveCount(0);
+      await expect(region).toContainText('Revisa los ajustes manualmente');
+      expect(writes).toEqual([]);
+    }
+  });
+
+  test('operator sees next verified step as read-only and cannot trigger an edit action', async ({ page }) => {
+    const writes = await mockSetup(page, ['OPERATOR']);
+    await page.route('**/api/v1/onboarding/status', route => route.fulfill(json({
+      businessProfileConfigured: false, servicesConfigured: false,
+      scheduleConfigured: false, phoneConfigured: false,
+      readyForCalls: false, nextStep: 'CONFIGURE_BUSINESS'
+    })));
+    await page.goto('/app/settings');
+    const next = page.getByTestId('settings-next-step');
+    await expect(next).toContainText('Completa los datos del negocio');
+    await expect(next).toContainText('Solo administración puede editar este paso');
+    await expect(next.getByRole('button')).toHaveCount(0);
+    expect(writes).toEqual([]);
+  });
+
   test('puts Express above manual editing while preserving every advanced tab', async ({ page }) => {
     const writes = await mockSetup(page);
     await page.goto('/app/settings');
