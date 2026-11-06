@@ -847,4 +847,82 @@ test.describe('React business import migration', () => {
     expect(calls.knowledgeWrites()).toHaveLength(0);
   });
 
+  test('disabled approval cannot be bypassed to save without selecting rows', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toBeVisible();
+    const button = page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' });
+    await expect(button).toBeDisabled();
+    // Bypass HTML disabled only to assert the React approve() guard; no API should be called.
+    await button.evaluate(element => {
+      element.removeAttribute('disabled');
+      element.click();
+    });
+    await expect(page.getByRole('status').filter({ hasText: /Configuración aprobada/i })).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('extraction failure outside CSV decode is reported safely without partial writes', async ({ page }) => {
+    await page.addInitScript(() => {
+      const originalNormalize = String.prototype.normalize;
+      String.prototype.normalize = function (...args) {
+        if (String(this) === 'FORCE_REVIEW_FAILURE') throw new Error('forced header normalization error');
+        return originalNormalize.apply(this, args);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'fail.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('FORCE_REVIEW_FAILURE,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(
+      /No pudimos leer la planilla de preguntas u horarios/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('late extraction rejection after leaving import never resurrects an obsolete review', async ({ page }) => {
+    await page.addInitScript(() => {
+      const originalText = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'late.csv') {
+          return new Promise(resolve => { window.__resolveLateImport = resolve; });
+        }
+        return originalText.call(this);
+      };
+      const originalNormalize = String.prototype.normalize;
+      String.prototype.normalize = function (...args) {
+        if (String(this) === 'FORCE_LATE_FAILURE') throw new Error('late normalization failure');
+        return originalNormalize.apply(this, args);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'late.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('FORCE_LATE_FAILURE,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect.poll(() => page.evaluate(() => typeof window.__resolveLateImport)).toBe('function');
+    await page.evaluate(() => {
+      history.pushState({}, '', '/app/settings');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(page).toHaveURL(/\/app\/settings\/?$/);
+    await page.evaluate(() => window.__resolveLateImport(
+      'FORCE_LATE_FAILURE,respuesta\n¿Atienden?,Sí\n'));
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
 });
