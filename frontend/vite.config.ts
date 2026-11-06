@@ -60,15 +60,22 @@ function directReactRoutes() {
 
 const inventoryCoverage = process.env.VITE_COVERAGE === "true";
 const homeCoverage = process.env.VITE_HOME_COVERAGE === "true";
-if (inventoryCoverage && homeCoverage) throw new Error("Home and Inventory coverage require separate builds.");
-const coverageEnabled = inventoryCoverage || homeCoverage;
+const importCoverage = process.env.VITE_IMPORT_COVERAGE === "true";
+if ([inventoryCoverage, homeCoverage, importCoverage].filter(Boolean).length > 1) {
+  throw new Error("Inventory, Home and Import coverage require separate builds.");
+}
+const coverageEnabled = inventoryCoverage || homeCoverage || importCoverage;
 
 export default defineConfig({
   base: "/app/",
   plugins: [
     react(),
     ...(coverageEnabled ? [istanbul({
-      include: homeCoverage ? [
+      include: importCoverage ? [
+        "src/features/businessImport/localSetup.ts",
+        "src/features/businessImport/setupApply.ts",
+        "src/pages/BusinessImport/FreeSetupReview.tsx"
+      ] : homeCoverage ? [
         "src/pages/Home/HomePage.tsx",
         "src/pages/Home/HomeAttentionRows.tsx",
         "src/features/operations/attentionApi.ts"
