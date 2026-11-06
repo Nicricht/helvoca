@@ -775,7 +775,7 @@ test.describe('React business import migration', () => {
       buffer: Buffer.from('pregunta,respuesta\n¿Pueden atender?,Sí\n')
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
-    await expect(page.getByTestId('free-setup-warning')).toContainText(/No pudimos leer/i);
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/unreadable\.csv: el CSV\/TSV tiene comillas sin cerrar o demasiadas filas/i);
     await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
     expect(calls.knowledgeWrites()).toHaveLength(0);
     expect(calls.selectedPatch()).toBeNull();
