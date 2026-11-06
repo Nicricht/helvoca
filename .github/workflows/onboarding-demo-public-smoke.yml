@@ -1,0 +1,52 @@
+name: Onboarding DEMO public smoke
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/onboarding-demo-public-smoke.yml"
+      - "tools/demo-preview/**"
+      - "Dockerfile.preview"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  demo-public-http:
+    name: verify-public-read-only-demo
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE_URL: https://recepvoz-onboarding-preview-demo-isolated.up.railway.app
+    steps:
+      - name: Verify isolated Railway preview and security boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --retry 5 --retry-delay 3 --max-time 20 "${BASE_URL}/healthz" |
+            jq -e '.status == "UP" and .mode == "READ_ONLY_FIXTURE"'
+          curl --fail-with-body --silent --show-error --retry 3 --retry-delay 2 --max-time 20 \
+            --cookie-jar /tmp/recepvoz-demo-cookies "${BASE_URL}/preview?sector=veterinary" -o /tmp/recepvoz-demo-preview.html
+          grep -q 'recepvoz-preview-fixture' /tmp/recepvoz-demo-preview.html
+          grep -q 'rv_preview_sector' /tmp/recepvoz-demo-cookies
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            -H 'Authorization: Bearer recepvoz-preview-fixture' \
+            --cookie /tmp/recepvoz-demo-cookies "${BASE_URL}/api/v1/onboarding/status" |
+            jq -e '.nextStep == "CONFIGURE_HOURS" and .readyForCalls == false'
+          curl --fail-with-body --silent --show-error --max-time 20 \
+            -H 'Authorization: Bearer recepvoz-preview-fixture' \
+            --cookie /tmp/recepvoz-demo-cookies "${BASE_URL}/api/v1/business/profile" |
+            jq -e '.presetKey == "veterinary"'
+          curl --fail-with-body --silent --show-error --max-time 20 "${BASE_URL}/app/settings" |
+            grep -q 'DEMO AISLADA'
+          unauthorized="$(curl --silent --show-error --max-time 20 -o /tmp/unauthorized.json -w '%{http_code}' "${BASE_URL}/api/v1/auth/me")"
+          test "${unauthorized}" = "401"
+          for method in POST PUT PATCH DELETE; do
+            code="$(curl --silent --show-error --max-time 20 \
+              -X "${method}" -H 'Authorization: Bearer recepvoz-preview-fixture' \
+              --data '{}' -o /tmp/denied.json -w '%{http_code}' \
+              "${BASE_URL}/api/v1/business/profile")"
+            test "${code}" = "405"
+            jq -e '.message | contains("solo lectura")' /tmp/denied.json
+          done
+          echo "LIVE_PUBLIC_PREVIEW_SMOKE=PASS (synthetic only; no writes)"
