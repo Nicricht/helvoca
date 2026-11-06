@@ -1,0 +1,36 @@
+name: Onboarding static preview contract
+
+on:
+  pull_request:
+    paths:
+      - "tools/demo-preview/**"
+      - "Dockerfile.preview"
+      - "frontend/**"
+      - ".github/workflows/onboarding-preview-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-gate:
+    name: isolated-preview-no-side-effects
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Test read-only fixture gateway (no external providers)
+        run: node --test tools/demo-preview/server.test.mjs
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and compile React preview
+        run: npm run frontend:build
+      - name: Verify built preview entrypoint
+        run: |
+          test -f src/main/resources/static/app/index.html
+          test -f src/main/resources/static/frontend-foundation.css
+          test -f tools/demo-preview/server.mjs
+          test -f Dockerfile.preview
