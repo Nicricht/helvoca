@@ -189,7 +189,8 @@
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   box-sizing: border-box;
   width: 100%;
   min-height: 39px;
@@ -203,10 +204,17 @@
 }
 
 .field input:focus,
-.field select:focus {
+.field select:focus,
+.field textarea:focus {
   outline: none;
   border-color: rgba(22, 217, 245, .32);
   box-shadow: 0 0 0 3px rgba(22, 217, 245, .06);
+}
+
+.field textarea {
+  min-height: 80px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
 .field input:disabled {
