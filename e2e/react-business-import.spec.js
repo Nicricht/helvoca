@@ -639,9 +639,9 @@ test.describe('React business import migration', () => {
     const calls = await boot(page, { products: [] });
     await page.goto('/app/settings/import');
     await page.getByLabel('Archivos del negocio').setInputFiles([
-      { name: 'sin-datos.csv', mimeType: 'text/csv', buffer: Buffer.from('   \\n') },
+      { name: 'sin-datos.csv', mimeType: 'text/csv', buffer: Buffer.from('   \n') },
       { name: 'horas.tsv', mimeType: 'text/tab-separated-values',
-        buffer: Buffer.from('dia\\tapertura\\tcierre\\nFeriado\\t09:00\\t18:00\\nLunes\\t25:00\\t18:00\\nMartes\\t18:00\\t09:00\\nMiércoles\\t08:00\\t12:00\\n') }
+        buffer: Buffer.from('dia\tapertura\tcierre\nFeriado\t09:00\t18:00\nLunes\t25:00\t18:00\nMartes\t18:00\t09:00\nMiércoles\t08:00\t12:00\n') }
     ]);
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
     await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleto o inválido/i);
@@ -661,7 +661,7 @@ test.describe('React business import migration', () => {
     await page.goto('/app/settings/import');
     await page.getByLabel('Archivos del negocio').setInputFiles({
       name: 'faq.csv', mimeType: 'text/csv',
-      buffer: Buffer.from('pregunta,respuesta\\n¿Sin respuesta?,\\n,Respuesta sin pregunta\\n"¿Dicen ""hola""?","Sí"\\n')
+      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?,\n,Respuesta sin pregunta\n"¿Dicen ""hola""?","Sí"\n')
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
     await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta o demasiado larga/i);
