@@ -626,6 +626,9 @@ test.describe('React business import migration', () => {
   });
 
   test('Settings and Inventory point directly to the canonical React importer', async ({ page }) => {
+    await boot(page);
+    await page.goto('/app/settings/import');
+    await expect(page.getByRole('heading', { level: 1, name: 'Importar negocio' })).toBeVisible();
     const root = path.resolve(__dirname, '..');
     const settings = fs.readFileSync(path.join(root, 'frontend/src/pages/Settings/SettingsPage.tsx'), 'utf8');
     const inventory = fs.readFileSync(path.join(root, 'frontend/src/pages/Inventory/InventoryPage.tsx'), 'utf8');
