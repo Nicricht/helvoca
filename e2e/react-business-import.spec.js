@@ -71,6 +71,7 @@ async function boot(page, options = {}) {
       return route.fulfill(json(savedProfile));
     }
     if (pathname === '/api/v1/business/hours' && request.method() === 'GET') {
+      if (options.failHoursRead) return route.fulfill(json({ message: 'No se pudo leer el horario.' }, 503));
       return route.fulfill(json(options.existingHours || []));
     }
     if (pathname === '/api/v1/business/hours' && request.method() === 'PUT') {
@@ -97,9 +98,13 @@ async function boot(page, options = {}) {
     }
 
     if (pathname === '/api/v1/knowledge' && request.method() === 'GET') {
+      if (options.failKnowledgeRead) return route.fulfill(json({ message: 'No se pudo leer las FAQ.' }, 503));
       return route.fulfill(json(options.existingKnowledge || []));
     }
     if (pathname === '/api/v1/knowledge' && request.method() === 'POST') {
+      if (options.failKnowledgeWriteAt === knowledgeWrites.length + 1) {
+        return route.fulfill(json({ message: 'No se pudo crear la FAQ.' }, 503));
+      }
       const item = request.postDataJSON();
       knowledgeWrites.push(item);
       return route.fulfill(json({ ...item, id: 'fake-knowledge-' + knowledgeWrites.length }));
@@ -296,6 +301,163 @@ test.describe('React business import migration', () => {
   });
 
 
+
+  test('mixed FAQ and hours approvals fail before any mutation', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'faq.csv', mimeType: 'text/csv', buffer: Buffer.from('pregunta,respuesta\n¿Hacen entregas?,Sí\n') },
+      { name: 'horarios.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\tapertura\tcierre\nLunes\t09:00\t18:00\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/por separado/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('edited invalid hours fail before GET or PATCH', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horas.tsv', mimeType: 'text/tab-separated-values',
+      buffer: Buffer.from('dia\tapertura\tcierre\nMartes\t10:00\t18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Respuesta sugerida 0').fill('18:00-09:00');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Horario inválido/i);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('editing two FAQ to the same title is rejected without writing', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Aquí\n¿Abren sábados?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByLabel('Clave sugerida 1').fill('¿Dónde están?');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/duplicada/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('failure reading existing FAQ never creates a record', async ({ page }) => {
+    const calls = await boot(page, { products: [], failKnowledgeRead: true });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Santiago\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardado|reintentar|error/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('failure reading existing hours never attempts selected-day mutation', async ({ page }) => {
+    const calls = await boot(page, { products: [], failHoursRead: true });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horas.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('dia,apertura,cierre\nLunes,09:00,18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardado|reintentar|error/i);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('a partial FAQ network failure reports that retry requires checking existing state', async ({ page }) => {
+    const calls = await boot(page, { products: [], failKnowledgeWriteAt: 2 });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Santiago\n¿Hacen envíos?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Comprueba lo guardado antes de reintentar/i);
+    expect(calls.knowledgeWrites()).toHaveLength(1);
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('unclosed CSV quotes and spreadsheet formulas produce warnings without writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'broken.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n"¿Pregunta?","sin cerrar') },
+      { name: 'formulas.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n=FORMULA,Texto\n¿Otra pregunta?,=SUM(1)\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/comillas sin cerrar|fórmula/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('free proposal limit is visible instead of silently importing every CSV row', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const source = 'pregunta,respuesta\n' +
+      Array.from({ length: 102 }, (_, index) => 'Pregunta ' + index + ',Respuesta ' + index).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv', buffer: Buffer.from(source)
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-row-99')).toBeVisible();
+    await expect(page.getByTestId('free-setup-row-100')).toHaveCount(0);
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/100 sugerencias/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('quoted multiline FAQ and identical duplicate row keep explicit original evidence', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('consulta frecuente;solucion\r\n"¿Dónde están?";"Santiago\nCentro"\r\n"¿Dónde están?";"Santiago\nCentro"\r\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 2');
+    await expect(page.getByTestId('free-setup-row-1')).toHaveCount(0);
+    await expect(page.getByLabel('Respuesta sugerida 0')).toHaveValue('Santiago\nCentro');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.knowledgeWrites().length).toBe(1);
+    expect(calls.knowledgeWrites()[0].content).toBe('Santiago\nCentro');
+  });
+
+  test('unsupported headers and oversized free file do not produce invented suggestions', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'unknown.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\nfoo,bar\n') },
+      { name: 'large.csv', mimeType: 'text/csv', buffer: Buffer.alloc(1024 * 1024 + 1, 65) }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/1 MB/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+  });
+
   test('metadata-only PDF can be reviewed and approved with no catalog services', async ({ page }) => {
     const calls = await boot(page, {
       products: [],
@@ -463,7 +625,7 @@ test.describe('React business import migration', () => {
     expect(requested).not.toContain('/business-import.css');
   });
 
-  test('Settings and Inventory point directly to the canonical React importer', async () => {
+  test('Settings and Inventory point directly to the canonical React importer', async ({ page }) => {
     const root = path.resolve(__dirname, '..');
     const settings = fs.readFileSync(path.join(root, 'frontend/src/pages/Settings/SettingsPage.tsx'), 'utf8');
     const inventory = fs.readFileSync(path.join(root, 'frontend/src/pages/Inventory/InventoryPage.tsx'), 'utf8');
