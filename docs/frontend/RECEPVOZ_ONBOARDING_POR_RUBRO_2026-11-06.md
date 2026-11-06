@@ -76,3 +76,20 @@ Propuesta de validación con usuarios autorizados, sin llamadas pagadas ni clien
 - **Topología temporal:** PR #860 nace de la rama documental de PR #858 para habilitar el recibo pre-cambio exigido por el repositorio antes del primer commit. El PR debe continuar DRAFT, con revisión de su base/diff antes de cualquier decisión de merge.
 
 **Siguiente acción segura tras CI:** revisar el PR #860 y, solo cuando se haya validado la experiencia por rubros, considerar un segundo incremento centrado en el primer CTA guiado y en medición del tiempo. No crear otro onboarding o CRM integral por anticipado.
+
+## Incremento 2 · recorrido guiado de un clic (PR #860, 2026-11-06)
+
+**Problema comprobado:** aunque Settings Express ya enseñaba Importar → Revisar → Preparar y mantenía las ocho pestañas, no había un botón que dirigiera al siguiente requisito devuelto por el backend. El cliente debía localizar por su cuenta la sección adecuada.
+
+**Cambio exclusivo de frontend (sin API ni migración nuevas):**
+- `SettingsExpressIntro.tsx` interpreta **únicamente** los siete valores reconocidos de `/api/v1/onboarding/status.nextStep`: `CONFIGURE_BUSINESS` → Negocio; `ADD_SERVICE` → Servicios; `CONFIGURE_HOURS` → Horarios; `CONNECT_PHONE_NUMBER` → Canales; `OPTIONAL_HUMAN_TRANSFER` → Negocio; `OPTIONAL_KNOWLEDGE` → Conocimiento; `READY` → Recepcionista IA.
+- El botón **Ir a ...** cambia la pestaña existente en `SettingsPage` y la URL `?section=...`, desplazando hasta la zona de edición; no guarda nada ni llama a ningún proveedor. El botón aparece solo para `BUSINESS_ADMIN`; `OPERATOR` ve una indicación de solo lectura.
+- Si la API está indisponible, carece de `nextStep` o devuelve código desconocido, la interfaz muestra **No hay un siguiente paso verificado** y no inventa una acción.
+- `READY` significa únicamente preparación básica según backend: el texto aclara que no certifica llamadas ni WhatsApp reales. `CONNECT_PHONE_NUMBER` tampoco activa el teléfono.
+- La tarjeta es adaptable al móvil, admite teclado y respeta la preferencia del sistema de movimiento reducido.
+
+**Pruebas añadidas** a `e2e/react-settings-express.spec.js`: los siete códigos reconocidos, destino/selección/URL, cero escrituras al navegar, teclado Enter, código desconocido y ausencia de valor, rol OPERATOR sin acción. Se conservan los tests de importación, seis resoluciones y acciones de guardado aislado existentes.
+
+**Objetivo de rapidez, pendiente de evidencia:** planteamos como *stretch* **≤10 minutos de intervención de configuración básica** para un cliente que ya dispone de sus datos, manteniendo el criterio de referencia **≤15 minutos**. Ningún tiempo está medido aún; aprobaciones externas, activación y certificación real de canales quedan fuera de la medición del asistente básico. Se debe medir con sesiones consentidas de pizzería, veterinaria, ferretería y clínica y registrar mediana, fallos y pasos recorridos. No usar la mejora visual como prueba de ahorro de tiempo.
+
+**Salida:** `IMPLEMENTED_IN_DRAFT`, `CI_EXACT_HEAD_PENDING` hasta comprobar el run final; no merge ni despliegue. Siguiente acción: certificación Fast/Full Gate y Playwright exactos sobre la última revisión del PR #860.
