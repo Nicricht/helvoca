@@ -218,7 +218,7 @@ test.describe('React business import migration', () => {
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
     await expect(page.getByTestId('free-setup-review')).toBeVisible();
-    await expect(page.getByTestId('free-setup-row-0')).toContainText('09:00-18:00');
+    await expect(page.getByLabel('Respuesta sugerida 0')).toHaveValue('09:00-18:00');
     expect(calls.savedHours()).toBeNull();
     await page.getByLabel('Seleccionar sugerencia 0').check();
     await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
