@@ -28,6 +28,7 @@ async function boot(page, options = {}) {
   let applyPayload = null;
   let savedProfile = null;
   let savedHours = null;
+  let selectedPatch = null;
   const knowledgeWrites = [];
 
   await page.route('**/api/v1/**', async route => {
@@ -74,6 +75,24 @@ async function boot(page, options = {}) {
     }
     if (pathname === '/api/v1/business/hours' && request.method() === 'PUT') {
       savedHours = request.postDataJSON();
+      return route.fulfill(json(savedHours.hours));
+    }
+
+    if (pathname === '/api/v1/business/hours/selected' && request.method() === 'PATCH') {
+      selectedPatch = request.postDataJSON();
+      const actual = options.concurrentHours ?? options.existingHours ?? [];
+      const chosenDays = new Set(selectedPatch.hours.map(hour => hour.dayOfWeek));
+      const selectedNow = actual.filter(hour => chosenDays.has(hour.dayOfWeek))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime));
+      const expected = [...selectedPatch.expectedSelectedDayHours]
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime));
+      if (JSON.stringify(selectedNow) !== JSON.stringify(expected)) {
+        return route.fulfill(json({ message: 'Los horarios seleccionados cambiaron.' }, 409));
+      }
+      savedHours = {
+        hours: [...actual.filter(hour => !chosenDays.has(hour.dayOfWeek)), ...selectedPatch.hours]
+          .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime))
+      };
       return route.fulfill(json(savedHours.hours));
     }
 
@@ -165,6 +184,7 @@ async function boot(page, options = {}) {
     applyPayload: () => applyPayload,
     savedProfile: () => savedProfile,
     savedHours: () => savedHours,
+    selectedPatch: () => selectedPatch,
     knowledgeWrites: () => knowledgeWrites
   };
 }
@@ -208,7 +228,8 @@ test.describe('React business import migration', () => {
 
   test('free TSV hours are selective and preserve every unapproved existing day', async ({ page }) => {
     const calls = await boot(page, {
-      products: [], existingHours: [{ dayOfWeek: 2, openTime: '10:00', closeTime: '19:00' }]
+      products: [], existingHours: [{ dayOfWeek: 2, openTime: '10:00', closeTime: '19:00' }],
+      concurrentHours: [{ dayOfWeek: 2, openTime: '12:00', closeTime: '20:00' }]
     });
     await page.goto('/app/settings/import');
     await page.getByLabel('Archivos del negocio').setInputFiles({
@@ -225,10 +246,38 @@ test.describe('React business import migration', () => {
     await expect.poll(() => calls.savedHours()).not.toBeNull();
     expect(calls.savedHours().hours).toEqual([
       { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' },
-      { dayOfWeek: 2, openTime: '10:00', closeTime: '19:00' }
+      { dayOfWeek: 2, openTime: '12:00', closeTime: '20:00' }
     ]);
+    expect(calls.selectedPatch()).toEqual({
+      hours: [{ dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }],
+      expectedSelectedDayHours: []
+    });
     expect(calls.knowledgeWrites()).toHaveLength(0);
     expect(calls.applyCalls()).toBe(0);
+  });
+
+  test('concurrent edit of the selected day fails closed with no schedule write', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [],
+      existingHours: [{ dayOfWeek: 1, openTime: '08:00', closeTime: '12:00' }],
+      concurrentHours: [{ dayOfWeek: 1, openTime: '10:00', closeTime: '19:00' }]
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horarios.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('dia,apertura,cierre\nLunes,09:00,18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardar|cambiaron|reintentar/i);
+    expect(calls.selectedPatch()).toMatchObject({
+      hours: [{ dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }],
+      expectedSelectedDayHours: [{ dayOfWeek: 1, openTime: '08:00', closeTime: '12:00' }]
+    });
+    expect(calls.savedHours()).toBeNull();
+    expect(calls.applyCalls()).toBe(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
   });
 
   test('conflicting or invalid CSV hours never become implied availability or writes', async ({ page }) => {
