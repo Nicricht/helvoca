@@ -100,9 +100,15 @@ export function FreeSetupReview({ files }: { files: File[] }) {
                 </label>
                 <label className={styles.field}>
                   <span>{row.kind === "FAQ" ? "Respuesta" : "Apertura-cierre HH:MM-HH:MM"}</span>
-                  <input aria-label={"Respuesta sugerida " + index} value={row.value}
-                         maxLength={row.kind === "FAQ" ? 4000 : 11}
-                         onChange={event => update(index, { value: event.target.value })} />
+                  {row.kind === "FAQ" ? (
+                    <textarea aria-label={"Respuesta sugerida " + index} value={row.value}
+                              rows={3} maxLength={4000}
+                              onChange={event => update(index, { value: event.target.value })} />
+                  ) : (
+                    <input aria-label={"Respuesta sugerida " + index} value={row.value}
+                           maxLength={11}
+                           onChange={event => update(index, { value: event.target.value })} />
+                  )}
                 </label>
               </div>
               <div className={styles.rowSource}>
