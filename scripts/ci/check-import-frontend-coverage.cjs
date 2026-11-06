@@ -162,7 +162,10 @@ const markdown = [
 ];
 writeFileSync(path.join(outDir, 'summary.md'), markdown.join('\n') + '\n');
 console.log(markdown.join('\n'));
-if (failed) process.exitCode = 1;
+if (failed) {
+  console.error("Import source missing coverage:", JSON.stringify(details, null, 2));
+  process.exitCode = 1;
+}
 
 }
 certifyCoverage().catch(error => {
