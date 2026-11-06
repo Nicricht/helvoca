@@ -736,4 +736,115 @@ test.describe('React business import migration', () => {
     expect(calls.selectedPatch()).toBeNull();
   });
 
+  test('instrumented save rejects no-selection and unsupported kind before all API writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await expect.poll(() => page.evaluate(() =>
+      typeof window.__recepvozImportCoverageApply)).toBe('function');
+    const results = await page.evaluate(async () => {
+      const apply = window.__recepvozImportCoverageApply;
+      const attempt = async (rows) => {
+        try { await apply(rows); return 'ACCEPTED'; }
+        catch (error) { return error instanceof Error ? error.message : String(error); }
+      };
+      return [
+        await attempt([{ kind: 'FAQ', key: 'Sin seleccionar', value: 'No',
+          sourceName: 'forged.csv', sourceRow: 2, selected: false }]),
+        await attempt([{ kind: 'UNKNOWN', key: 'Tipo incorrecto', value: 'No',
+          sourceName: 'forged.csv', sourceRow: 2, selected: true }])
+      ];
+    });
+    expect(results[0]).toMatch(/Selecciona alguna sugerencia/i);
+    expect(results[1]).toMatch(/Tipo de sugerencia no permitido/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('CSV text read rejection produces an explicit warning without importing anything', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'unreadable.csv') return Promise.reject(new Error('reader failed'));
+        return original.call(this);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'unreadable.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Pueden atender?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/No pudimos leer/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('non-Error transport failures use safe fallback without writing', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Pueden atender?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.evaluate(() => {
+      const original = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        if (String(input).includes('/api/v1/knowledge')) return Promise.reject('transport rejected');
+        return original(input, init);
+      };
+    });
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/No se pudo guardar la configuración/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('unrecognized headers have no review, warnings or silent writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'not-a-faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('sku,precio\nABC,2000\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('unmount during slow CSV reading prevents applying stale async suggestions', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'pending.csv') {
+          return new Promise(resolve => { window.__resolvePendingFreeSetup = resolve; });
+        }
+        return original.call(this);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'pending.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Se atiende?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect.poll(() => page.evaluate(() =>
+      typeof window.__resolvePendingFreeSetup)).toBe('function');
+    await page.evaluate(() => {
+      history.pushState({}, '', '/app/settings');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(page).toHaveURL(/\/app\/settings\/?$/);
+    await page.evaluate(() => window.__resolvePendingFreeSetup(
+      'pregunta,respuesta\n¿Se atiende?,Sí\n'
+    ));
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
 });
