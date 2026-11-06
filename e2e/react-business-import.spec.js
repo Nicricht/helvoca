@@ -718,4 +718,22 @@ test.describe('React business import migration', () => {
     expect(calls.selectedPatch()).toBeNull();
   });
 
+  test('501 data rows are rejected consistently with or without a terminal newline', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const source = 'pregunta,respuesta\n' +
+      Array.from({ length: 501 }, (_, i) => 'Pregunta ' + i + ',Respuesta ' + i).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'sin-final.csv', mimeType: 'text/csv', buffer: Buffer.from(source) },
+      { name: 'con-final.csv', mimeType: 'text/csv', buffer: Buffer.from(source + '\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText('sin-final.csv');
+    await expect(page.getByTestId('free-setup-warning')).toContainText('con-final.csv');
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/demasiadas filas/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
 });
