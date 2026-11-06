@@ -167,7 +167,7 @@ jobs:
   test:
     # This context is required by the active main ruleset; it must fail closed
     # when any applicable independent Full Gate job fails or is skipped.
-    needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, legacy-v99-runtime-on-v103]
+    needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, import-frontend-coverage, legacy-v99-runtime-on-v103]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -181,6 +181,7 @@ jobs:
           SYSTEM_E2E_RESULT: ${{ needs['system-integration-e2e'].result }}
           HOME_COVERAGE_RESULT: ${{ needs['home-frontend-coverage'].result }}
           INVENTORY_COVERAGE_RESULT: ${{ needs['inventory-frontend-coverage'].result }}
+          IMPORT_COVERAGE_RESULT: ${{ needs['import-frontend-coverage'].result }}
           LEGACY_ROLLBACK_RESULT: ${{ needs['legacy-v99-runtime-on-v103'].result }}
         run: |
           set -euo pipefail
@@ -196,6 +197,7 @@ jobs:
           if [ "$EVENT_NAME" = "pull_request" ]; then
             required_gate home-frontend-coverage "$HOME_COVERAGE_RESULT"
             required_gate inventory-frontend-coverage "$INVENTORY_COVERAGE_RESULT"
+            required_gate import-frontend-coverage "$IMPORT_COVERAGE_RESULT"
             required_gate legacy-v99-runtime-on-v103 "$LEGACY_ROLLBACK_RESULT"
           fi
 
@@ -400,6 +402,48 @@ jobs:
             test-results/home-coverage/**
             .home-coverage-raw/**
             .home-coverage-tests.txt
+            test-results/**/error-context.md
+          if-no-files-found: warn
+          retention-days: 14
+          include-hidden-files: true
+
+  import-frontend-coverage:
+    needs: [fast-gate]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Build isolated instrumented Import sources
+        env:
+          VITE_IMPORT_COVERAGE: "true"
+        run: npm run frontend:build
+      - name: Discover business import browser cases
+        run: npx playwright test e2e/react-business-import.spec.js --list | tee .import-coverage-tests.txt
+      - name: Capture import source branches and behavior in Chromium
+        env:
+          VITE_IMPORT_COVERAGE: "true"
+        run: npx playwright test e2e/react-business-import.spec.js
+      - name: Enforce strict 100 percent affected Import source coverage
+        run: node scripts/ci/check-import-frontend-coverage.cjs
+      - name: Archive remapped Import coverage even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: import-frontend-source-coverage
+          path: |
+            test-results/import-coverage/**
+            .import-coverage-raw/**
+            .import-coverage-tests.txt
             test-results/**/error-context.md
           if-no-files-found: warn
           retention-days: 14

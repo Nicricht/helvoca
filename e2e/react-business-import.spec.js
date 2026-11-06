@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+const { test, expect } = require('./import-coverage-fixture');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,6 +28,8 @@ async function boot(page, options = {}) {
   let applyPayload = null;
   let savedProfile = null;
   let savedHours = null;
+  let selectedPatch = null;
+  const knowledgeWrites = [];
 
   await page.route('**/api/v1/**', async route => {
     const request = route.request();
@@ -69,11 +71,43 @@ async function boot(page, options = {}) {
       return route.fulfill(json(savedProfile));
     }
     if (pathname === '/api/v1/business/hours' && request.method() === 'GET') {
+      if (options.failHoursRead) return route.fulfill(json({ message: 'No se pudo leer el horario.' }, 503));
       return route.fulfill(json(options.existingHours || []));
     }
     if (pathname === '/api/v1/business/hours' && request.method() === 'PUT') {
       savedHours = request.postDataJSON();
       return route.fulfill(json(savedHours.hours));
+    }
+
+    if (pathname === '/api/v1/business/hours/selected' && request.method() === 'PATCH') {
+      selectedPatch = request.postDataJSON();
+      const actual = options.concurrentHours ?? options.existingHours ?? [];
+      const chosenDays = new Set(selectedPatch.hours.map(hour => hour.dayOfWeek));
+      const selectedNow = actual.filter(hour => chosenDays.has(hour.dayOfWeek))
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime));
+      const expected = [...selectedPatch.expectedSelectedDayHours]
+        .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime));
+      if (JSON.stringify(selectedNow) !== JSON.stringify(expected)) {
+        return route.fulfill(json({ message: 'Los horarios seleccionados cambiaron.' }, 409));
+      }
+      savedHours = {
+        hours: [...actual.filter(hour => !chosenDays.has(hour.dayOfWeek)), ...selectedPatch.hours]
+          .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime))
+      };
+      return route.fulfill(json(savedHours.hours));
+    }
+
+    if (pathname === '/api/v1/knowledge' && request.method() === 'GET') {
+      if (options.failKnowledgeRead) return route.fulfill(json({ message: 'No se pudo leer las FAQ.' }, 503));
+      return route.fulfill(json(options.existingKnowledge || []));
+    }
+    if (pathname === '/api/v1/knowledge' && request.method() === 'POST') {
+      if (options.failKnowledgeWriteAt === knowledgeWrites.length + 1) {
+        return route.fulfill(json({ message: 'No se pudo crear la FAQ.' }, 503));
+      }
+      const item = request.postDataJSON();
+      knowledgeWrites.push(item);
+      return route.fulfill(json({ ...item, id: 'fake-knowledge-' + knowledgeWrites.length }));
     }
 
     if (pathname === '/api/v1/onboarding/import/preview' && request.method() === 'POST') {
@@ -154,11 +188,275 @@ async function boot(page, options = {}) {
     applyCalls: () => applyCalls,
     applyPayload: () => applyPayload,
     savedProfile: () => savedProfile,
-    savedHours: () => savedHours
+    savedHours: () => savedHours,
+    selectedPatch: () => selectedPatch,
+    knowledgeWrites: () => knowledgeWrites
   };
 }
 
 test.describe('React business import migration', () => {
+  test('free CSV FAQ preview never writes before explicit approval and leaves existing FAQ untouched', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [],
+      existingKnowledge: [{ id: 'existing', title: '¿Dónde están?', content: 'Respuesta anterior', active: true }]
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'preguntas.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('\uFEFFpregunta;respuesta\n"¿Dónde están?";"Santiago"\n"¿Envían; productos?";"Sí, previa coordinación"\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toBeVisible();
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('preguntas.csv');
+    await expect(page.getByTestId('free-setup-row-1')).toContainText('fila 3');
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+    expect(calls.applyCalls()).toBe(0);
+
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByText(/FAQ existente.*sin sobrescribir/)).toBeVisible();
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+
+    // A second explicit review can create only the newly selected answer.
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByLabel('Respuesta sugerida 1').fill('Sí, solo retiro programado.');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.knowledgeWrites().length).toBe(1);
+    expect(calls.knowledgeWrites()[0]).toMatchObject({
+      title: '¿Envían; productos?', content: 'Sí, solo retiro programado.', category: 'FAQ'
+    });
+    expect(calls.applyCalls()).toBe(0);
+  });
+
+  test('free TSV hours are selective and preserve every unapproved existing day', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [], existingHours: [{ dayOfWeek: 2, openTime: '10:00', closeTime: '19:00' }],
+      concurrentHours: [{ dayOfWeek: 2, openTime: '12:00', closeTime: '20:00' }]
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horarios.tsv',
+      mimeType: 'text/tab-separated-values',
+      buffer: Buffer.from('dia\tapertura\tcierre\nLunes\t09:00\t18:00\nMartes\t11:00\t20:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toBeVisible();
+    await expect(page.getByLabel('Respuesta sugerida 0')).toHaveValue('09:00-18:00');
+    expect(calls.savedHours()).toBeNull();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.savedHours()).not.toBeNull();
+    expect(calls.savedHours().hours).toEqual([
+      { dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' },
+      { dayOfWeek: 2, openTime: '12:00', closeTime: '20:00' }
+    ]);
+    expect(calls.selectedPatch()).toEqual({
+      hours: [{ dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }],
+      expectedSelectedDayHours: []
+    });
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.applyCalls()).toBe(0);
+  });
+
+  test('concurrent edit of the selected day fails closed with no schedule write', async ({ page }) => {
+    const calls = await boot(page, {
+      products: [],
+      existingHours: [{ dayOfWeek: 1, openTime: '08:00', closeTime: '12:00' }],
+      concurrentHours: [{ dayOfWeek: 1, openTime: '10:00', closeTime: '19:00' }]
+    });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horarios.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('dia,apertura,cierre\nLunes,09:00,18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardar|cambiaron|reintentar/i);
+    expect(calls.selectedPatch()).toMatchObject({
+      hours: [{ dayOfWeek: 1, openTime: '09:00', closeTime: '18:00' }],
+      expectedSelectedDayHours: [{ dayOfWeek: 1, openTime: '08:00', closeTime: '12:00' }]
+    });
+    expect(calls.savedHours()).toBeNull();
+    expect(calls.applyCalls()).toBe(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('conflicting or invalid CSV hours never become implied availability or writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'conflictos.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('dia,apertura,cierre\nLunes,09:00,12:00\nLunes,12:00,18:00\nMartes,xx,16:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/conflicto|incompleto|inválido/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.savedHours()).toBeNull();
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+
+
+  test('mixed FAQ and hours approvals fail before any mutation', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'faq.csv', mimeType: 'text/csv', buffer: Buffer.from('pregunta,respuesta\n¿Hacen entregas?,Sí\n') },
+      { name: 'horarios.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\tapertura\tcierre\nLunes\t09:00\t18:00\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/por separado/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('edited invalid hours fail before GET or PATCH', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horas.tsv', mimeType: 'text/tab-separated-values',
+      buffer: Buffer.from('dia\tapertura\tcierre\nMartes\t10:00\t18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Respuesta sugerida 0').fill('18:00-09:00');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Horario inválido/i);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('editing two FAQ to the same title is rejected without writing', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Aquí\n¿Abren sábados?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByLabel('Clave sugerida 1').fill('¿Dónde están?');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/duplicada/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('failure reading existing FAQ never creates a record', async ({ page }) => {
+    const calls = await boot(page, { products: [], failKnowledgeRead: true });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Santiago\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardado|reintentar|error/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('failure reading existing hours never attempts selected-day mutation', async ({ page }) => {
+    const calls = await boot(page, { products: [], failHoursRead: true });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'horas.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('dia,apertura,cierre\nLunes,09:00,18:00\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/guardado|reintentar|error/i);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('a partial FAQ network failure reports that retry requires checking existing state', async ({ page }) => {
+    const calls = await boot(page, { products: [], failKnowledgeWriteAt: 2 });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Dónde están?,Santiago\n¿Hacen envíos?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Seleccionar sugerencia 1').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Comprueba lo guardado antes de reintentar/i);
+    expect(calls.knowledgeWrites()).toHaveLength(1);
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('unclosed CSV quotes and spreadsheet formulas produce warnings without writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'broken.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n"¿Pregunta?","sin cerrar') },
+      { name: 'formulas.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n=FORMULA,Texto\n¿Otra pregunta?,=SUM(1)\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/comillas sin cerrar|fórmula/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+  });
+
+  test('free proposal limit is visible instead of silently importing every CSV row', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const source = 'pregunta,respuesta\n' +
+      Array.from({ length: 102 }, (_, index) => 'Pregunta ' + index + ',Respuesta ' + index).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv', buffer: Buffer.from(source)
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-row-99')).toBeVisible();
+    await expect(page.getByTestId('free-setup-row-100')).toHaveCount(0);
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/100 sugerencias/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('quoted multiline FAQ and identical duplicate row keep explicit original evidence', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('consulta frecuente;solucion\r\n"¿Dónde están?";"Santiago\nCentro"\r\n"¿Dónde están?";"Santiago\nCentro"\r\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 2');
+    await expect(page.getByTestId('free-setup-row-1')).toHaveCount(0);
+    await expect(page.getByLabel('Respuesta sugerida 0')).toHaveValue('Santiago\nCentro');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.knowledgeWrites().length).toBe(1);
+    expect(calls.knowledgeWrites()[0].content).toBe('Santiago\nCentro');
+  });
+
+  test('unsupported headers and oversized free file do not produce invented suggestions', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'unknown.csv', mimeType: 'text/csv', buffer: Buffer.from('a,b\nfoo,bar\n') },
+      { name: 'large.csv', mimeType: 'text/csv', buffer: Buffer.alloc(1024 * 1024 + 1, 65) }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/1 MB/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.savedHours()).toBeNull();
+  });
 
   test('metadata-only PDF can be reviewed and approved with no catalog services', async ({ page }) => {
     const calls = await boot(page, {
@@ -327,7 +625,10 @@ test.describe('React business import migration', () => {
     expect(requested).not.toContain('/business-import.css');
   });
 
-  test('Settings and Inventory point directly to the canonical React importer', async () => {
+  test('Settings and Inventory point directly to the canonical React importer', async ({ page }) => {
+    await boot(page);
+    await page.goto('/app/settings/import');
+    await expect(page.getByRole('heading', { level: 1, name: 'Importar negocio' })).toBeVisible();
     const root = path.resolve(__dirname, '..');
     const settings = fs.readFileSync(path.join(root, 'frontend/src/pages/Settings/SettingsPage.tsx'), 'utf8');
     const inventory = fs.readFileSync(path.join(root, 'frontend/src/pages/Inventory/InventoryPage.tsx'), 'utf8');
@@ -337,4 +638,312 @@ test.describe('React business import migration', () => {
     expect(settings).toContain('/app/settings/import');
     expect(inventory).toContain('/app/settings/import');
   });
+  test('invalid TSV days and time windows remain warnings while only explicit valid rows can be approved', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'sin-datos.csv', mimeType: 'text/csv', buffer: Buffer.from('   \n') },
+      { name: 'horas.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\tapertura\tcierre\nFeriado\t09:00\t18:00\nLunes\t25:00\t18:00\nMartes\t18:00\t09:00\nMiércoles\t08:00\t12:00\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleto o inválido/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 5');
+    await expect(page.getByTestId('free-setup-row-1')).toHaveCount(0);
+    expect(calls.savedHours()).toBeNull();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.selectedPatch()).not.toBeNull();
+    expect(calls.selectedPatch().hours).toEqual([
+      { dayOfWeek: 3, openTime: '08:00', closeTime: '12:00' }
+    ]);
+  });
+
+  test('incomplete FAQ rows are rejected, doubled quotes are parsed, and editing blank value blocks every write', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?,\n,Respuesta sin pregunta\n"¿Dicen ""hola""?","Sí"')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta o demasiado larga/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 4');
+    await expect(page.getByLabel('Clave sugerida 0')).toHaveValue('¿Dicen "hola"?');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Respuesta sugerida 0').fill('');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Completa los datos seleccionados/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    await page.getByLabel('Respuesta sugerida 0').fill('Sí, por supuesto.');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.knowledgeWrites().length).toBe(1);
+    expect(calls.knowledgeWrites()[0]).toMatchObject({
+      title: '¿Dicen "hola"?', content: 'Sí, por supuesto.'
+    });
+  });
+
+  test('more than 500 CSV rows and a third conflicting schedule remain unapproved with no writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const huge = 'pregunta,respuesta\n' +
+      Array.from({ length: 503 }, (_, index) => 'Pregunta ' + index + ',Respuesta ' + index).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'demasiadas.csv', mimeType: 'text/csv', buffer: Buffer.from(huge) },
+      { name: 'tres-conflictos.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\tapertura\tcierre\nLunes\t08:00\t12:00\nLunes\t09:00\t13:00\nLunes\t10:00\t14:00\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/demasiadas filas/i);
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/Conflicto en MONDAY/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('missing FAQ cell is rejected and tampered oversized edit is blocked before persistence', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?\n¿Pregunta válida?,Respuesta válida\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 3');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    const answer = page.getByLabel('Respuesta sugerida 0');
+    await answer.evaluate(element => element.removeAttribute('maxlength'));
+    await answer.fill('A'.repeat(4001));
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/FAQ demasiado extensa/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('501 data rows are rejected consistently with or without a terminal newline', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const source = 'pregunta,respuesta\n' +
+      Array.from({ length: 501 }, (_, i) => 'Pregunta ' + i + ',Respuesta ' + i).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'sin-final.csv', mimeType: 'text/csv', buffer: Buffer.from(source) },
+      { name: 'con-final.csv', mimeType: 'text/csv', buffer: Buffer.from(source + '\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText('sin-final.csv');
+    await expect(page.getByTestId('free-setup-warning')).toContainText('con-final.csv');
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/demasiadas filas/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('instrumented save rejects no-selection and unsupported kind before all API writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    if (process.env.VITE_IMPORT_COVERAGE !== 'true') {
+      // The diagnostic bridge must never ship in the normal application.
+      expect(await page.evaluate(() => typeof window.__recepvozImportCoverageApply)).toBe('undefined');
+      await page.getByLabel('Archivos del negocio').setInputFiles({
+        name: 'faq.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n¿Atienden?,Sí\n')
+      });
+      await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+      await expect(page.getByTestId('free-setup-review')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' })).toBeDisabled();
+      expect(calls.knowledgeWrites()).toHaveLength(0);
+      expect(calls.selectedPatch()).toBeNull();
+      return;
+    }
+    await expect.poll(() => page.evaluate(() =>
+      typeof window.__recepvozImportCoverageApply)).toBe('function');
+    const results = await page.evaluate(async () => {
+      const apply = window.__recepvozImportCoverageApply;
+      const attempt = async (rows) => {
+        try { await apply(rows); return 'ACCEPTED'; }
+        catch (error) { return error instanceof Error ? error.message : String(error); }
+      };
+      return [
+        await attempt([{ kind: 'FAQ', key: 'Sin seleccionar', value: 'No',
+          sourceName: 'forged.csv', sourceRow: 2, selected: false }]),
+        await attempt([{ kind: 'UNKNOWN', key: 'Tipo incorrecto', value: 'No',
+          sourceName: 'forged.csv', sourceRow: 2, selected: true }])
+      ];
+    });
+    expect(results[0]).toMatch(/Selecciona alguna sugerencia/i);
+    expect(results[1]).toMatch(/Tipo de sugerencia no permitido/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('CSV text read rejection produces an explicit warning without importing anything', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'unreadable.csv') return Promise.reject(new Error('reader failed'));
+        return original.call(this);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'unreadable.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Pueden atender?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/unreadable\.csv: el CSV\/TSV tiene comillas sin cerrar o demasiadas filas/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('non-Error transport failures use safe fallback without writing', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Pueden atender?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.evaluate(() => {
+      const original = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        if (String(input).includes('/api/v1/knowledge')) return Promise.reject('transport rejected');
+        return original(input, init);
+      };
+    });
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/No se pudo guardar la configuración/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('unrecognized headers have no review, warnings or silent writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'not-a-faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('sku,precio\nABC,2000\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('unmount during slow CSV reading prevents applying stale async suggestions', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'pending.csv') {
+          return new Promise(resolve => { window.__resolvePendingFreeSetup = resolve; });
+        }
+        return original.call(this);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'pending.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Se atiende?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect.poll(() => page.evaluate(() =>
+      typeof window.__resolvePendingFreeSetup)).toBe('function');
+    await page.evaluate(() => {
+      history.pushState({}, '', '/app/settings');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(page).toHaveURL(/\/app\/settings\/?$/);
+    await page.evaluate(() => window.__resolvePendingFreeSetup(
+      'pregunta,respuesta\n¿Se atiende?,Sí\n'
+    ));
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('disabled approval cannot be bypassed to save without selecting rows', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-review')).toBeVisible();
+    const button = page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' });
+    await expect(button).toBeDisabled();
+    // React ignores normal clicks on disabled controls. Invoke the actual
+    // instance handler in this isolated test to check the defensive early return.
+    await button.evaluate(element => {
+      const reactPropsKey = Object.keys(element).find(key => key.startsWith('__reactProps$'));
+      if (!reactPropsKey) throw new Error('Rendered React event props unavailable');
+      const handler = element[reactPropsKey]?.onClick;
+      if (typeof handler !== 'function') throw new Error('Approval handler unavailable');
+      handler();
+    });
+    await expect(page.getByRole('status').filter({ hasText: /Configuración aprobada/i })).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('extraction failure outside CSV decode is reported safely without partial writes', async ({ page }) => {
+    await page.addInitScript(() => {
+      const originalNormalize = String.prototype.normalize;
+      String.prototype.normalize = function (...args) {
+        if (String(this) === 'FORCE_REVIEW_FAILURE') throw new Error('forced header normalization error');
+        return originalNormalize.apply(this, args);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'fail.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('FORCE_REVIEW_FAILURE,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(
+      /No pudimos leer la planilla de preguntas u horarios/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
+  test('late extraction rejection after leaving import never resurrects an obsolete review', async ({ page }) => {
+    await page.addInitScript(() => {
+      const originalText = File.prototype.text;
+      File.prototype.text = function () {
+        if (this.name === 'late.csv') {
+          return new Promise(resolve => { window.__resolveLateImport = resolve; });
+        }
+        return originalText.call(this);
+      };
+      const originalNormalize = String.prototype.normalize;
+      String.prototype.normalize = function (...args) {
+        if (String(this) === 'FORCE_LATE_FAILURE') throw new Error('late normalization failure');
+        return originalNormalize.apply(this, args);
+      };
+    });
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'late.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('FORCE_LATE_FAILURE,respuesta\n¿Atienden?,Sí\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect.poll(() => page.evaluate(() => typeof window.__resolveLateImport)).toBe('function');
+    await page.evaluate(() => {
+      history.pushState({}, '', '/app/settings');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+    await expect(page).toHaveURL(/\/app\/settings\/?$/);
+    await page.evaluate(() => window.__resolveLateImport(
+      'FORCE_LATE_FAILURE,respuesta\n¿Atienden?,Sí\n'));
+    await expect(page.getByTestId('free-setup-review')).toHaveCount(0);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
 });

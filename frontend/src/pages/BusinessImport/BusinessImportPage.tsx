@@ -28,6 +28,7 @@ import {
   type BusinessImportBusinessFacts,
   type ImportItemKind
 } from "../../features/businessImport/api";
+import { FreeSetupReview } from "./FreeSetupReview";
 import styles from "./BusinessImportPage.module.css";
 
 type BusinessFactField = "publicPhone" | "publicEmail" | "websiteUrl" | "addressLine" | "commune" | "city" | "region" | "countryCode" | "publicDescription";
@@ -618,6 +619,8 @@ export function BusinessImportPage() {
               </div>
             )}
 
+
+            <FreeSetupReview files={files} />
 
             {facts && (
               <section className={styles.card} aria-label="Datos del negocio detectados" data-testid="business-import-facts">

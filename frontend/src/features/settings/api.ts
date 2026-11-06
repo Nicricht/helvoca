@@ -381,6 +381,14 @@ export function replaceBusinessHours(hours: BusinessHour[]) {
   return apiRequest<BusinessHour[]>("/api/v1/business/hours", { method: "PUT", body: JSON.stringify({ hours }) });
 }
 
+/** Atomic selected-day update; stale changes on selected days return HTTP 409. */
+export function patchSelectedBusinessHours(hours: BusinessHour[], expectedSelectedDayHours: BusinessHour[]) {
+  return apiRequest<BusinessHour[]>("/api/v1/business/hours/selected", {
+    method: "PATCH",
+    body: JSON.stringify({ hours, expectedSelectedDayHours })
+  });
+}
+
 export function createServiceItem(input: Omit<ServiceItem, "id">) {
   return apiRequest<ServiceItem>("/api/v1/services", { method: "POST", body: JSON.stringify(input) });
 }

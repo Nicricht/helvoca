@@ -35,3 +35,15 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+/**
+ * Browser-only source coverage diagnostic. Vite removes this entire branch from
+ * normal builds because VITE_IMPORT_COVERAGE is unset. This does not expose a
+ * write action on the production site, and E2E calls only local mocked APIs.
+ */
+if (import.meta.env.VITE_IMPORT_COVERAGE === "true") {
+  void import("./features/businessImport/setupApply").then(({ applyReviewedSetup }) => {
+    (window as Window & { __recepvozImportCoverageApply?: typeof applyReviewedSetup })
+      .__recepvozImportCoverageApply = applyReviewedSetup;
+  });
+}
