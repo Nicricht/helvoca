@@ -661,7 +661,7 @@ test.describe('React business import migration', () => {
     await page.goto('/app/settings/import');
     await page.getByLabel('Archivos del negocio').setInputFiles({
       name: 'faq.csv', mimeType: 'text/csv',
-      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?,\n,Respuesta sin pregunta\n"¿Dicen ""hola""?","Sí"\n')
+      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?,\n,Respuesta sin pregunta\n"¿Dicen ""hola""?","Sí"')
     });
     await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
     await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta o demasiado larga/i);
