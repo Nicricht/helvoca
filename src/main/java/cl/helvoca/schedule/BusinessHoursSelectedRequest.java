@@ -8,6 +8,6 @@ import java.util.List;
 
 /** A conditional patch: only selected days can be changed. */
 public record BusinessHoursSelectedRequest(
-        @NotEmpty List<@Valid BusinessHoursRequest.Interval> hours,
-        @NotNull List<@Valid BusinessHoursRequest.Interval> expectedSelectedDayHours
+        @NotEmpty @Valid List<BusinessHoursRequest.Interval> hours,
+        @NotNull @Valid List<BusinessHoursRequest.Interval> expectedSelectedDayHours
 ) {}
