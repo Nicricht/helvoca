@@ -742,6 +742,20 @@ test.describe('React business import migration', () => {
   test('instrumented save rejects no-selection and unsupported kind before all API writes', async ({ page }) => {
     const calls = await boot(page, { products: [] });
     await page.goto('/app/settings/import');
+    if (process.env.VITE_IMPORT_COVERAGE !== 'true') {
+      // The diagnostic bridge must never ship in the normal application.
+      expect(await page.evaluate(() => typeof window.__recepvozImportCoverageApply)).toBe('undefined');
+      await page.getByLabel('Archivos del negocio').setInputFiles({
+        name: 'faq.csv', mimeType: 'text/csv',
+        buffer: Buffer.from('pregunta,respuesta\n¿Atienden?,Sí\n')
+      });
+      await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+      await expect(page.getByTestId('free-setup-review')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' })).toBeDisabled();
+      expect(calls.knowledgeWrites()).toHaveLength(0);
+      expect(calls.selectedPatch()).toBeNull();
+      return;
+    }
     await expect.poll(() => page.evaluate(() =>
       typeof window.__recepvozImportCoverageApply)).toBe('function');
     const results = await page.evaluate(async () => {
