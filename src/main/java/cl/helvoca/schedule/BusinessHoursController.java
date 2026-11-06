@@ -26,4 +26,10 @@ public class BusinessHoursController {
     public List<BusinessHourResponse> replace(@Valid @RequestBody BusinessHoursRequest request) {
         return service.replace(request);
     }
+
+    @PatchMapping("/selected")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public List<BusinessHourResponse> mergeSelected(@Valid @RequestBody BusinessHoursSelectedRequest request) {
+        return service.mergeSelected(request);
+    }
 }
