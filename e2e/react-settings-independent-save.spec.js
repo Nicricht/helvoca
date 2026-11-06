@@ -98,6 +98,75 @@ async function boot(page, options = {}) {
 function mutations(state) { return state.writes.filter(x => x.method !== 'GET'); }
 
 test.describe('Settings independent save contract', () => {
+  test('sector guidance is advisory and veterinary preset saves only with explicit approval', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+
+    const sector = page.getByLabel('Rubro');
+    const advisory = [
+      ['store', 'Revisa productos, precios, disponibilidad, horarios, entregas y políticas de cambios. No confirmes stock sin verificar.'],
+      ['hardware_store', 'Revisa catálogo, medidas, stock, cotizaciones, pedidos y despacho. Confirma cantidades y disponibilidad antes de cerrar una venta.'],
+      ['services', 'Revisa servicios, duraciones, tarifas, horarios, zona de cobertura y condiciones de reserva.'],
+      ['restaurant', 'Revisa carta, precios, horarios, preguntas frecuentes, pedidos y reservas. No confirmes productos agotados como disponibles.'],
+      ['clinic', 'Revisa especialidades, profesionales, duración de consultas, horarios, precios y reservas. No inventes disponibilidad ni indicaciones clínicas.'],
+      ['veterinary', 'Revisa especies atendidas, servicios, profesionales, horarios, urgencias, precios y citas. No inventes disponibilidad ni recomendaciones veterinarias.'],
+      ['salon', 'Revisa servicios, duraciones, precios, profesionales y disponibilidad para reservas.'],
+      ['workshop', 'Revisa tipos de reparación, presupuestos, horarios, plazos y requisitos para recibir equipos.'],
+      ['hospitality', 'Revisa tipos de alojamiento, tarifas, horarios de ingreso y salida y políticas de reserva.'],
+      ['professional', 'Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva.']
+    ];
+
+    for (const [preset, text] of advisory) {
+      await sector.selectOption(preset);
+      await expect(page.getByText('Sugerencia para este rubro')).toBeVisible();
+      await expect(page.getByText(text, { exact: true })).toBeVisible();
+      expect(mutations(state)).toEqual([]);
+    }
+
+    // A sector is guidance only: it never populates price, stock, hours or channels.
+    expect(state.data.profile.presetKey).toBe('services');
+    expect(state.data.services).toHaveLength(1);
+    expect(state.data.hours).toHaveLength(1);
+
+    await sector.selectOption('veterinary');
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(item => item.method + ' ' + item.path))
+      .toEqual(['PUT /api/v1/business/profile']);
+    expect(state.data.profile.presetKey).toBe('veterinary');
+    expect(state.data.profile.sellsServices).toBe(true);
+    expect(state.data.profile.usesReservations).toBe(true);
+
+    await page.reload();
+    await expect(page.getByLabel('Rubro')).toHaveValue('veterinary');
+    await expect(page.getByText(advisory[5][1], { exact: true })).toBeVisible();
+
+    await page.getByLabel('Rubro').selectOption('');
+    await expect(page.getByText('Sugerencia para este rubro')).toHaveCount(0);
+    expect(mutations(state)).toHaveLength(1);
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(state.data.profile.presetKey).toBeNull();
+    expect(mutations(state).map(item => item.method + ' ' + item.path))
+      .toEqual(['PUT /api/v1/business/profile', 'PUT /api/v1/business/profile']);
+  });
+
+  test('an operator sees persisted veterinary guidance without editing or side effects', async ({ page }) => {
+    const state = await boot(page, { roles: ['OPERATOR'] });
+    state.data.profile.presetKey = 'veterinary';
+    await page.goto('/app/settings');
+
+    await expect(page.getByLabel('Rubro')).toHaveValue('veterinary');
+    await expect(page.getByLabel('Rubro')).toBeDisabled();
+    await expect(page.getByText('Sugerencia para este rubro')).toBeVisible();
+    await expect(page.getByText(
+      'Revisa especies atendidas, servicios, profesionales, horarios, urgencias, precios y citas. No inventes disponibilidad ni recomendaciones veterinarias.',
+      { exact: true }
+    )).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Guardar cambios' })).toHaveCount(0);
+    expect(mutations(state)).toEqual([]);
+  });
+
   test('changing business name saves only business metadata and never syncs collections', async ({ page }) => {
     const state = await boot(page);
     await page.goto('/app/settings');
