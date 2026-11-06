@@ -55,7 +55,7 @@ const businessPresetOptions = [
 
 const businessPresetSuggestions: Record<string, string> = {
   store: "Revisa productos, precios, disponibilidad, horarios, entregas y políticas de cambios. No confirmes stock sin verificar.",
-  hardware_store: "Revisa catálogo, medidas, stock, cotizaciones, pedidos y despacho. Confirma cantidades y disponibilidad antes de cerrar una venta.",
+  hardware_store: "Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Revisa medidas, cantidades y disponibilidad antes de cerrar una venta.",
   services: "Revisa servicios, duraciones, tarifas, horarios, zona de cobertura y condiciones de reserva.",
   restaurant: "Revisa carta, precios, horarios, preguntas frecuentes, pedidos y reservas. No confirmes productos agotados como disponibles.",
   clinic: "Revisa especialidades, profesionales, duración de consultas, horarios, precios y reservas. No inventes disponibilidad ni indicaciones clínicas.",
