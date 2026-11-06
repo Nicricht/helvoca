@@ -635,4 +635,49 @@ test.describe('React business import migration', () => {
     expect(settings).toContain('/app/settings/import');
     expect(inventory).toContain('/app/settings/import');
   });
+  test('invalid TSV days and time windows remain warnings while only explicit valid rows can be approved', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'sin-datos.csv', mimeType: 'text/csv', buffer: Buffer.from('   \\n') },
+      { name: 'horas.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\\tapertura\\tcierre\\nFeriado\\t09:00\\t18:00\\nLunes\\t25:00\\t18:00\\nMartes\\t18:00\\t09:00\\nMiércoles\\t08:00\\t12:00\\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleto o inválido/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 5');
+    await expect(page.getByTestId('free-setup-row-1')).toHaveCount(0);
+    expect(calls.savedHours()).toBeNull();
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.selectedPatch()).not.toBeNull();
+    expect(calls.selectedPatch().hours).toEqual([
+      { dayOfWeek: 3, openTime: '08:00', closeTime: '12:00' }
+    ]);
+  });
+
+  test('incomplete FAQ rows are rejected, doubled quotes are parsed, and editing blank value blocks every write', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\\n¿Sin respuesta?,\\n,Respuesta sin pregunta\\n"¿Dicen ""hola""?","Sí"\\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta o demasiado larga/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 4');
+    await expect(page.getByLabel('Clave sugerida 0')).toHaveValue('¿Dicen "hola"?');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    await page.getByLabel('Respuesta sugerida 0').fill('');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/Completa los datos seleccionados/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    await page.getByLabel('Respuesta sugerida 0').fill('Sí, por supuesto.');
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect.poll(() => calls.knowledgeWrites().length).toBe(1);
+    expect(calls.knowledgeWrites()[0]).toMatchObject({
+      title: '¿Dicen "hola"?', content: 'Sí, por supuesto.'
+    });
+  });
+
 });
