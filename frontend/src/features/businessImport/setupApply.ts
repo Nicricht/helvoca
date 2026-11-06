@@ -2,7 +2,7 @@ import {
   createKnowledgeItem,
   getBusinessHours,
   getKnowledge,
-  replaceBusinessHours,
+  patchSelectedBusinessHours,
   type BusinessHour
 } from "../settings/api";
 import type { LocalSetupRow } from "./localSetup";
@@ -68,11 +68,10 @@ export async function applyReviewedSetup(rows: LocalSetupRow[]): Promise<SetupSa
   const existingFaqs = selectedFaqs.length ? await getKnowledge() : [];
 
   if (selectedHours.length) {
-    const combined = currentHours
-      .filter(hour => !days.has(hour.dayOfWeek))
-      .concat(selectedHours)
-      .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.openTime.localeCompare(b.openTime));
-    await replaceBusinessHours(combined);
+    // The server compares the selected-day snapshot under a tenant row lock.
+    // Other administrators' changes to unrelated days are never replaced.
+    const expectedSelectedDayHours = currentHours.filter(hour => days.has(hour.dayOfWeek));
+    await patchSelectedBusinessHours(selectedHours, expectedSelectedDayHours);
   }
 
   let faqCreated = 0;
