@@ -680,4 +680,42 @@ test.describe('React business import migration', () => {
     });
   });
 
+  test('more than 500 CSV rows and a third conflicting schedule remain unapproved with no writes', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    const huge = 'pregunta,respuesta\n' +
+      Array.from({ length: 503 }, (_, index) => 'Pregunta ' + index + ',Respuesta ' + index).join('\n');
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles([
+      { name: 'demasiadas.csv', mimeType: 'text/csv', buffer: Buffer.from(huge) },
+      { name: 'tres-conflictos.tsv', mimeType: 'text/tab-separated-values',
+        buffer: Buffer.from('dia\tapertura\tcierre\nLunes\t08:00\t12:00\nLunes\t09:00\t13:00\nLunes\t10:00\t14:00\n') }
+    ]);
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/demasiadas filas/i);
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/Conflicto en MONDAY/i);
+    await expect(page.getByTestId('free-setup-row-0')).toHaveCount(0);
+    expect(calls.selectedPatch()).toBeNull();
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+  });
+
+  test('missing FAQ cell is rejected and tampered oversized edit is blocked before persistence', async ({ page }) => {
+    const calls = await boot(page, { products: [] });
+    await page.goto('/app/settings/import');
+    await page.getByLabel('Archivos del negocio').setInputFiles({
+      name: 'faq.csv', mimeType: 'text/csv',
+      buffer: Buffer.from('pregunta,respuesta\n¿Sin respuesta?\n¿Pregunta válida?,Respuesta válida\n')
+    });
+    await page.getByRole('button', { name: 'Analizar y crear borrador' }).click();
+    await expect(page.getByTestId('free-setup-warning')).toContainText(/incompleta/i);
+    await expect(page.getByTestId('free-setup-row-0')).toContainText('fila 3');
+    await page.getByLabel('Seleccionar sugerencia 0').check();
+    const answer = page.getByLabel('Respuesta sugerida 0');
+    await answer.evaluate(element => element.removeAttribute('maxlength'));
+    await answer.fill('A'.repeat(4001));
+    await page.getByRole('button', { name: 'Aprobar sugerencias seleccionadas' }).click();
+    await expect(page.getByRole('alert')).toContainText(/FAQ demasiado extensa/i);
+    expect(calls.knowledgeWrites()).toHaveLength(0);
+    expect(calls.selectedPatch()).toBeNull();
+  });
+
 });
