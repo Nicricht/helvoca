@@ -46,6 +46,7 @@ const businessPresetOptions = [
   ["services", "Servicios"],
   ["restaurant", "Restaurant / alimentos"],
   ["clinic", "Salud / clínica"],
+  ["veterinary", "Veterinaria / mascotas"],
   ["salon", "Belleza / peluquería"],
   ["workshop", "Taller / reparación"],
   ["hospitality", "Hotel / hospedaje"],
@@ -53,11 +54,16 @@ const businessPresetOptions = [
 ] as const;
 
 const businessPresetSuggestions: Record<string, string> = {
-  store: "Prioriza productos.",
-  hardware_store: "Prioriza catálogo, stock, cotizaciones, pedidos y despacho. Confirma medidas, cantidades y disponibilidad antes de cerrar una venta.",
-  salon: "Prioriza servicios y reservas.",
-  restaurant: "Prioriza productos y pedidos.",
-  clinic: "Prioriza servicios y reservas."
+  store: "Revisa productos, precios, disponibilidad, horarios, entregas y políticas de cambios. No confirmes stock sin verificar.",
+  hardware_store: "Revisa catálogo, medidas, stock, cotizaciones, pedidos y despacho. Confirma cantidades y disponibilidad antes de cerrar una venta.",
+  services: "Revisa servicios, duraciones, tarifas, horarios, zona de cobertura y condiciones de reserva.",
+  restaurant: "Revisa carta, precios, horarios, preguntas frecuentes, pedidos y reservas. No confirmes productos agotados como disponibles.",
+  clinic: "Revisa especialidades, profesionales, duración de consultas, horarios, precios y reservas. No inventes disponibilidad ni indicaciones clínicas.",
+  veterinary: "Revisa especies atendidas, servicios, profesionales, horarios, urgencias, precios y citas. No inventes disponibilidad ni recomendaciones veterinarias.",
+  salon: "Revisa servicios, duraciones, precios, profesionales y disponibilidad para reservas.",
+  workshop: "Revisa tipos de reparación, presupuestos, horarios, plazos y requisitos para recibir equipos.",
+  hospitality: "Revisa tipos de alojamiento, tarifas, horarios de ingreso y salida y políticas de reserva.",
+  professional: "Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva."
 };
 
 const agentCapabilities = [
