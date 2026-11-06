@@ -55,7 +55,10 @@ function parseRecords(text: string, separator: string): Array<{ cells: string[];
   let sourceRow = 1;
   const finishRecord = () => {
     cells.push(cell.trim());
-    if (cells.some(value => value !== "")) result.push({ cells, sourceRow });
+    if (cells.some(value => value !== "")) {
+      result.push({ cells, sourceRow });
+      if (result.length > MAX_ROWS_PER_FILE + 1) throw new Error("demasiadas filas");
+    }
     cells = [];
     cell = "";
     sourceRow = line + 1;
@@ -76,7 +79,6 @@ function parseRecords(text: string, separator: string): Array<{ cells: string[];
       if (char === "\n") line++;
       cell += char;
     }
-    if (result.length > MAX_ROWS_PER_FILE + 1) throw new Error("demasiadas filas");
   }
   if (inQuotes) throw new Error("comillas sin cerrar");
   if (cell !== "" || cells.length) finishRecord();
@@ -92,12 +94,13 @@ function separatorFor(header: string, filename: string): string {
 
 function recordsFor(text: string, filename: string) {
   const cleaned = text.replace(/^\uFEFF/, "");
-  const header = cleaned.split(/\r?\n/, 1)[0] ?? "";
+  const header = cleaned.split(/\r?\n/, 1)[0];
   return parseRecords(cleaned, separatorFor(header, filename));
 }
 
 function rowValue(cells: string[], index: number): string {
-  return index < 0 ? "" : (cells[index] ?? "").trim();
+  // Column indices are validated by faq/hours header detection before this helper is called.
+  return (cells[index] ?? "").trim();
 }
 
 export async function extractFreeSetup(files: File[]): Promise<LocalSetupResult> {
@@ -157,8 +160,6 @@ export async function extractFreeSetup(files: File[]): Promise<LocalSetupResult>
       }
       candidates.push({ kind, key, value, sourceName: file.name, sourceRow: record.sourceRow, selected: false });
     }
-    if (records.length > MAX_ROWS_PER_FILE + 1)
-      warnings.push(file.name + ": solo se revisaron las primeras 500 filas.");
   }
 
   const rows: LocalSetupRow[] = [];
