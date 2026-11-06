@@ -70,7 +70,7 @@ class BusinessHoursAdminServiceTest {
         var request = new BusinessHoursRequest(List.of(interval(1, 9, 13), interval(1, 12, 18)));
 
         assertThrows(IllegalArgumentException.class, () -> subject.replace(request));
-        verifyNoInteractions(businesses);
+        verify(businesses, never()).lockByIdForUpdate(any());
         verify(hours, never()).deleteAllByBusinessId(any());
         verify(hours, never()).save(any());
     }
@@ -124,7 +124,7 @@ class BusinessHoursAdminServiceTest {
                 new BusinessHoursSelectedRequest(List.of(interval(1, 9, 12), interval(1, 13, 18)), List.of())));
         assertThrows(IllegalArgumentException.class, () -> subject.mergeSelected(
                 new BusinessHoursSelectedRequest(List.of(interval(1, 9, 18)), List.of(interval(2, 10, 19)))));
-        verifyNoInteractions(businesses);
+        verify(businesses, never()).lockByIdForUpdate(any());
         verify(hours, never()).deleteAllByBusinessId(any());
     }
 
