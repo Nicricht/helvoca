@@ -41,3 +41,15 @@ Example **only**, not a recommendation or an actual price quote: if operations s
 6. Roll out to one consenting trial business with a small operational budget, manual monitoring and one-click emergency-off. Only after validation, consider self-service general availability.
 
 No provider requests, production environment variable changes, price assumptions or extra Railway services are part of this PR.
+
+## Free CSV/TSV FAQ and weekly-hours review · PR #862 (2026-11-06)
+
+This is an unpaid, frontend-only increment of [Issue #776](https://github.com/Nicricht/helvoca/issues/776). It does not enable, implement or call the paid image/PDF Gemini/OpenAI path.
+
+- The existing authenticated /api/v1/onboarding/import/preview remains unchanged. The browser also reads ONLY small UTF-8 .csv/.tsv files (up to 1 MiB each) and proposes explicit FAQ pairs (pregunta/respuesta) and weekly opening/closing intervals (dia/apertura/cierre). Header synonyms allowed. No inferred time, policy, availability or answer. UTF-8 BOM, quoted separators and tabs handled; invalid rows warned and omitted.
+- Every candidate carries original filename and source row. At most 100 suggestions per batch; at most 500 file rows. Conflicts for the same question/day are excluded with visible warning, not guessed. Proposals are unselected by default.
+- The canonical React page mounts FreeSetupReview only once a preview exists. The business administrator may select, deselect and edit, then click Aprobar sugerencias seleccionadas. No business data saved on preview. Existing BUSINESS_ADMIN role guard retained on both page and server endpoints.
+- Approved FAQ are compared against existing stored knowledge; same-title FAQ are never overwritten. Approved hours merge with existing weekly schedule, leaving all unselected days untouched. Invalid intervals, duplicate days and duplicate questions fail closed before writes. FAQ and hours must be approved in separate batches due to independent REST transaction boundaries.
+- All mutations reuse existing tenant-authenticated /api/v1/knowledge and /api/v1/business/hours APIs. No new SQL/schema/API/provider credentials, calls, orders, reservations, messages or payments. A network failure mid-FAQ batch can leave previously created FAQ; UI warns to verify existing state before retry and repeated same-title entries are skipped.
+- Scope limitation: no free FAQ/hour extraction from XLS/XLSX, PDF or images. Existing Excel catalogue, gated paid import and existing business-facts review remain unchanged. No claim of full-document auto-configuration or verified ten-minute onboarding.
+- QA gate: [PR #862](https://github.com/Nicricht/helvoca/pull/862) must complete exact-head Fast/Full, TypeScript and E2E. PR remains DRAFT; no merge/deploy without certification. Automated test time is not human setup time.
