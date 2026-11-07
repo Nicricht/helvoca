@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Link2, Phone, Search, ShieldCheck, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   activateMetaWhatsApp,
   connectExistingPhoneNumber,
@@ -19,6 +19,7 @@ import {
   searchAvailablePhoneNumbers,
   setPhoneActive,
   setPhoneWhatsAppEnabled,
+  stageMetaCoexistence,
   validateMetaPhoneNumber,
   type AvailablePhoneNumber,
   type MetaPhoneCandidate,
@@ -104,7 +105,58 @@ export function ChannelsSettingsPanel({
   const [selectedMetaPhone, setSelectedMetaPhone] = useState("");
   const [validatedMetaPhone, setValidatedMetaPhone] = useState(false);
   const [pin, setPin] = useState("");
+  // Fail closed for numbers that already use the WhatsApp Business mobile app.
+  // The standard register endpoint is NOT a verified coexistence onboarding path.
+  const [existingBusinessApp, setExistingBusinessApp] = useState(true);
+  const [coexistenceSession, setCoexistenceSession] = useState<{
+    wabaId: string;
+    phoneNumberId?: string;
+  } | null>(null);
+  const metaSignupWabaIdRef = useRef<string | null>(null);
   const metaActionLock = useRef(false);
+
+  useEffect(() => {
+    function onMetaSession(event: MessageEvent) {
+      // Embedded Signup posts its session outcome from a Meta-owned origin.
+      if (event.origin !== "https://www.facebook.com"
+        && event.origin !== "https://web.facebook.com") return;
+      let message: unknown = event.data;
+      if (typeof message === "string") {
+        try { message = JSON.parse(message); } catch { return; }
+      }
+      if (!message || typeof message !== "object") return;
+      const payload = message as {
+        type?: string;
+        event?: string;
+        data?: { waba_id?: string; phone_number_id?: string };
+      };
+      if (payload.type !== "WA_EMBEDDED_SIGNUP") return;
+      const wabaId = payload.data?.waba_id ?? "";
+      const phoneNumberId = payload.data?.phone_number_id;
+      const validWabaId = /^[0-9]{5,30}$/.test(wabaId);
+      const validPhoneId = !phoneNumberId || /^[0-9]{5,30}$/.test(phoneNumberId);
+
+      if ((payload.event === "FINISH"
+          || payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING")
+        && validWabaId && validPhoneId) {
+        // Bind the authorization code to the WABA reported by Meta. The
+        // backend independently proves this customer's code can read it.
+        metaSignupWabaIdRef.current = wabaId;
+        if (payload.event === "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING") {
+          setCoexistenceSession({
+            wabaId,
+            phoneNumberId: phoneNumberId || undefined
+          });
+        }
+      } else if (payload.event === "CANCEL" || payload.event === "ERROR") {
+        metaSignupWabaIdRef.current = null;
+        setCoexistenceSession(null);
+        setMetaMessage("Meta no completó la autorización de WhatsApp.");
+      }
+    }
+    window.addEventListener("message", onMetaSession);
+    return () => window.removeEventListener("message", onMetaSession);
+  }, [existingBusinessApp]);
 
   const provisioningStatus = useQuery({
     queryKey: ["settings", "phone-provisioning-status"],
@@ -313,6 +365,12 @@ export function ChannelsSettingsPanel({
 
   async function beginMetaSignup() {
     if (!canManage || metaActionLock.current) return;
+    if (existingBusinessApp && !metaBootstrap.data?.coexistenceAvailable) {
+      setMetaMessage("La coexistencia con WhatsApp Business aún no está disponible en este entorno. No se registrará ni migrará tu cuenta.");
+      return;
+    }
+    setCoexistenceSession(null);
+    metaSignupWabaIdRef.current = null;
     const bootstrap = metaBootstrap.data;
     if (!bootstrap?.available || !bootstrap.appId || !bootstrap.configId || !bootstrap.graphApiVersion) {
       setMetaMessage("La conexión guiada con Meta no está disponible en este entorno.");
@@ -340,10 +398,14 @@ export function ChannelsSettingsPanel({
           return;
         }
         try {
-          const handoff = await exchangeMetaAuthorizationCode(code);
+          const wabaId = metaSignupWabaIdRef.current;
+          if (!wabaId) {
+            throw new Error("Meta no confirmó el WABA de esta autorización. Reinicia la conexión y vuelve a intentarlo.");
+          }
+          const handoff = await exchangeMetaAuthorizationCode(code, wabaId);
           if (!handoff.accepted) throw new Error("Meta authorization rejected");
           setWabas(handoff.wabas ?? []);
-          setSelectedWaba("");
+          setSelectedWaba(handoff.wabas?.[0]?.id ?? "");
           setMetaPhones([]);
           setSelectedMetaPhone("");
           setValidatedMetaPhone(false);
@@ -363,7 +425,9 @@ export function ChannelsSettingsPanel({
         auth_type: "rerequest",
         response_type: "code",
         override_default_response_type: true,
-        extras: { setup: {} }
+        extras: existingBusinessApp
+          ? { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" }
+          : { setup: {} }
       });
       return;
     } catch (error) {
@@ -398,6 +462,13 @@ export function ChannelsSettingsPanel({
 
   async function validateMetaPhone() {
     if (!selectedWaba || !selectedMetaPhone || metaActionLock.current) return;
+    if (existingBusinessApp && (!coexistenceSession
+      || coexistenceSession.wabaId !== selectedWaba
+      || (coexistenceSession.phoneNumberId != null
+        && coexistenceSession.phoneNumberId !== selectedMetaPhone))) {
+      setMetaMessage("Meta todavía no confirmó la coexistencia de este número. No se realizará ningún registro.");
+      return;
+    }
     metaActionLock.current = true;
     setMetaMessage("Validando número con Meta…");
     try {
@@ -405,7 +476,9 @@ export function ChannelsSettingsPanel({
       if (result.state !== "PHONE_NUMBER_VALIDATED") throw new Error("Meta phone validation failed");
       setValidatedMetaPhone(true);
       setPin("");
-      setMetaMessage("Número validado. Ingresa un PIN de seis dígitos para finalizar.");
+      setMetaMessage(existingBusinessApp
+        ? "Número validado. La comprobación final conservará WhatsApp Business en el celular."
+        : "Número validado. Ingresa un PIN de seis dígitos para finalizar.");
     } catch (error) {
       setValidatedMetaPhone(false);
       setMetaMessage(errorMessage(error, "No pudimos validar ese número."));
@@ -415,6 +488,11 @@ export function ChannelsSettingsPanel({
   }
 
   async function finalizeMetaPhone() {
+    if (existingBusinessApp) {
+      setPin("");
+      setMetaMessage("Registro tradicional bloqueado para WhatsApp Business.");
+      return;
+    }
     if (!selectedWaba || !selectedMetaPhone || !validatedMetaPhone || !/^[0-9]{6}$/.test(pin)) {
       setMetaMessage("El PIN debe tener exactamente seis dígitos.");
       return;
@@ -438,6 +516,37 @@ export function ChannelsSettingsPanel({
       await refreshChannels();
     } catch (error) {
       setMetaMessage(errorMessage(error, "No pudimos finalizar la configuración de WhatsApp."));
+    } finally {
+      metaActionLock.current = false;
+    }
+  }
+
+  async function finalizeCoexistencePhone() {
+    if (!existingBusinessApp || metaActionLock.current || !validatedMetaPhone
+      || !selectedWaba || !selectedMetaPhone || !coexistenceSession
+      || coexistenceSession.wabaId !== selectedWaba
+      || (coexistenceSession.phoneNumberId != null
+        && coexistenceSession.phoneNumberId !== selectedMetaPhone)) {
+      setMetaMessage("Falta la confirmación de Meta para conectar la cuenta existente.");
+      return;
+    }
+    metaActionLock.current = true;
+    setMetaMessage("Comprobando coexistencia directamente con Meta…");
+    try {
+      const result = await stageMetaCoexistence(selectedWaba, selectedMetaPhone);
+      if (result.state !== "COEXISTENCE_VERIFIED_AND_STAGED" || result.enabled !== false) {
+        throw new Error("La coexistencia no quedó verificada por Meta.");
+      }
+      setMetaMessage("Meta confirmó la coexistencia. Número preparado, todavía desactivado hasta la prueba controlada.");
+      setWabas([]);
+      setMetaPhones([]);
+      setSelectedWaba("");
+      setSelectedMetaPhone("");
+      setValidatedMetaPhone(false);
+      setCoexistenceSession(null);
+      await refreshChannels();
+    } catch (error) {
+      setMetaMessage(errorMessage(error, "No pudimos comprobar la coexistencia con Meta. La cuenta se mantiene sin cambios."));
     } finally {
       metaActionLock.current = false;
     }
@@ -685,9 +794,38 @@ export function ChannelsSettingsPanel({
 
             {canManage && !metaStatus.data?.configured && (
               <div className={styles.metaFlow}>
+                <label className={styles.field}>
+                  <span>
+                    <input
+                      type="checkbox"
+                      checked={existingBusinessApp}
+                      onChange={event => {
+                        setExistingBusinessApp(event.target.checked);
+                        setMetaMessage("");
+                        setSdkReady(false);
+                        setWabas([]);
+                        setSelectedWaba("");
+                        setMetaPhones([]);
+                        setSelectedMetaPhone("");
+                        setValidatedMetaPhone(false);
+                        setPin("");
+                        setCoexistenceSession(null);
+                      }}
+                    />
+                    {" "}El número ya utiliza WhatsApp Business y quiero conservarlo
+                  </span>
+                </label>
+                {existingBusinessApp && (
+                  <p role="status">
+                    La coexistencia con WhatsApp Business requiere una integración específica
+                    y autorización en Meta. El registro tradicional está bloqueado para
+                    proteger la cuenta y su historial.
+                  </p>
+                )}
                 <button
                   className="button secondary"
                   type="button"
+                  disabled={existingBusinessApp && !metaBootstrap.data?.coexistenceAvailable}
                   onClick={beginMetaSignup}
                 >
                   {sdkReady ? "Continuar con Meta" : "Conectar WhatsApp"}
@@ -744,7 +882,23 @@ export function ChannelsSettingsPanel({
                   </div>
                 )}
 
-                {validatedMetaPhone && (
+                {validatedMetaPhone && existingBusinessApp && (
+                  <div className={styles.pinBox}>
+                    <p>Coexistencia: conservarás WhatsApp Business en el celular. No se solicitará PIN de registro ni se llamará al registro tradicional.</p>
+                    <button
+                      className="button primary"
+                      type="button"
+                      disabled={!coexistenceSession || coexistenceSession.wabaId !== selectedWaba
+                        || (coexistenceSession.phoneNumberId != null
+                          && coexistenceSession.phoneNumberId !== selectedMetaPhone)}
+                      onClick={finalizeCoexistencePhone}
+                    >
+                      Verificar y preparar coexistencia
+                    </button>
+                  </div>
+                )}
+
+                {validatedMetaPhone && !existingBusinessApp && (
                   <div className={styles.pinBox}>
                     <label className={styles.field}>
                       <span>PIN de registro de Meta</span>
