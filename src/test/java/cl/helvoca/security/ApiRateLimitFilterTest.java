@@ -87,11 +87,11 @@ class ApiRateLimitFilterTest {
     }
 
     @Test
-    void platformCertificationUsesDedicatedPerUserThrottle() throws Exception {
+    void platformCertificationUsesOrdinaryAuthenticatedRateInsteadOfFivePerHourQuota() throws Exception {
         ApiRateLimitProperties properties = new ApiRateLimitProperties();
         DistributedRateLimiter limiter = mock(DistributedRateLimiter.class);
-        when(limiter.consume(startsWith("platform-certification:"), eq(5), eq(3600), any(Instant.class)))
-                .thenReturn(new DistributedRateLimiter.Result(true, 1, 4, Instant.now().getEpochSecond() + 3600));
+        when(limiter.consume(startsWith("platform-certification:"), eq(600), eq(60), any(Instant.class)))
+                .thenReturn(new DistributedRateLimiter.Result(true, 1, 599, Instant.now().getEpochSecond() + 60));
 
         Jwt jwt = new Jwt("token", Instant.now(), Instant.now().plusSeconds(300),
                 Map.of("alg", "none"), Map.of("sub", "platform-admin-1", "roles", java.util.List.of("PLATFORM_ADMIN")));
@@ -105,7 +105,7 @@ class ApiRateLimitFilterTest {
 
         filter.doFilter(request, response, chain);
 
-        verify(limiter).consume(startsWith("platform-certification:"), eq(5), eq(3600), any(Instant.class));
+        verify(limiter).consume(startsWith("platform-certification:"), eq(600), eq(60), any(Instant.class));
         verify(chain).doFilter(request, response);
     }
 

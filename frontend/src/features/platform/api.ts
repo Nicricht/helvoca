@@ -223,3 +223,49 @@ export function provisionPlatformBusiness(payload: PlatformBusinessProvisioningR
 export function getPlatformEconomics() {
   return apiRequest<PlatformEconomics>("/api/v1/platform/economics");
 }
+
+
+export type TwilioEnrollmentView = {
+  changeId: string | null;
+  state: string;
+};
+
+export type PlatformLoginResponse = {
+  accessToken: string;
+  user: {
+    roles: string[];
+  };
+};
+
+export function getCurrentSingleOperatorEnrollment() {
+  return apiRequest<TwilioEnrollmentView>("/api/v1/platform/twilio-single-operator-demo/current");
+}
+
+export function prepareSingleOperatorEnrollment() {
+  return apiRequest<TwilioEnrollmentView>(
+    "/api/v1/platform/twilio-single-operator-demo/prepare",
+    { method: "POST" }
+  );
+}
+
+export function confirmSingleOperatorEnrollment(
+  changeId: string,
+  currentPassword: string,
+  expectedPhoneNumber: string
+) {
+  return apiRequest<TwilioEnrollmentView>(
+    "/api/v1/platform/twilio-single-operator-demo/" + encodeURIComponent(changeId) + "/confirm",
+    {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, expectedPhoneNumber })
+    }
+  );
+}
+
+export function loginPlatformAdmin(email: string, password: string) {
+  return apiRequest<PlatformLoginResponse>(
+    "/api/v1/auth/login",
+    { method: "POST", body: JSON.stringify({ email, password }) },
+    false
+  );
+}

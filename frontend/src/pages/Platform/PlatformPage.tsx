@@ -9,6 +9,7 @@ import {
   FlaskConical,
   LogOut,
   Play,
+  PhoneCall,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -35,6 +36,7 @@ import {
   type PlatformEconomics
 } from "../../features/platform/api";
 import styles from "./PlatformPage.module.css";
+import { TwilioEnrollmentPanel } from "./TwilioEnrollmentPanel";
 
 const READINESS = [
   ["runtime", "Runtime demo"],
@@ -363,6 +365,7 @@ export function PlatformPage() {
         <nav className={styles.sectionNav} aria-label="Secciones de plataforma">
           <a href="#platformDemos"><FlaskConical size={14} /> Demos</a>
           <a href="#platformProvision"><Building2 size={14} /> Clientes</a>
+          <a href="#platformTwilioEnrollment"><PhoneCall size={14} /> Twilio</a>
           <a href="#platformEconomics"><BarChart3 size={14} /> Administración</a>
         </nav>
 
@@ -608,6 +611,17 @@ export function PlatformPage() {
               )}
             </article>
           </div>
+        </section>
+
+        <section id="platformTwilioEnrollment" className={styles.card} aria-labelledby="platformTwilioEnrollmentTitle">
+          <div className={styles.sectionHead}>
+            <div>
+              <p className={styles.eyebrow}>TELEFONÍA</p>
+              <h2 id="platformTwilioEnrollmentTitle">Vinculación Twilio · Aurora Sur</h2>
+              <p>Enrola el número existente con el único administrador de plataforma. Esta operación no inicia llamadas.</p>
+            </div>
+          </div>
+          <TwilioEnrollmentPanel email={me.data?.email || ""} />
         </section>
 
         <section id="platformEconomics" className={styles.card} aria-labelledby="platformEconomicsTitle">

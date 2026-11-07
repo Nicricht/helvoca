@@ -29,6 +29,35 @@ import static org.mockito.Mockito.*;
 class GeminiLiveVoiceSessionTest {
 
     @Test
+    void constructorRejectsMissingTenantContext() {
+        assertThrows(IllegalArgumentException.class, () -> new GeminiLiveVoiceSession(
+                null,
+                mock(VoiceTransportSession.class),
+                properties(),
+                mock(RealtimeToolService.class),
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient()));
+
+        RealtimeCallContext missingBusinessId = new RealtimeCallContext(
+                UUID.randomUUID(), null, null, "+56911111111", "+14355652512", "MZ-test");
+        assertThrows(IllegalArgumentException.class, () -> new GeminiLiveVoiceSession(
+                missingBusinessId,
+                mock(VoiceTransportSession.class),
+                properties(),
+                mock(RealtimeToolService.class),
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient()));
+    }
+
+    @Test
     void setupUsesNativeAudioVoiceTranscriptsAndRecepVozTools() {
         GeminiLiveProperties properties = properties();
         RealtimeCallContext context = context();
