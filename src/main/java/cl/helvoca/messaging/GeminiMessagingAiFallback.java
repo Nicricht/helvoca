@@ -242,9 +242,31 @@ public class GeminiMessagingAiFallback {
             out.put(new JSONObject()
                     .put("name", name)
                     .put("description", adaptDescription(definition.optString("description", "")))
-                    .put("parameters", definition.getJSONObject("parameters")));
+                    .put("parameters", geminiParameters(definition.getJSONObject("parameters"))));
         }
         return out;
+    }
+
+    // Gemini REST FunctionDeclaration.parameters accepts a narrower schema than
+    // the shared voice/OpenAI definitions. Never mutate the shared definitions.
+    private static JSONObject geminiParameters(JSONObject source) {
+        JSONObject copy = new JSONObject(source.toString());
+        removeUnsupportedGeminiSchemaFields(copy);
+        return copy;
+    }
+
+    private static void removeUnsupportedGeminiSchemaFields(JSONObject schema) {
+        schema.remove("additionalProperties");
+        JSONObject properties = schema.optJSONObject("properties");
+        if (properties != null) {
+            for (String name : properties.keySet()) {
+                removeUnsupportedGeminiSchemaFields(properties.getJSONObject(name));
+            }
+        }
+        JSONObject items = schema.optJSONObject("items");
+        if (items != null) {
+            removeUnsupportedGeminiSchemaFields(items);
+        }
     }
 
     private static void appendDefinitions(JSONArray target, JSONArray source) {
