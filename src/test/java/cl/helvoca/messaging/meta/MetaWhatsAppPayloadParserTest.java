@@ -130,6 +130,32 @@ class MetaWhatsAppPayloadParserTest {
         assertTrue(MetaWhatsAppPayloadParser.parseTextMessages(body).isEmpty());
     }
     @Test
+    void coexistenceAppEchoesNeverTriggerArtificialAssistantReplies() throws Exception {
+        byte[] body = """
+                {
+                  "entry": [{
+                    "changes": [{
+                      "field": "smb_message_echoes",
+                      "value": {
+                        "metadata": {"phone_number_id": "PHONE-123"},
+                        "messages": [{
+                          "from": "56950730447",
+                          "id": "wamid.ECHO-1",
+                          "type": "text",
+                          "text": {"body": "Mensaje escrito por recepcionista"}
+                        }]
+                      }
+                    }]
+                  }]
+                }
+                """.getBytes(StandardCharsets.UTF_8);
+
+        assertTrue(MetaWhatsAppPayloadParser.parseTextMessages(body).isEmpty());
+        assertTrue(MetaWhatsAppPayloadParser.parseAudioMessages(body).isEmpty());
+        assertTrue(MetaWhatsAppPayloadParser.parseDeliveryStatuses(body).isEmpty());
+    }
+
+    @Test
     void extractsAudioMessageMediaIdentityAndMimeType() throws Exception {
         byte[] body = """
                 {

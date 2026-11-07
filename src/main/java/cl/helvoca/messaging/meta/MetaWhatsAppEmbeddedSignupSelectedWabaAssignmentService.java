@@ -21,6 +21,7 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
     private final MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient;
     private final MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient;
     private final MetaWhatsAppProperties metaProperties;
+    private final MetaWhatsAppTenantWabaAuthorizationService wabaAuthorization;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
 
@@ -31,6 +32,7 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
             MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
             MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient,
             MetaWhatsAppProperties metaProperties,
+            MetaWhatsAppTenantWabaAuthorizationService wabaAuthorization,
             TenantProvider tenantProvider,
             AuditService auditService) {
         this.readinessService = readinessService;
@@ -38,24 +40,9 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
         this.assignedUsersClient = assignedUsersClient;
         this.assignSystemUserClient = assignSystemUserClient;
         this.metaProperties = metaProperties;
+        this.wabaAuthorization = wabaAuthorization;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
-    }
-
-    MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService(
-            MetaWhatsAppEmbeddedSignupReadinessService readinessService,
-            MetaWhatsAppEmbeddedSignupSharedWabaClient sharedWabaClient,
-            MetaWhatsAppEmbeddedSignupAssignedUsersClient assignedUsersClient,
-            MetaWhatsAppEmbeddedSignupAssignSystemUserClient assignSystemUserClient,
-            MetaWhatsAppProperties metaProperties) {
-        this(
-                readinessService,
-                sharedWabaClient,
-                assignedUsersClient,
-                assignSystemUserClient,
-                metaProperties,
-                null,
-                null);
     }
 
     public MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentResult ensureAssigned(String wabaId) {
@@ -64,6 +51,10 @@ public class MetaWhatsAppEmbeddedSignupSelectedWabaAssignmentService {
         }
 
         String cleanWabaId = requireWabaId(wabaId);
+        if (wabaAuthorization == null) {
+            throw new ConflictException("META_WHATSAPP_WABA_AUTHORIZATION_UNAVAILABLE");
+        }
+        wabaAuthorization.requireAuthorized(cleanWabaId);
         if (!isSharedWaba(cleanWabaId)) {
             throw new ConflictException("META_EMBEDDED_SIGNUP_WABA_NOT_SHARED");
         }

@@ -297,11 +297,46 @@ test('channel provisioning and WhatsApp activation remain explicit in React Sett
   await expect.poll(() => activationCalls).toBe(1);
 });
 
+test('existing WhatsApp Business app blocks standard Meta registration before any provider mutation', async ({ page }) => {
+  await bootReactSettings(page);
+  let providerWrites = 0;
+
+  await page.route('**/api/v1/channels/whatsapp/meta/config', route => route.fulfill(json({
+    status: 'NOT_CONFIGURED',
+    configured: false,
+    enabled: false
+  })));
+  await page.route('**/api/v1/channels/whatsapp/meta/embedded-signup/**', route => {
+    if (route.request().method() !== 'GET') providerWrites += 1;
+    return route.fulfill(json({ enabled: true, available: true }));
+  });
+
+  await page.goto('/app/settings?section=channels');
+
+  const existingApp = page.getByRole('checkbox', {
+    name: 'El número ya utiliza WhatsApp Business y quiero conservarlo'
+  });
+  await expect(existingApp).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Conectar WhatsApp' })).toBeDisabled();
+  await expect(page.getByText(/El registro tradicional está bloqueado/)).toBeVisible();
+  expect(providerWrites).toBe(0);
+});
+
 test('Meta embedded signup completes inside React and clears the registration PIN', async ({ page }) => {
   await page.addInitScript(() => {
     window.FB = {
       init: () => {},
-      login: callback => callback({ authResponse: { code: 'temporary-e2e-code' } })
+      login: callback => {
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: 'https://www.facebook.com',
+        data: {
+          type: 'WA_EMBEDDED_SIGNUP',
+          event: 'FINISH',
+          data: { waba_id: '1906385232743451' }
+        }
+      }));
+      callback({ authResponse: { code: 'temporary-e2e-code' } });
+    }
     };
   });
   await bootReactSettings(page);
@@ -413,10 +448,14 @@ test('Meta embedded signup completes inside React and clears the registration PI
 
   await page.goto('/app/settings?section=channels');
 
+  // This test covers a NEW number, not an existing WhatsApp Business App account.
+  await page.getByRole('checkbox', {
+    name: 'El número ya utiliza WhatsApp Business y quiero conservarlo'
+  }).uncheck();
   await page.getByRole('button', { name: 'Conectar WhatsApp' }).click();
   await page.getByRole('button', { name: 'Continuar con Meta' }).click();
 
-  await expect.poll(() => authorizationPayload).toEqual({ code: 'temporary-e2e-code' });
+  await expect.poll(() => authorizationPayload).toEqual({ code: 'temporary-e2e-code', wabaId: '1906385232743451' });
   await expect(page.getByText('Negocio E2E WhatsApp')).toBeVisible();
 
   await page.getByRole('button', { name: /Negocio E2E WhatsApp/ }).click();

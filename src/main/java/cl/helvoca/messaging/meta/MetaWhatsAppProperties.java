@@ -12,6 +12,13 @@ public class MetaWhatsAppProperties {
     private String graphBaseUrl = "https://graph.facebook.com";
     private String verifyToken = "";
     private String appSecret = "";
+    // Deliberately opt-in: standard /register can disconnect an existing Business App.
+    private boolean standardRegistrationEnabled = false;
+    private boolean coexistenceEnabled = false;
+    private String coexistenceAllowedBusinessId = "";
+    private String coexistenceAllowedPhone = "";
+    // Global opt-in for tenant-scoped self-service coexistence onboarding.
+    private boolean coexistenceSelfServiceEnabled = false;
     private boolean embeddedSignupEnabled = false;
     private String embeddedSignupAppId = "";
     private String embeddedSignupConfigId = "";
@@ -75,6 +82,46 @@ public class MetaWhatsAppProperties {
 
     public boolean hasAppSecret() {
         return !getAppSecret().isBlank();
+    }
+
+    public boolean isStandardRegistrationEnabled() {
+        return standardRegistrationEnabled;
+    }
+
+    public void setStandardRegistrationEnabled(boolean enabled) {
+        this.standardRegistrationEnabled = enabled;
+    }
+
+    public boolean isCoexistenceEnabled() {
+        return coexistenceEnabled;
+    }
+
+    public void setCoexistenceEnabled(boolean enabled) {
+        this.coexistenceEnabled = enabled;
+    }
+
+    public String getCoexistenceAllowedBusinessId() {
+        return clean(coexistenceAllowedBusinessId);
+    }
+
+    public void setCoexistenceAllowedBusinessId(String businessId) {
+        this.coexistenceAllowedBusinessId = businessId;
+    }
+
+    public String getCoexistenceAllowedPhone() {
+        return clean(coexistenceAllowedPhone);
+    }
+
+    public void setCoexistenceAllowedPhone(String phone) {
+        this.coexistenceAllowedPhone = phone;
+    }
+
+    public boolean isCoexistenceSelfServiceEnabled() {
+        return coexistenceSelfServiceEnabled;
+    }
+
+    public void setCoexistenceSelfServiceEnabled(boolean enabled) {
+        this.coexistenceSelfServiceEnabled = enabled;
     }
 
     public boolean isEmbeddedSignupEnabled() {

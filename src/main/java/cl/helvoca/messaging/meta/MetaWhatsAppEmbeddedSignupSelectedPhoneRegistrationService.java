@@ -14,6 +14,7 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService {
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService validationService;
     private final MetaWhatsAppEmbeddedSignupRegisterPhoneClient registerPhoneClient;
     private final MetaWhatsAppProperties metaProperties;
+    private final MetaWhatsAppCoexistencePhoneStatusClient coexistenceStatus;
     private final TenantProvider tenantProvider;
     private final AuditService auditService;
 
@@ -22,28 +23,36 @@ public class MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService {
             MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService validationService,
             MetaWhatsAppEmbeddedSignupRegisterPhoneClient registerPhoneClient,
             MetaWhatsAppProperties metaProperties,
+            MetaWhatsAppCoexistencePhoneStatusClient coexistenceStatus,
             TenantProvider tenantProvider,
             AuditService auditService) {
         this.validationService = validationService;
         this.registerPhoneClient = registerPhoneClient;
         this.metaProperties = metaProperties;
+        this.coexistenceStatus = coexistenceStatus;
         this.tenantProvider = tenantProvider;
         this.auditService = auditService;
-    }
-
-    MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService(
-            MetaWhatsAppEmbeddedSignupSelectedPhoneValidationService validationService,
-            MetaWhatsAppEmbeddedSignupRegisterPhoneClient registerPhoneClient,
-            MetaWhatsAppProperties metaProperties) {
-        this(validationService, registerPhoneClient, metaProperties, null, null);
     }
 
     public MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationResult register(
             String wabaId,
             String phoneNumberId,
             String pin) {
+        // An existing WhatsApp Business App number must use the coexistence path,
+        // never the ordinary Cloud API registration flow.
+        if (!metaProperties.isStandardRegistrationEnabled()) {
+            throw new ConflictException("META_STANDARD_REGISTRATION_DISABLED");
+        }
         MetaWhatsAppEmbeddedSignupSelectedPhoneValidationResult validated =
                 validationService.validate(wabaId, phoneNumberId);
+        if (coexistenceStatus == null) {
+            throw new ConflictException("META_PHONE_BUSINESS_APP_STATUS_UNAVAILABLE");
+        }
+        if (coexistenceStatus.isOnBusinessApp(
+                validated.phoneNumberId(),
+                metaProperties.getEmbeddedSignupSystemUserAccessToken())) {
+            throw new ConflictException("META_EXISTING_BUSINESS_APP_REQUIRES_COEXISTENCE");
+        }
 
         MetaWhatsAppEmbeddedSignupRegisterPhoneResult registration =
                 registerPhoneClient.register(
