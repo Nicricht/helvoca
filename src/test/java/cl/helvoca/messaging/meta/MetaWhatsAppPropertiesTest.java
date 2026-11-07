@@ -17,6 +17,7 @@ class MetaWhatsAppPropertiesTest {
         assertEquals("https://graph.facebook.com/v26.0", properties.graphApiRoot());
         assertFalse(properties.hasVerifyToken());
         assertFalse(properties.hasAppSecret());
+        assertFalse(properties.isCoexistenceSelfServiceEnabled());
     }
 
     @Test
@@ -33,5 +34,13 @@ class MetaWhatsAppPropertiesTest {
         assertEquals("secret", properties.getAppSecret());
         assertTrue(properties.hasVerifyToken());
         assertTrue(properties.hasAppSecret());
+    }
+
+    @Test
+    void exposesTenantCoexistenceSelfServiceOnlyWhenExplicitlyEnabled() {
+        MetaWhatsAppProperties properties = new MetaWhatsAppProperties();
+        properties.setCoexistenceSelfServiceEnabled(true);
+
+        assertTrue(properties.isCoexistenceSelfServiceEnabled());
     }
 }

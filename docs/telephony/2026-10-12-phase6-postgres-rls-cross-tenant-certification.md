@@ -40,3 +40,18 @@ El test de PostgreSQL para `VERIFIED_EXISTING` necesita evidencias **negativas r
 - No desplegar, fusionar, activar piloto, adquirir números, usar Gemini pagado, registrar claves, consultar producción ni ejecutar llamadas.
 - La seguridad local comprobada no constituye permiso para abrir llamadas. **PRODUCTION / COMMERCIAL: NO-GO**.
 - No comenzar Parte 7 automáticamente; esperar cierre de esta fase y autorización contextual.
+## Gemini Live: contexto tenant en callbacks asíncronos (2026-11-03)
+
+Los eventos de Gemini Live llegan por callbacks de WebSocket que pueden ejecutarse en hilos distintos del request HTTP que admitió la llamada. El `TenantDatabaseContext` es `ThreadLocal`, por lo que el scope instalado por el filtro HTTP no se hereda automáticamente.
+
+- `GeminiLiveVoiceProvider` inyecta el bean de aplicación `TenantDatabaseContext` en cada `GeminiLiveVoiceSession`.
+- La sesión exige un `RealtimeCallContext.businessId` no nulo y ejecuta el procesamiento de eventos, la limpieza por fallo y el cierre/flush final dentro de `runAsTenant(context.businessId())`.
+- El scope es acotado y restaurable: al terminar cada callback el hilo vuelve a su contexto previo (normalmente `DENIED`). Las herramientas mantienen su propio `TenantTransactionExecutor`; los scopes anidados conservan su semántica.
+- No se concede rol SYSTEM a la sesión, no se modifica ninguna policy, no se desactiva FORCE RLS y no se añade BYPASSRLS.
+- La regresión `PostgresRowLevelSecurityIntegrationTest.geminiWebSocketCallbacksPersistWithinPinnedTenantOnExecutorThreads` usa PostgreSQL 18 real y el provider de Spring. Verifica la persistencia de `ai_setup_completed_at` y `call_transcript` para el tenant dueño, invisibilidad para otro tenant, rechazo de escritura cruzada y restauración del hilo a DENIED.
+
+Esta prueba no requiere Gemini real, Twilio real ni una llamada telefónica.
+
+### Fail-closed constructor guard
+
+`GeminiLiveVoiceSession` rejects both a missing `RealtimeCallContext` and a context whose `businessId` is null before accepting WebSocket work. The unit test `GeminiLiveVoiceSessionTest.constructorRejectsMissingTenantContext` covers both invalid inputs; valid tenant contexts are exercised by the existing session and PostgreSQL integration suites. The differential Java coverage gate requires 100% changed lines, branches and methods, including these rejection branches.

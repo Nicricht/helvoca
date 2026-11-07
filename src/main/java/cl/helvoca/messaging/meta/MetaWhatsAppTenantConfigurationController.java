@@ -26,6 +26,9 @@ public class MetaWhatsAppTenantConfigurationController {
     private final MetaWhatsAppEmbeddedSignupSelectedPhoneRegistrationService embeddedSignupSelectedPhoneRegistrationService;
     private final MetaWhatsAppEmbeddedSignupPhoneStagingService embeddedSignupPhoneStagingService;
 
+    @Autowired(required = false)
+    private MetaWhatsAppCoexistenceStagingService coexistenceStagingService;
+
     @Autowired
     public MetaWhatsAppTenantConfigurationController(
             MetaWhatsAppTenantConfigurationService service,
@@ -191,6 +194,16 @@ public class MetaWhatsAppTenantConfigurationController {
                 request.wabaId(),
                 request.phoneNumberId(),
                 request.pin());
+    }
+
+    @PostMapping("/embedded-signup/waba/phone-number/coexistence/stage")
+    @PreAuthorize("hasRole('BUSINESS_ADMIN')")
+    public MetaWhatsAppEmbeddedSignupPhoneStagingResult stageVerifiedCoexistence(
+            @Valid @RequestBody MetaWhatsAppCoexistenceStageRequest request) {
+        if (coexistenceStagingService == null) {
+            throw new IllegalStateException("Meta coexistence staging unavailable");
+        }
+        return coexistenceStagingService.stage(request.wabaId(), request.phoneNumberId());
     }
 
     @PostMapping("/config/deactivate")

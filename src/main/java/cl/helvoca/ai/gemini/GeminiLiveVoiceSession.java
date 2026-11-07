@@ -5,6 +5,7 @@ import cl.helvoca.ai.realtime.RealtimeToolService;
 import cl.helvoca.call.CallCertificationService;
 import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceAiSession;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
@@ -24,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -61,6 +63,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             "[RECEPVOZ_VOICE_BAKEOFF_LINE_5]");
 
     private final RealtimeCallContext context;
+    private final TenantDatabaseContext databaseContext;
     private final VoiceTransportSession transport;
     private final GeminiLiveProperties properties;
     private final RealtimeToolService tools;
@@ -115,7 +118,26 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                            CallCertificationService certifications,
                            VoiceProviderHealthRegistry health,
                            HttpClient http) {
+        this(context, transport, properties, tools, transcripts, summaries, lifecycle,
+                certifications, health, http, new TenantDatabaseContext());
+    }
+
+    GeminiLiveVoiceSession(RealtimeCallContext context,
+                           VoiceTransportSession transport,
+                           GeminiLiveProperties properties,
+                           RealtimeToolService tools,
+                           CallTranscriptService transcripts,
+                           CallSummaryService summaries,
+                           CallLifecycleService lifecycle,
+                           CallCertificationService certifications,
+                           VoiceProviderHealthRegistry health,
+                           HttpClient http,
+                           TenantDatabaseContext databaseContext) {
+        if (context == null || context.businessId() == null) {
+            throw new IllegalArgumentException("Realtime call context requires businessId");
+        }
         this.context = context;
+        this.databaseContext = Objects.requireNonNull(databaseContext, "databaseContext");
         this.transport = transport;
         this.properties = properties;
         this.tools = tools;
@@ -244,6 +266,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private void handle(String payload) {
+        runInTenantScope(() -> handleInTenant(payload));
+    }
+
+    private void handleInTenant(String payload) {
         try {
             JSONObject event = new JSONObject(payload);
             if (event.has("setupComplete")) {
@@ -271,6 +297,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         } catch (Exception e) {
             log.warn("Could not process Gemini Live event call={}: {}", context.callId(), e.getMessage());
         }
+    }
+
+    private void runInTenantScope(Runnable work) {
+        databaseContext.runAsTenant(context.businessId(), work);
     }
 
     private void onSetupComplete() {
@@ -967,6 +997,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void fail(String reason, VoiceProviderHealthRegistry.FailureKind kind) {
         if (!closed.compareAndSet(false, true)) return;
+        runInTenantScope(() -> failInTenant(reason, kind));
+    }
+
+    private void failInTenant(String reason, VoiceProviderHealthRegistry.FailureKind kind) {
         // A failed carrier call must not leave an expensive upstream Gemini
         // session connected. close() cannot run after the closed CAS above.
         pendingAudio.clear();
@@ -1059,6 +1093,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     @Override
     public void close() {
         if (!closed.compareAndSet(false, true)) return;
+        runInTenantScope(this::closeInTenant);
+    }
+
+    private void closeInTenant() {
         inboundFrames.reset();
         assistantAudioFramer.clear();
         flushTranscripts();
