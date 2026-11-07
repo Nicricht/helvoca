@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
 
 import java.time.*;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
@@ -218,6 +219,7 @@ public class RealtimeToolService {
                 Si el idioma es español, usa español de Chile desde la primera sílaba de la llamada, incluido el saludo inicial. Evita fórmulas rígidas como "¿Qué es lo que usted desea?" y prefiere una forma cercana y profesional como "Cuéntame, ¿en qué te puedo ayudar?".
                 La zona horaria del negocio es %s.
                 La fecha y hora local actual del negocio es %s.
+                El calendario local confirma que hoy es %s (%s).
                 CONTENIDO DEL SALUDO CONFIGURADO (no lo recites literalmente): %s
                 Reformula siempre ese contenido para respetar el tono, ritmo y variante regional definidos por las reglas de voz.
                 PREFERENCIAS PERSONALIZADAS DEL NEGOCIO: %s
@@ -225,6 +227,10 @@ public class RealtimeToolService {
 
                 REGLAS OBLIGATORIAS DE HELVOCA:
                 Interpreta expresiones como hoy, mañana y pasado mañana usando la fecha local del negocio, nunca UTC.
+                Nunca calcules ni infieras el día de la semana de memoria.
+                Si el cliente menciona explícitamente un día de semana, incluye requestedWeekday en la herramienta de agenda con uno de MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY o SUNDAY.
+                El backend compara requestedWeekday con la fecha local del negocio. Si devuelve WEEKDAY_DATE_MISMATCH o INVALID_REQUESTED_WEEKDAY, no confirmes ni ejecutes la operación: corrige la fecha con el día solicitado o pregunta al cliente.
+                Cuando list_available_slots o check_booking_availability devuelvan dayOfWeek, usa ese valor literalmente en create_booking o reschedule_booking; nunca lo recalcules.
                 Nunca inventes disponibilidad, precios, reservas, clientes, horarios ni resultados de operaciones.
                 Nunca inventes causas para una falta de disponibilidad. Si la herramienta indica unavailabilityReasonKnown=false, limita la explicación a customerSafeExplanation y di que la causa no está informada; no atribuyas el resultado a alta demanda, agenda llena, feriados, personal insuficiente ni otra causa no devuelta por el backend.
                 Usa únicamente las herramientas publicadas para consultar información oficial y realizar acciones.
@@ -254,6 +260,8 @@ public class RealtimeToolService {
                 agentLanguage,
                 business.getTimezone(),
                 localNow.toOffsetDateTime(),
+                localNow.toLocalDate(),
+                localNow.getDayOfWeek().name(),
                 greeting,
                 custom);
     }
@@ -265,7 +273,9 @@ public class RealtimeToolService {
                 .put("name", b.getName())
                 .put("language", b.getLanguage())
                 .put("timezone", b.getTimezone())
-                .put("localNow", localNow.toOffsetDateTime().toString()));
+                .put("localNow", localNow.toOffsetDateTime().toString())
+                .put("localDate", localNow.toLocalDate().toString())
+                .put("dayOfWeek", localNow.getDayOfWeek().name()));
     }
 
     private JSONObject listServices(RealtimeCallContext context) {
@@ -390,6 +400,8 @@ public class RealtimeToolService {
     private JSONObject listAvailableSlots(RealtimeCallContext context, JSONObject args) {
         UUID serviceId = uuid(required(args, "serviceId"));
         LocalDate date = localDate(required(args, "date"));
+        JSONObject weekdayError = requestedWeekdayError(date, args);
+        if (weekdayError != null) return weekdayError;
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
         BusinessScheduleService.AvailabilityLookahead lookup = schedule.listAvailableSlotsWithLookahead(
                 context.businessId(), serviceId, service.getDurationMinutes(), date, 8, 7, 3);
@@ -401,6 +413,7 @@ public class RealtimeToolService {
                 .put("serviceName", service.getName())
                 .put("durationMinutes", service.getDurationMinutes())
                 .put("date", date.toString())
+                .put("dayOfWeek", date.getDayOfWeek().name())
                 .put("timezone", availability.timezone())
                 .put("scheduleConfigured", availability.scheduleConfigured())
                 .put("slots", slots);
@@ -440,7 +453,8 @@ public class RealtimeToolService {
                     .put("endAt", slot.endAt().toString())
                     .put("localStart", slot.localStart().toOffsetDateTime().toString())
                     .put("localEnd", slot.localEnd().toOffsetDateTime().toString())
-                    .put("localTime", slot.localStart().toLocalTime().toString()));
+                    .put("localTime", slot.localStart().toLocalTime().toString())
+                    .put("dayOfWeek", slot.localStart().getDayOfWeek().name()));
         }
         return slots;
     }
@@ -449,6 +463,8 @@ public class RealtimeToolService {
         UUID serviceId = uuid(required(args, "serviceId"));
         Instant startAt = instant(required(args, "startAt"));
         validateFuture(startAt);
+        JSONObject weekdayError = requestedWeekdayError(context.businessId(), startAt, args);
+        if (weekdayError != null) return weekdayError;
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
         Instant endAt = startAt.plus(service.getDurationMinutes(), ChronoUnit.MINUTES);
         boolean withinBusinessHours = schedule.isWithinBusinessHours(context.businessId(), startAt, endAt);
@@ -456,13 +472,16 @@ public class RealtimeToolService {
                 ? bookings.countOverlaps(context.businessId(), serviceId, startAt, endAt, BookingStatus.CANCELLED, null)
                 : 0L;
         boolean available = withinBusinessHours && overlaps == 0;
+        ZonedDateTime localStart = localDateTime(context.businessId(), startAt);
 
         JSONObject data = new JSONObject()
                 .put("serviceId", serviceId.toString())
                 .put("serviceName", service.getName())
                 .put("startAt", startAt.toString())
                 .put("endAt", endAt.toString())
-                .put("localStart", formatLocal(context.businessId(), startAt))
+                .put("localStart", localStart.toOffsetDateTime().toString())
+                .put("localDate", localStart.toLocalDate().toString())
+                .put("dayOfWeek", localStart.getDayOfWeek().name())
                 .put("available", available)
                 .put("withinBusinessHours", withinBusinessHours);
 
@@ -484,6 +503,8 @@ public class RealtimeToolService {
         UUID serviceId = uuid(required(args, "serviceId"));
         Instant startAt = instant(required(args, "startAt"));
         validateFuture(startAt);
+        JSONObject weekdayError = requestedWeekdayError(context.businessId(), startAt, args);
+        if (weekdayError != null) return weekdayError;
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
         Customer customer = currentCustomer(context);
         if (customer == null) return error("CUSTOMER_NOT_REGISTERED", "Necesito el nombre del cliente antes de confirmar la reserva.");
@@ -520,13 +541,16 @@ public class RealtimeToolService {
         for (Booking booking : bookings.findAllByBusinessIdAndCustomerIdAndStatusAndStartAtAfterOrderByStartAtAsc(
                 context.businessId(), customerId, BookingStatus.CONFIRMED, Instant.now())) {
             ServiceItem service = services.findByIdAndBusinessId(booking.getServiceId(), context.businessId()).orElse(null);
+            ZonedDateTime localStart = localDateTime(context.businessId(), booking.getStartAt());
             JSONObject item = new JSONObject()
                     .put("bookingId", booking.getId().toString())
                     .put("serviceId", booking.getServiceId().toString())
                     .put("service", service == null ? "Servicio" : service.getName())
                     .put("startAt", booking.getStartAt().toString())
                     .put("endAt", booking.getEndAt().toString())
-                    .put("localStart", formatLocal(context.businessId(), booking.getStartAt()))
+                    .put("localStart", localStart.toOffsetDateTime().toString())
+                    .put("localDate", localStart.toLocalDate().toString())
+                    .put("dayOfWeek", localStart.getDayOfWeek().name())
                     .put("status", booking.getStatus().name());
             out.put(item);
             if (out.length() >= 10) break;
@@ -538,6 +562,8 @@ public class RealtimeToolService {
         UUID bookingId = uuid(required(args, "bookingId"));
         Instant newStartAt = instant(required(args, "newStartAt"));
         validateFuture(newStartAt);
+        JSONObject weekdayError = requestedWeekdayError(context.businessId(), newStartAt, args);
+        if (weekdayError != null) return weekdayError;
         UUID customerId = currentCustomerId(context);
         if (customerId == null) {
             return error("CUSTOMER_NOT_REGISTERED", "No encuentro un cliente asociado a esta llamada.");
@@ -647,6 +673,7 @@ public class RealtimeToolService {
     }
 
     private JSONObject bookingData(UUID businessId, Booking booking, ServiceItem service) {
+        ZonedDateTime localStart = localDateTime(businessId, booking.getStartAt());
         return new JSONObject()
                 .put("bookingId", booking.getId().toString())
                 .put("status", booking.getStatus().name())
@@ -654,7 +681,9 @@ public class RealtimeToolService {
                 .put("service", service.getName())
                 .put("startAt", booking.getStartAt().toString())
                 .put("endAt", booking.getEndAt().toString())
-                .put("localStart", formatLocal(businessId, booking.getStartAt()));
+                .put("localStart", localStart.toOffsetDateTime().toString())
+                .put("localDate", localStart.toLocalDate().toString())
+                .put("dayOfWeek", localStart.getDayOfWeek().name());
     }
 
     private UUID currentCustomerId(RealtimeCallContext context) {
@@ -713,9 +742,74 @@ public class RealtimeToolService {
         return service;
     }
 
-    private String formatLocal(UUID businessId, Instant value) {
+    private ZonedDateTime localDateTime(UUID businessId, Instant value) {
         Business business = requireBusiness(businessId);
-        return value.atZone(ZoneId.of(business.getTimezone())).toOffsetDateTime().toString();
+        return value.atZone(ZoneId.of(business.getTimezone()));
+    }
+
+    private String formatLocal(UUID businessId, Instant value) {
+        return localDateTime(businessId, value).toOffsetDateTime().toString();
+    }
+
+    private JSONObject requestedWeekdayError(LocalDate localDate, JSONObject args) {
+        String requestedWeekday = requestedWeekdayArgument(args);
+        if (requestedWeekday == null) return null;
+        return compareRequestedWeekday(localDate, requestedWeekday);
+    }
+
+    protected JSONObject requestedWeekdayError(UUID businessId, Instant value, JSONObject args) {
+        String requestedWeekday = requestedWeekdayArgument(args);
+        if (requestedWeekday == null) return null;
+        ZoneId zone = ZoneId.of(requireBusiness(businessId).getTimezone());
+        return compareRequestedWeekday(value.atZone(zone).toLocalDate(), requestedWeekday);
+    }
+
+    protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args) {
+        return requestedWeekdayError(businessId, args, "startAt");
+    }
+
+    protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args, String instantArgument) {
+        String requestedWeekday = requestedWeekdayArgument(args);
+        if (requestedWeekday == null) return null;
+        if (requestedWeekday.isBlank()) return invalidRequestedWeekday();
+
+        String rawInstant = args.optString(instantArgument, null);
+        if (rawInstant == null || rawInstant.isBlank()) return null;
+
+        Instant value;
+        try {
+            value = instant(rawInstant);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+        return requestedWeekdayError(businessId, value, args);
+    }
+
+    private static String requestedWeekdayArgument(JSONObject args) {
+        if (!args.has("requestedWeekday")) return null;
+        return args.isNull("requestedWeekday") ? "" : args.optString("requestedWeekday", "");
+    }
+
+    private static JSONObject compareRequestedWeekday(LocalDate localDate, String requestedWeekday) {
+        DayOfWeek requested;
+        try {
+            requested = DayOfWeek.valueOf(requestedWeekday.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return invalidRequestedWeekday();
+        }
+        DayOfWeek actual = localDate.getDayOfWeek();
+        if (requested == actual) return null;
+        Locale spanish = Locale.forLanguageTag("es-CL");
+        String actualName = actual.getDisplayName(TextStyle.FULL, spanish);
+        String requestedName = requested.getDisplayName(TextStyle.FULL, spanish);
+        return error("WEEKDAY_DATE_MISMATCH",
+                "La fecha local " + localDate + " corresponde a " + actualName + ", no a " + requestedName
+                        + ". Revisa la fecha con el cliente antes de continuar.");
+    }
+
+    private static JSONObject invalidRequestedWeekday() {
+        return error("INVALID_REQUESTED_WEEKDAY",
+                "El día solicitado no es válido. Usa MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY o SUNDAY.");
     }
 
     private static RequestPriority requestPriority(String value) {

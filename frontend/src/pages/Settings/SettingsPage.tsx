@@ -211,6 +211,14 @@ export function SettingsPage() {
     window.history.replaceState(null, "", url);
   }
 
+  function revealSection(section?: SectionKey) {
+    if (section) openSection(section);
+    document.getElementById("settingsAdvanced")?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "start"
+    });
+  }
+
   function updateRoot(
     key: "businessName" | "timezone" | "language" | "humanTransferPhone",
     value: string
@@ -453,12 +461,8 @@ export function SettingsPage() {
           serviceCount={draft.services.length}
           knowledgeCount={draft.knowledge.length}
           canImport={model.canManage}
-          onAdvanced={() => {
-            document.getElementById("settingsAdvanced")?.scrollIntoView({
-              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-              block: "start"
-            });
-          }}
+          onAdvanced={() => revealSection()}
+          onContinue={section => revealSection(section)}
         />
 
         <section className={styles.hero} aria-label="Identidad de RecepVoz">

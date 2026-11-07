@@ -1,6 +1,8 @@
 package cl.helvoca.ai.realtime;
 
+import cl.helvoca.booking.BookingConfirmationWorkflowService;
 import cl.helvoca.booking.BookingRepository;
+import cl.helvoca.booking.BookingSource;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
 import cl.helvoca.call.CallAction;
@@ -11,6 +13,7 @@ import cl.helvoca.call.CallTraceService;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.knowledge.KnowledgeItemRepository;
 import cl.helvoca.learning.UnansweredQuestionService;
+import cl.helvoca.operations.BusinessOrder;
 import cl.helvoca.request.BusinessRequestService;
 import cl.helvoca.schedule.BusinessScheduleService;
 import cl.helvoca.servicecatalog.ServiceItemRepository;
@@ -20,6 +23,11 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -175,6 +183,271 @@ class CertificationGuardedRealtimeToolServiceTest {
 
         assertEquals("CERTIFICATION_BOOKING_REQUIRED", result.getJSONObject("error").getString("code"));
         verifyNoInteractions(f.bookings);
+    }
+
+    @Test
+    void primaryCreateBookingRejectsWeekdayMismatchBeforeCreatingTwoPhaseProposal() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        Business business = new Business();
+        business.setName("Negocio");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        BookingConfirmationWorkflowService workflow = mock(BookingConfirmationWorkflowService.class);
+        setField(f.service, "bookingConfirmationWorkflow", workflow);
+        JSONObject proposal = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("requiresConfirmation", true)
+                        .put("bookingCreated", false))
+                .put("error", JSONObject.NULL);
+        when(workflow.execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class)))
+                .thenReturn(proposal);
+
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject()
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("startAt", startAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(workflow);
+        verifyNoInteractions(f.bookings);
+        verify(f.trace).recordTool(
+                eq(f.businessId), eq(f.callId), eq("create_booking"), any(JSONObject.class), anyLong());
+    }
+
+    @Test
+    void primaryCreateBookingKeepsTwoPhaseProposalForMatchingWeekday() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        Business business = new Business();
+        business.setName("Negocio");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        BookingConfirmationWorkflowService workflow = mock(BookingConfirmationWorkflowService.class);
+        setField(f.service, "bookingConfirmationWorkflow", workflow);
+
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        UUID operationId = UUID.randomUUID();
+        String token = UUID.randomUUID().toString();
+        JSONObject proposal = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", operationId.toString())
+                        .put("confirmationToken", token)
+                        .put("requiresConfirmation", true)
+                        .put("bookingCreated", false))
+                .put("error", JSONObject.NULL);
+        when(workflow.execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class)))
+                .thenReturn(proposal);
+
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject()
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("startAt", startAt.toString())
+                        .put("requestedWeekday", "FRIDAY")
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertTrue(result.getJSONObject("data").getBoolean("requiresConfirmation"));
+        assertFalse(result.getJSONObject("data").getBoolean("bookingCreated"));
+        verify(workflow).execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class));
+    }
+
+    @Test
+    void primaryCreateBookingAllowsDateOnlyPhaseOneWhenNoWeekdayWasStated() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        BookingConfirmationWorkflowService workflow = mock(BookingConfirmationWorkflowService.class);
+        setField(f.service, "bookingConfirmationWorkflow", workflow);
+        JSONObject proposal = new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .put("requiresConfirmation", true)
+                        .put("bookingCreated", false))
+                .put("error", JSONObject.NULL);
+        when(workflow.execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class)))
+                .thenReturn(proposal);
+
+        Instant startAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject()
+                        .put("serviceId", UUID.randomUUID().toString())
+                        .put("startAt", startAt.toString())
+                        .toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertTrue(result.getJSONObject("data").getBoolean("requiresConfirmation"));
+        assertFalse(result.getJSONObject("data").getBoolean("bookingCreated"));
+        verify(workflow).execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class));
+    }
+
+    @Test
+    void primaryCreateBookingPhaseTwoStillReachesWorkflowWithoutStartAtOrWeekday() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        BookingConfirmationWorkflowService workflow = mock(BookingConfirmationWorkflowService.class);
+        setField(f.service, "bookingConfirmationWorkflow", workflow);
+        JSONObject invalidConfirmation = new JSONObject()
+                .put("success", false)
+                .put("data", JSONObject.NULL)
+                .put("error", new JSONObject()
+                        .put("code", "INVALID_CONFIRMATION")
+                        .put("message", "La confirmación requiere identificadores válidos."));
+        when(workflow.execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class)))
+                .thenReturn(invalidConfirmation);
+
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "create_booking",
+                new JSONObject()
+                        .put("operationId", UUID.randomUUID().toString())
+                        .put("confirmationToken", UUID.randomUUID().toString())
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("INVALID_CONFIRMATION", result.getJSONObject("error").getString("code"));
+        verify(workflow).execute(
+                eq(f.businessId), eq(customerId), eq(f.callId), eq(f.context.callerNumber()),
+                eq(BusinessOrder.Source.VOICE), eq(BookingSource.AI_CALL), any(JSONObject.class));
+    }
+
+    @Test
+    void primaryRescheduleRejectsWeekdayMismatchBeforeBookingLookupOrLock() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+
+        Business business = new Business();
+        business.setName("Negocio");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        Instant newStartAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", UUID.randomUUID().toString())
+                        .put("newStartAt", newStartAt.toString())
+                        .put("requestedWeekday", "THURSDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("WEEKDAY_DATE_MISMATCH", result.getJSONObject("error").getString("code"));
+        verifyNoInteractions(f.bookings);
+        verifyNoInteractions(f.jdbc);
+    }
+
+    @Test
+    void primaryRescheduleAllowsMatchingWeekdayToReachExistingHandler() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        Business business = new Business();
+        business.setName("Negocio");
+        business.setTimezone("America/Santiago");
+        business.setLanguage("es");
+        when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
+
+        UUID bookingId = UUID.randomUUID();
+        Instant newStartAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", bookingId.toString())
+                        .put("newStartAt", newStartAt.toString())
+                        .put("requestedWeekday", "FRIDAY")
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("BOOKING_NOT_FOUND", result.getJSONObject("error").getString("code"));
+        verify(f.bookings).findByIdAndBusinessIdAndCustomerId(bookingId, f.businessId, customerId);
+        verifyNoInteractions(f.jdbc);
+    }
+
+    @Test
+    void primaryRescheduleKeepsDateOnlyRequestsBackwardCompatible() {
+        Fixture f = new Fixture();
+        f.call.setCertification(false);
+        UUID customerId = UUID.randomUUID();
+        f.call.setCustomerId(customerId);
+
+        UUID bookingId = UUID.randomUUID();
+        Instant newStartAt = ZonedDateTime.of(
+                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+        JSONObject result = new JSONObject(f.service.execute(
+                f.context,
+                "reschedule_booking",
+                new JSONObject()
+                        .put("bookingId", bookingId.toString())
+                        .put("newStartAt", newStartAt.toString())
+                        .toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("BOOKING_NOT_FOUND", result.getJSONObject("error").getString("code"));
+        verify(f.bookings).findByIdAndBusinessIdAndCustomerId(bookingId, f.businessId, customerId);
+        verifyNoInteractions(f.jdbc);
+    }
+
+    private static void setField(Object target, String fieldName, Object value) {
+        try {
+            var field = target.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            field.set(target, value);
+        } catch (ReflectiveOperationException e) {
+            throw new AssertionError(e);
+        }
     }
 
     private static CallAction success(String type) {
