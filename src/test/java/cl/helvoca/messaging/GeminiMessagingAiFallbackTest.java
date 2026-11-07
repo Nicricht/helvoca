@@ -19,6 +19,30 @@ import static org.mockito.Mockito.*;
 class GeminiMessagingAiFallbackTest {
 
     @Test
+    void stripsUnsupportedGeminiToolSchemaKeyword() throws Exception {
+        // The shared create_order schema is valid for other providers, but Gemini
+        // REST FunctionDeclaration.parameters rejects additionalProperties.
+        var method = GeminiMessagingAiFallback.class
+                .getDeclaredMethod("functionDeclarations", Set.class);
+        method.setAccessible(true);
+        var declarations = (org.json.JSONArray) method.invoke(null, Set.of("create_order"));
+
+        assertEquals(1, declarations.length());
+        var declaration = declarations.getJSONObject(0);
+        assertEquals("create_order", declaration.getString("name"));
+        var itemSchema = declaration.getJSONObject("parameters")
+                .getJSONObject("properties")
+                .getJSONObject("items")
+                .getJSONObject("items");
+        var modifiers = itemSchema.getJSONObject("properties")
+                .getJSONObject("modifiers");
+        assertEquals("object", modifiers.getString("type"));
+        assertFalse(modifiers.has("additionalProperties"),
+                "The Gemini REST parameters subset rejects this JSON Schema keyword");
+    }
+
+
+    @Test
     void returnsSanitizedGeminiTextWithoutPuttingApiKeyInUrl() throws Exception {
         GeminiLiveProperties properties = new GeminiLiveProperties();
         properties.setApiKey("secret-key");
