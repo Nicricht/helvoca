@@ -20,16 +20,16 @@ class GeminiMessagingAiFallbackTest {
 
     @Test
     void stripsUnsupportedGeminiToolSchemaKeyword() throws Exception {
-        // The shared create_order schema is valid for other providers, but Gemini
+        // The shared quote_order schema is valid for other providers, but Gemini
         // REST FunctionDeclaration.parameters rejects additionalProperties.
         var method = GeminiMessagingAiFallback.class
                 .getDeclaredMethod("functionDeclarations", Set.class);
         method.setAccessible(true);
-        var declarations = (org.json.JSONArray) method.invoke(null, Set.of("create_order"));
+        var declarations = (org.json.JSONArray) method.invoke(null, Set.of("quote_order"));
 
         assertEquals(1, declarations.length());
         var declaration = declarations.getJSONObject(0);
-        assertEquals("create_order", declaration.getString("name"));
+        assertEquals("quote_order", declaration.getString("name"));
         var itemSchema = declaration.getJSONObject("parameters")
                 .getJSONObject("properties")
                 .getJSONObject("items")
