@@ -61,14 +61,29 @@ class TwilioVerifiedExistingVoiceRouteGateTest {
     void demoRouteRequiresActiveDemoAndExistingTwoPersonAuditWithoutGlobalPilotSwitch() {
         var demo = new TwilioVerifiedExistingVoiceRouteGate(jdbc, pilot, scope, true,
                 BUSINESS.toString(), PHONE.toString(), ACCOUNT, true);
-        when(jdbc.queryForObject(contains("FROM business b"), eq(Boolean.class), eq(BUSINESS)))
-                .thenReturn(false, true, true);
+        when(jdbc.queryForObject(contains("FROM business b"), eq(Boolean.class),
+                eq(BUSINESS), eq(false))).thenReturn(false, true, true);
         when(jdbc.queryForObject(contains("twilio_existing_enrollment_claim"), eq(Boolean.class),
                 any(), any(), any(), any(), any())).thenReturn(false, true);
 
         assertFalse(scope.callAsSystem(() -> demo.allows(number))); // CUSTOMER or suspended
         assertFalse(scope.callAsSystem(() -> demo.allows(number))); // missing dual audit
         assertTrue(scope.callAsSystem(() -> demo.allows(number)));
+        verifyNoInteractions(pilot);
+    }
+
+    @Test
+    void customerDemoRequiresSeparateOptInAndImmutableTwoPersonProof() {
+        var customerRoute = new TwilioVerifiedExistingVoiceRouteGate(
+                jdbc, pilot, scope, true, BUSINESS.toString(), PHONE.toString(),
+                ACCOUNT, true, true);
+        when(jdbc.queryForObject(contains("FROM business b"), eq(Boolean.class),
+                eq(BUSINESS), eq(true))).thenReturn(true);
+        when(jdbc.queryForObject(contains("twilio_existing_enrollment_claim"),
+                eq(Boolean.class), any(), any(), any(), any(), any()))
+                .thenReturn(false, true);
+        assertFalse(scope.callAsSystem(() -> customerRoute.allows(number)));
+        assertTrue(scope.callAsSystem(() -> customerRoute.allows(number)));
         verifyNoInteractions(pilot);
     }
 

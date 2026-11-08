@@ -86,7 +86,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         if (path.startsWith("/api/v1/public/")) return from("public", properties.getPublicApi(), false);
         if (path.startsWith("/api/v1/billing/")) return from("billing", properties.getBilling(), true);
         if (path.startsWith("/api/v1/platform/certification-runs")) {
-            return from("platform-certification", properties.getPlatformCertification(), true);
+            return from("platform-certification", properties.getAuthenticatedApi(), true);
         }
         return from("authenticated", properties.getAuthenticatedApi(), true);
     }

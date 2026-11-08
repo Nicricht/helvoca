@@ -35,6 +35,11 @@ class RecepVozConversationPolicyServiceTest {
 
         assertTrue(policy.contains("Responde normalmente en una o dos frases"));
         assertTrue(policy.contains("máximo aproximado de 25 palabras"));
+        assertTrue(policy.contains("energía alegre, cercana y optimista"));
+        assertTrue(policy.contains("sonrisa audible"));
+        assertTrue(policy.contains("nunca infantil, exagerada, coqueta ni teatral"));
+        assertTrue(policy.contains("reduce la energía y prioriza calma, empatía y seriedad"));
+        assertTrue(policy.contains("¡Buenísimo!"));
         assertTrue(policy.contains("No repitas ni resumas lo que el cliente acaba de decir"));
         assertTrue(policy.contains("conversationState"));
         assertTrue(policy.contains("closedFields"));
