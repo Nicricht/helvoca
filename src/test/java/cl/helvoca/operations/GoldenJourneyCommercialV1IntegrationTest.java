@@ -125,7 +125,7 @@ class GoldenJourneyCommercialV1IntegrationTest {
     }
 
     @Test
-    void goldenJourneyBooksReschedulesConfirmsAndClosesWithoutExternalProviders() throws Exception {
+    void goldenJourneyBooksReschedulesCancelsAndClosesWithoutExternalProviders() throws Exception {
         Business business = business("Golden Journey Spa");
         ServiceItem service = service(business.getId(), "Masaje relajante");
         LocalDate bookingDate = LocalDate.now(ZONE).plusDays(2);
@@ -270,14 +270,33 @@ class GoldenJourneyCommercialV1IntegrationTest {
         assertEquals(secondStart.toString(), customerBookings.getJSONObject(0).getString("startAt"));
         say(dialogue, call.getId(), "ASSISTANT", "Sí, quedó confirmada en el nuevo horario.");
 
+        certifyTenantIsolation(bookingId, secondStart, call.getId());
+
+        say(dialogue, call.getId(), "USER", "Quiero cancelar esa reserva, por favor.");
+        JSONObject cancelled = execute(context, "cancel_booking",
+                new JSONObject().put("bookingId", bookingId.toString()));
+        assertEquals(bookingId.toString(), data(cancelled).getString("bookingId"));
+        assertEquals("CANCELLED", data(cancelled).getString("status"));
+
+        Booking cancelledBooking = bookings.findByIdAndBusinessIdAndCustomerId(
+                bookingId, business.getId(), customerId).orElseThrow();
+        assertEquals(BookingStatus.CANCELLED, cancelledBooking.getStatus());
+        assertEquals(secondStart, cancelledBooking.getStartAt());
+        assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size());
+        say(dialogue, call.getId(), "ASSISTANT", "Listo, tu reserva quedó cancelada.");
+
+        say(dialogue, call.getId(), "USER", "¿Puedes confirmar que ya no aparece como activa?");
+        JSONObject afterCancellation = execute(context, "list_customer_bookings", new JSONObject());
+        assertEquals(0, data(afterCancellation).getJSONArray("bookings").length());
+        say(dialogue, call.getId(), "ASSISTANT", "Correcto, ya no tienes reservas activas.");
+
         ConversationOperationState persistedConversation = conversationStates
                 .findByBusinessIdAndChannelAndSourceReferenceId(
                         business.getId(), BusinessOrder.Source.VOICE, call.getId())
                 .orElseThrow();
         assertEquals(bookingId.toString(), String.valueOf(persistedConversation.getState().get("bookingId")));
         assertEquals(secondStart.toString(), String.valueOf(persistedConversation.getState().get("startAt")));
-
-        certifyTenantIsolation(bookingId, secondStart, call.getId());
+        assertEquals("CANCELLED", String.valueOf(persistedConversation.getState().get("bookingStatus")));
 
         say(dialogue, call.getId(), "USER", "Perfecto, eso sería todo. Chao.");
         say(dialogue, call.getId(), "ASSISTANT", "Chao, que estés muy bien.");
@@ -308,8 +327,17 @@ class GoldenJourneyCommercialV1IntegrationTest {
         assertActionCount(trace, "BOOKING_PROPOSED", 1);
         assertActionCount(trace, "BOOKING_CREATED", 1);
         assertActionCount(trace, "BOOKING_RESCHEDULED", 1);
-        assertActionCount(trace, "BOOKINGS_LISTED", 1);
+        assertActionCount(trace, "BOOKING_CANCELLED", 1);
+        assertActionCount(trace, "BOOKINGS_LISTED", 2);
         assertActionCount(trace, "CALL_ENDED", 1);
+
+        CallAction cancellationAction = trace.stream()
+                .filter(action -> "BOOKING_CANCELLED".equals(action.getActionType()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(cancellationAction.isSuccess());
+        assertEquals("BOOKING", cancellationAction.getEntityType());
+        assertEquals(bookingId, cancellationAction.getEntityId());
 
         List<ConversationQualityEngine.Action> qualityActions = trace.stream()
                 .map(action -> new ConversationQualityEngine.Action(
@@ -343,9 +371,13 @@ class GoldenJourneyCommercialV1IntegrationTest {
         CallSummary summary = summaries.findByCallId(call.getId()).orElseThrow();
         assertTrue(summary.getSummary().contains("reserva creada"));
         assertTrue(summary.getSummary().contains("reserva reprogramada"));
+        assertTrue(summary.getSummary().contains("reserva cancelada"));
 
         assertEquals(1, bookings.findAllByBusinessIdOrderByStartAtDesc(business.getId()).size());
-        assertEquals("BOOKING_RESCHEDULED",
+        assertEquals(BookingStatus.CANCELLED,
+                bookings.findByIdAndBusinessIdAndCustomerId(bookingId, business.getId(), customerId)
+                        .orElseThrow().getStatus());
+        assertEquals("BOOKING_CANCELLED",
                 calls.findByIdAndBusinessId(call.getId(), business.getId()).orElseThrow().getResolution());
     }
 
@@ -622,6 +654,17 @@ class GoldenJourneyCommercialV1IntegrationTest {
         assertEquals("BOOKING_NOT_FOUND", crossTenant.getJSONObject("error").getString("code"));
         assertTrue(bookings.findByIdAndBusinessId(bookingId, otherBusiness.getId()).isEmpty());
         assertEquals(expectedStart, bookings.findById(bookingId).orElseThrow().getStartAt());
+
+        otherCall.setCertification(false);
+        calls.saveAndFlush(otherCall);
+        JSONObject crossTenantCancellation = rawExecute(
+                otherContext,
+                "cancel_booking",
+                new JSONObject().put("bookingId", bookingId.toString()));
+        assertFalse(crossTenantCancellation.getBoolean("success"));
+        assertEquals("BOOKING_NOT_FOUND",
+                crossTenantCancellation.getJSONObject("error").getString("code"));
+        assertEquals(BookingStatus.CONFIRMED, bookings.findById(bookingId).orElseThrow().getStatus());
         assertTrue(conversationStates.findByBusinessIdAndChannelAndSourceReferenceId(
                 otherBusiness.getId(), BusinessOrder.Source.VOICE, primaryCallId).isEmpty());
     }
