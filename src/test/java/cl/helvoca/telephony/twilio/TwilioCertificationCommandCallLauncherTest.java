@@ -120,13 +120,7 @@ class TwilioCertificationCommandCallLauncherTest {
 
 
     @Test
-    void providerEnforcesConfiguredCallDurationSeparatelyFromRingingTimeout() throws Exception {
-        assertProviderTimeLimit(75, 75);
-        assertProviderTimeLimit(10, 20);
-        assertProviderTimeLimit(300, 180);
-    }
-
-    private static void assertProviderTimeLimit(int configuredSeconds, int expectedSeconds) throws Exception {
+    void providerRequestDoesNotSetAnApplicationDurationLimit() throws Exception {
         AtomicReference<HttpRequest> observedRequest = new AtomicReference<>();
         HttpClient http = mock(HttpClient.class);
         HttpResponse<String> response = mock(HttpResponse.class);
@@ -141,19 +135,17 @@ class TwilioCertificationCommandCallLauncherTest {
 
         TwilioCertificationCommandCallLauncher launcher = new TwilioCertificationCommandCallLauncher(
                 properties(), "+14355652512", "+56966939611", "+56966939611",
-                "+56975856664", configuredSeconds, mock(TwilioCallControl.class), http);
-
-        assertEquals(expectedSeconds <= 75, launcher.durationWithinDemoLimit());
+                "+56975856664", http);
 
         assertEquals(CALL_SID, launcher.launch(TOKEN));
         HttpRequest request = observedRequest.get();
         assertNotNull(request);
         assertEquals("POST", request.method());
         String body = publishedBody(request);
-        assertTrue(Arrays.asList(body.split("&")).contains("TimeLimit=" + expectedSeconds),
-                "Twilio must independently enforce the bounded conversation duration");
         assertTrue(Arrays.asList(body.split("&")).contains("Timeout=25"),
-                "Ringing timeout is not a conversation time limit");
+                "The ringing timeout must remain independent from conversation duration");
+        assertFalse(Arrays.asList(body.split("&")).stream().anyMatch(part -> part.startsWith("TimeLimit=")),
+                "The application must not send a per-call duration cutoff to Twilio");
     }
 
     private static String publishedBody(HttpRequest request) throws Exception {
@@ -198,8 +190,6 @@ class TwilioCertificationCommandCallLauncherTest {
                 to,
                 allowedTo,
                 forbiddenTo,
-                150,
-                mock(TwilioCallControl.class),
                 http);
     }
 

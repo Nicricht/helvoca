@@ -21,6 +21,12 @@ public class TwilioExistingEnrollmentAdminController {
         this.service = service;
     }
 
+    @PostMapping("/stage")
+    public TwilioExistingEnrollmentAdminService.StageExistingView stageExisting(
+            @RequestBody TwilioExistingEnrollmentAdminService.StageExistingRequest request) {
+        return service.stageExisting(request);
+    }
+
     @PostMapping
     public TwilioExistingEnrollmentAdminService.View request(
             @RequestBody TwilioExistingEnrollmentAdminService.Request request) {

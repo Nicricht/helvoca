@@ -6,6 +6,7 @@ import cl.helvoca.business.BusinessStatus;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.security.TenantDatabaseContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -21,7 +22,9 @@ public final class TwilioCertificationDemoBindingGate {
     private final BusinessRepository businesses;
     private final TwilioVerifiedExistingVoiceRouteGate existingRoute;
     private final TenantDatabaseContext databaseContext;
+    private final boolean scopedCustomerDemoEnabled;
 
+    @Autowired
     public TwilioCertificationDemoBindingGate(
             @Value("${TWILIO_CERTIFICATION_DEMO_BUSINESS_ID:}") String businessId,
             @Value("${TWILIO_TEST_FROM:}") String from,
@@ -29,14 +32,22 @@ public final class TwilioCertificationDemoBindingGate {
             PhoneNumberRepository phones,
             BusinessRepository businesses,
             TwilioVerifiedExistingVoiceRouteGate existingRoute,
-            TenantDatabaseContext databaseContext) {
+            TenantDatabaseContext databaseContext,
+            @Value("${TWILIO_CERTIFICATION_SCOPED_CUSTOMER_DEMO_ENABLED:false}") boolean scopedCustomerDemoEnabled) {
         this.pinnedBusinessId = parseUuid(businessId);
+        this.scopedCustomerDemoEnabled = scopedCustomerDemoEnabled;
         this.from = from;
         this.accountSid = accountSid;
         this.phones = phones;
         this.businesses = businesses;
         this.existingRoute = existingRoute;
         this.databaseContext = databaseContext;
+    }
+
+    TwilioCertificationDemoBindingGate(String businessId, String from, String accountSid,
+            PhoneNumberRepository phones, BusinessRepository businesses,
+            TwilioVerifiedExistingVoiceRouteGate existingRoute, TenantDatabaseContext databaseContext) {
+        this(businessId, from, accountSid, phones, businesses, existingRoute, databaseContext, false);
     }
 
     public UUID pinnedBusinessId() { return pinnedBusinessId; }
@@ -53,7 +64,9 @@ public final class TwilioCertificationDemoBindingGate {
             return databaseContext.callAsSystem(() -> phones.findByPhoneNumberAndActiveTrue(from)
                     .filter(phone -> carrierBound(phone, commandBusinessId))
                     .filter(phone -> businesses.findById(commandBusinessId)
-                            .filter(business -> business.getMode() == BusinessMode.DEMO)
+                            .filter(business -> business.getMode() == BusinessMode.DEMO
+                                    || scopedCustomerDemoEnabled
+                                       && business.getMode() == BusinessMode.CUSTOMER)
                             .filter(business -> business.getStatus() == BusinessStatus.ACTIVE)
                             .isPresent())
                     .filter(existingRoute::allows)
