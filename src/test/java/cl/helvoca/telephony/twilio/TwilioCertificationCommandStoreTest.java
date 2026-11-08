@@ -289,6 +289,19 @@ class TwilioCertificationCommandStoreTest {
 
 
     @Test
+    void invalidChatGptAuroraRequestsNeverReachTheDatabase() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
+        UUID businessId = UUID.randomUUID();
+
+        assertTrue(store.findForChatGptAurora("bad", businessId).isEmpty());
+        assertTrue(store.findForChatGptAurora("platform-run-20261104-001", businessId).isEmpty());
+        assertTrue(store.findForChatGptAurora("chatgpt-aurora-20261104T120000Z-abc123", null).isEmpty());
+        assertTrue(store.claimNextForChatGptAurora(null).isEmpty());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
     void dedicatedClaimQueryOnlySelectsChatGptAuroraCommands() {
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(), any(), any(), any()))
