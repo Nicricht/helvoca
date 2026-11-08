@@ -296,6 +296,7 @@ class TwilioCertificationCommandStoreTest {
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
         UUID businessId = UUID.randomUUID();
 
+        assertTrue(store.claimNextForChatGptAurora(null).isEmpty());
         assertTrue(store.claimNextForChatGptAurora(businessId).isEmpty());
 
         org.mockito.ArgumentCaptor<String> sql = org.mockito.ArgumentCaptor.forClass(String.class);
@@ -313,6 +314,7 @@ class TwilioCertificationCommandStoreTest {
         TwilioCertificationCommandStore store = new TwilioCertificationCommandStore(jdbc);
         UUID businessId = UUID.randomUUID();
 
+        assertTrue(store.findForChatGptAurora("bad", businessId).isEmpty());
         assertTrue(store.findForChatGptAurora("chatgpt-aurora-20261104T120000Z-abc123", businessId).isEmpty());
         assertTrue(store.findForChatGptAurora("platform-run-20261104-001", businessId).isEmpty());
         assertTrue(store.findForChatGptAurora("chatgpt-aurora-20261104T120000Z-abc123", null).isEmpty());
