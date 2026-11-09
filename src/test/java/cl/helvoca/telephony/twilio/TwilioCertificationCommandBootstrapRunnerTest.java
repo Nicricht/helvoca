@@ -110,4 +110,20 @@ class TwilioCertificationCommandBootstrapRunnerTest {
         noBinding.run(mock(ApplicationArguments.class));
         verifyNoInteractions(store);
     }
+
+    @Test
+    void nullBootstrapRunIdAlsoRemainsReadOnly() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        when(binding.readinessBlocker()).thenReturn("PINS_INVALID");
+        var runner = new TwilioCertificationCommandBootstrapRunner(null,
+                store, new TenantDatabaseContext(), binding);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                runner, "demoReadinessLogEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                runner, "railwayEnvironmentName", "demo-isolated");
+        runner.run(mock(ApplicationArguments.class));
+        verify(binding).readinessBlocker();
+        verifyNoInteractions(store);
+    }
 }

@@ -238,4 +238,40 @@ class TwilioCertificationDemoBindingGateTest {
         assertEquals("DATABASE_QUERY_BLOCKED", gate.readinessBlocker());
         assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
     }
+
+    @Test
+    void diagnosticRejectsEachMissingOrMalformedPinBeforeAnyDatabaseRead() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var context = new TenantDatabaseContext();
+        for (String invalidFrom : new String[]{null, " "}) {
+            var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(),
+                    invalidFrom, ACCOUNT, phones, businesses, route, context);
+            assertEquals("PINS_INVALID", gate.readinessBlocker());
+        }
+        for (String invalidAccount : new String[]{null, "wrong-account"}) {
+            var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(),
+                    FROM, invalidAccount, phones, businesses, route, context);
+            assertEquals("PINS_INVALID", gate.readinessBlocker());
+        }
+        verifyNoInteractions(phones, businesses, route);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
+    @Test
+    void diagnosticNeverAllowsPilotEvenWithScopedCustomerOptIn() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var phone = certifiedPhone(DEMO_ID);
+        var business = new Business();
+        business.setMode(BusinessMode.PILOT);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, new TenantDatabaseContext(), true);
+        assertEquals("BUSINESS_NOT_SCOPED", gate.readinessBlocker());
+        verifyNoInteractions(route);
+    }
 }
