@@ -115,7 +115,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
         assertTrue(instructions.contains("voz claramente femenina, joven-adulta y luminosa"));
         assertTrue(instructions.contains("mujer joven de Santiago"));
-        assertTrue(instructions.contains("sonrisa audible"));
+        assertTrue(instructions.contains("energía moderada"));
+        assertTrue(instructions.contains("sin exagerar la sonrisa ni teatralizar la entonación"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("me pueda colaborar"));
@@ -129,6 +130,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
         assertTrue(instructions.contains("mantén exactamente el mismo género"));
         assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
+        assertTrue(instructions.contains("pide confirmación o deletreo"));
+        assertTrue(instructions.contains("Confirma verbalmente el cambio solo cuando register_caller devuelva success=true"));
         assertTrue(instructions.contains("NO vuelvas a preguntar nada"));
         assertTrue(instructions.contains("completar una reserva, venta o consulta NO significa que la llamada terminó"));
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
