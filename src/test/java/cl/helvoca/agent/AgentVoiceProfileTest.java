@@ -61,6 +61,28 @@ class AgentVoiceProfileTest {
         assertEquals("seductive_male", AgentVoiceProfile.normalizeForStorage("seductive_male"));
         assertEquals("Enceladus", AgentVoiceProfile.resolveGemini("seductive_male", "Kore"));
         assertEquals("cedar", AgentVoiceProfile.resolveOpenAi("seductive_male", "alloy"));
+
+        // Preserve the current Sulafat identity while offering a distinct, opt-in youthful timbre.
+        assertEquals("youthful_female", AgentVoiceProfile.normalizeForStorage("youthful_female"));
+        assertEquals("Leda", AgentVoiceProfile.resolveGemini("youthful_female", "Sulafat"));
+        assertEquals("coral", AgentVoiceProfile.resolveOpenAi("youthful_female", "alloy"));
+        assertEquals("Sulafat", AgentVoiceProfile.resolveGemini("seductive_female", "Leda"));
+
+        assertEquals("friendly_male", AgentVoiceProfile.normalizeForStorage("friendly_male"));
+        assertEquals("Achird", AgentVoiceProfile.resolveGemini("friendly_male", "Sulafat"));
+        assertEquals("cedar", AgentVoiceProfile.resolveOpenAi("friendly_male", "alloy"));
+    }
+
+    @Test
+    void apiVoiceCatalogExposesAllOptionsWithPersistableSelections() {
+        for (AgentVoiceProfile profile : AgentVoiceProfile.catalog()) {
+            AiAgentController.VoiceProfileResponse option =
+                    AiAgentController.VoiceProfileResponse.from(profile);
+            assertEquals(profile.code(), option.code());
+            assertEquals(AgentVoiceProfile.normalizeForStorage(profile.code()), option.selection());
+            assertEquals(profile.displayName(), option.name());
+            assertEquals(profile.description(), option.description());
+        }
     }
 
     @Test
@@ -73,7 +95,7 @@ class AgentVoiceProfileTest {
 
     @Test
     void everyPublishedProfileHasProviderMappings() {
-        assertEquals(12, AgentVoiceProfile.catalog().size());
+        assertEquals(14, AgentVoiceProfile.catalog().size());
         for (AgentVoiceProfile profile : AgentVoiceProfile.catalog()) {
             assertFalse(profile.code().isBlank());
             assertFalse(profile.displayName().isBlank());

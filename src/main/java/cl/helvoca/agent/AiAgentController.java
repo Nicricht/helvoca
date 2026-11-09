@@ -59,10 +59,8 @@ public class AiAgentController {
             String description
     ) {
         static VoiceProfileResponse from(AgentVoiceProfile profile) {
-            String selection = profile == AgentVoiceProfile.SEDUCTIVE_FEMALE
-                    || profile == AgentVoiceProfile.SEDUCTIVE_MALE
-                    ? profile.code()
-                    : profile.openAiVoice();
+            // One authoritative alias rule, shared with persistent agent settings.
+            String selection = AgentVoiceProfile.normalizeForStorage(profile.code());
             return new VoiceProfileResponse(
                     profile.code(), selection, profile.displayName(), profile.description());
         }

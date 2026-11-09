@@ -421,6 +421,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
                 return <option key={value} value={value}>{option.name || value}</option>;
               })}
             </select>
+            <small>Elige la voz para las próximas llamadas. La voz actual se conserva hasta que guardes los cambios.</small>
           </Field>
 
           <Field label="Saludo inicial" wide>

@@ -43,6 +43,155 @@ import static org.mockito.Mockito.*;
 
 class RealtimeToolServiceTest {
     @Test
+    void registerCallerCorrectionUpdatesCustomerAlreadyLinkedToTrustedCallWithoutDuplicate() {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        String callerNumber = "+56911111111";
+        String streamSid = "MZ-name-correction";
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), customers, mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), calls,
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
+
+        Customer existing = new Customer();
+        setId(existing, customerId);
+        existing.setBusinessId(businessId);
+        existing.setPhone(callerNumber);
+        existing.setName("Nombre mal reconocido");
+
+        CallSession call = trustedCall(businessId, customerId, streamSid);
+        setId(call, callId);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        when(customers.findByIdAndBusinessId(customerId, businessId)).thenReturn(Optional.of(existing));
+        when(customers.saveAndFlush(existing)).thenReturn(existing);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, callerNumber, "+56222222222", streamSid);
+        JSONObject result = new JSONObject(tools.execute(
+                context,
+                "register_caller",
+                new JSONObject().put("name", "Nombre corregido").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(customerId.toString(), result.getJSONObject("data").getString("customerId"));
+        assertEquals("Nombre corregido", result.getJSONObject("data").getString("name"));
+        assertEquals("Nombre corregido", existing.getName());
+        assertEquals(customerId, call.getCustomerId());
+        verify(customers).saveAndFlush(existing);
+        verify(customers, never()).findFirstByBusinessIdAndPhone(any(), anyString());
+        verify(calls, never()).save(any());
+    }
+
+    @Test
+    void registerCallerCorrectionFailsClosedWhenLinkedCustomerIsMissingFromTenant() {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID missingCustomerId = UUID.randomUUID();
+        String streamSid = "MZ-stale-customer-link";
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), customers, mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), calls,
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
+
+        CallSession call = trustedCall(businessId, missingCustomerId, streamSid);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        when(customers.findByIdAndBusinessId(missingCustomerId, businessId)).thenReturn(Optional.empty());
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, "+56911111111", "+56222222222", streamSid);
+        JSONObject result = new JSONObject(tools.execute(
+                context, "register_caller", new JSONObject().put("name", "Nombre corregido").toString()));
+
+        assertFalse(result.getBoolean("success"));
+        assertEquals("CALLER_CUSTOMER_NOT_FOUND", result.getJSONObject("error").getString("code"));
+        verify(customers, never()).findFirstByBusinessIdAndPhone(any(), anyString());
+        verify(customers, never()).saveAndFlush(any());
+        verify(calls, never()).save(any());
+    }
+
+    @Test
+    void registerCallerLinksVerifiedExistingCustomerWhenCallHasNoCustomerYet() {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        String callerNumber = "+56911111111";
+        String streamSid = "MZ-existing-customer";
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), customers, mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), calls,
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
+
+        Customer existing = new Customer();
+        setId(existing, customerId);
+        existing.setBusinessId(businessId);
+        existing.setPhone(callerNumber);
+        CallSession call = trustedCall(businessId, null, streamSid);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        when(customers.findFirstByBusinessIdAndPhone(businessId, callerNumber)).thenReturn(Optional.of(existing));
+        when(customers.saveAndFlush(existing)).thenReturn(existing);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, callerNumber, "+56222222222", streamSid);
+        JSONObject result = new JSONObject(tools.execute(
+                context, "register_caller", new JSONObject().put("name", "Nombre confirmado").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(customerId.toString(), result.getJSONObject("data").getString("customerId"));
+        assertEquals(customerId, call.getCustomerId());
+        verify(calls).save(call);
+    }
+
+    @Test
+    void registerCallerCreatesOneCustomerWhenTrustedCallHasNoExistingIdentity() {
+        UUID businessId = UUID.randomUUID();
+        UUID callId = UUID.randomUUID();
+        UUID customerId = UUID.randomUUID();
+        String callerNumber = "+56911111111";
+        String streamSid = "MZ-new-customer";
+
+        CustomerRepository customers = mock(CustomerRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                mock(BusinessRepository.class), customers, mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), mock(BookingRepository.class), calls,
+                mock(BusinessScheduleService.class), mock(BusinessRequestService.class),
+                mock(UnansweredQuestionService.class));
+
+        CallSession call = trustedCall(businessId, null, streamSid);
+        when(calls.findByIdAndBusinessId(callId, businessId)).thenReturn(Optional.of(call));
+        when(customers.findFirstByBusinessIdAndPhone(businessId, callerNumber)).thenReturn(Optional.empty());
+        when(customers.saveAndFlush(any(Customer.class))).thenAnswer(invocation -> {
+            Customer created = invocation.getArgument(0);
+            setId(created, customerId);
+            return created;
+        });
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                callId, businessId, null, callerNumber, "+56222222222", streamSid);
+        JSONObject result = new JSONObject(tools.execute(
+                context, "register_caller", new JSONObject().put("name", "Paciente nuevo").toString()));
+
+        assertTrue(result.getBoolean("success"));
+        assertEquals(customerId.toString(), result.getJSONObject("data").getString("customerId"));
+        assertEquals(customerId, call.getCustomerId());
+        verify(customers, times(1)).saveAndFlush(any(Customer.class));
+        verify(calls).save(call);
+    }
+
+    @Test
     void tracePersistenceFailureDoesNotBreakRealtimeToolResult() throws Exception {
         RealtimeToolService tools = service();
         CallTraceService trace = mock(CallTraceService.class);

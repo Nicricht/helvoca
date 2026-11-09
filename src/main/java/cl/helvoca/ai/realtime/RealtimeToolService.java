@@ -324,8 +324,20 @@ public class RealtimeToolService {
         if (name.isBlank()) throw new IllegalArgumentException("El nombre no puede estar vacío.");
         String email = optional(args, "email");
 
-        Customer customer = customers.findFirstByBusinessIdAndPhone(context.businessId(), context.callerNumber())
-                .orElseGet(Customer::new);
+        CallSession call = requireTrustedCall(context);
+        boolean correctingLinkedCustomer = call.getCustomerId() != null;
+        Customer customer;
+        if (correctingLinkedCustomer) {
+            customer = customers.findByIdAndBusinessId(call.getCustomerId(), context.businessId())
+                    .orElse(null);
+            if (customer == null) {
+                return error("CALLER_CUSTOMER_NOT_FOUND",
+                        "No fue posible encontrar el registro del cliente asociado a esta llamada.");
+            }
+        } else {
+            customer = customers.findFirstByBusinessIdAndPhone(context.businessId(), context.callerNumber())
+                    .orElseGet(Customer::new);
+        }
         if (customer.getId() == null) {
             customer.setBusinessId(context.businessId());
             customer.setPhone(context.callerNumber());
@@ -334,10 +346,11 @@ public class RealtimeToolService {
         if (email != null && !email.isBlank()) customer.setEmail(email.trim());
         customer = customers.saveAndFlush(customer);
 
-        CallSession call = requireTrustedCall(context);
-        call.setCustomerId(customer.getId());
-        calls.save(call);
-        if (customerIdentities != null) {
+        if (!correctingLinkedCustomer) {
+            call.setCustomerId(customer.getId());
+            calls.save(call);
+        }
+        if (!correctingLinkedCustomer && customerIdentities != null) {
             customerIdentities.recordProviderAssertedPhone(
                     context.businessId(),
                     customer.getId(),

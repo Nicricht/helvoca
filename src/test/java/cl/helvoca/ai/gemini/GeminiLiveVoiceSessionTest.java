@@ -93,7 +93,9 @@ class GeminiLiveVoiceSessionTest {
         JSONObject inputTranscription = setup.getJSONObject("inputAudioTranscription");
         assertEquals("es-CL", inputTranscription.getJSONArray("languageCodes").getString(0));
         assertEquals("VERBATIM", inputTranscription.getString("mode"));
-        assertTrue(inputTranscription.getJSONArray("customVocabulary").toList().contains("RecepVoz"));
+        assertFalse(inputTranscription.has("customVocabulary"));
+        // The assistant still knows the brand through system instructions,
+        // without biasing ambiguous caller audio into that brand name.
         assertFalse(setup.has("proactivity"));
 
         String instructions = setup.getJSONObject("systemInstruction")
@@ -101,13 +103,20 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Reglas oficiales del negocio"));
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertTrue(instructions.contains("UNA SOLA VEZ al iniciar la llamada"));
+        assertTrue(instructions.contains("está prohibido repetir el saludo de bienvenida"));
+        assertTrue(instructions.contains("SI ESCUCHAS SOLO EL NOMBRE DEL PRODUCTO"));
+        assertTrue(instructions.contains("NO vuelvas a saludar ni reinicies la llamada"));
+        assertTrue(instructions.contains("no reinicies la conversación"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
         assertTrue(instructions.contains("CERO CALL CENTER"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
         assertTrue(instructions.contains("voz claramente femenina, joven-adulta y luminosa"));
         assertTrue(instructions.contains("mujer joven de Santiago"));
-        assertTrue(instructions.contains("sonrisa audible"));
+        assertTrue(instructions.contains("energía moderada"));
+        assertTrue(instructions.contains("sin exagerar la sonrisa ni teatralizar la entonación"));
         assertTrue(instructions.contains("DESDE LA PRIMERA SÍLABA"));
         assertTrue(instructions.contains("Ya, cuéntame, ¿en qué te ayudo?"));
         assertTrue(instructions.contains("me pueda colaborar"));
@@ -121,6 +130,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("está prohibido hacer dos veces la misma pregunta"));
         assertTrue(instructions.contains("mantén exactamente el mismo género"));
         assertTrue(instructions.contains("find_caller antes de pedir nombre o teléfono"));
+        assertTrue(instructions.contains("pide confirmación o deletreo"));
+        assertTrue(instructions.contains("Confirma verbalmente el cambio solo cuando register_caller devuelva success=true"));
         assertTrue(instructions.contains("NO vuelvas a preguntar nada"));
         assertTrue(instructions.contains("completar una reserva, venta o consulta NO significa que la llamada terminó"));
         assertTrue(instructions.contains("cadencia urbana de Santiago de Chile"));
@@ -326,8 +337,43 @@ class GeminiLiveVoiceSessionTest {
                 .getString("text");
 
         assertTrue(instructions.contains("voz claramente masculina y adulta"));
+        assertTrue(instructions.contains("PERSONA VOCAL: habla como un recepcionista chileno"));
         assertTrue(instructions.contains("mismo género"));
-        assertFalse(instructions.contains("primera frase debe usar de inmediato una voz claramente femenina"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertFalse(instructions.contains("la voz debe sonar femenina y joven"));
+        assertFalse(instructions.contains("mujer joven de Santiago"));
+        assertFalse(instructions.contains("misma identidad femenina joven-adulta"));
+    }
+
+    @Test
+    void friendlyMaleAchirdDoesNotReceiveFemalePersona() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Achird");
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        String instructions = session.buildSetup()
+                .getJSONObject("setup").getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text");
+
+        assertTrue(instructions.contains("PERSONA VOCAL: habla como un recepcionista chileno"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertFalse(instructions.contains("habla como una recepcionista chilena joven-adulta"));
+        assertFalse(instructions.contains("la voz debe sonar femenina y joven"));
     }
 
     @Test
@@ -459,6 +505,12 @@ class GeminiLiveVoiceSessionTest {
                 "No.", "¿Necesitas algo más?", ""));
         assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
                 "No.", "Muchas gracias por llamar. Que estés muy bien.", "¿Necesitas algo más?"));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "Nada.", "¿Necesitas algo más?", ""));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "No, no, no, no.", "¿Necesitas algo más?", ""));
+        assertFalse(GeminiLiveVoiceSession.hasClosingIntent(
+                "Nada.", "¿Quieres otro horario?", ""));
     }
 
     @Test
@@ -566,6 +618,59 @@ class GeminiLiveVoiceSessionTest {
         session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
                 .put("functionCalls", new JSONArray().put(new JSONObject()
                         .put("id", "end-after-no")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))))
+                .toString(), true);
+
+        verify(tools).prepareDeferredEndCall(context);
+    }
+
+    @Test
+    void endCallAcceptsNadaAfterAnythingElseQuestionDespiteShortAudioFragment() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        session.onText(providerSocket, generationCompleteWithOutput("¿Necesitas algo más?"), true);
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "Nada."))
+                        .put("turnComplete", true))
+                .toString(), true);
+        // In the real Aurora call, a tiny ASR fragment followed "nada".
+        // It must not reopen the conversation or cause an anything-else loop.
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "En."))
+                        .put("turnComplete", true))
+                .toString(), true);
+        session.onText(providerSocket, generationCompleteWithOutput(
+                "Muchas gracias por llamar. Que estés muy bien. Hasta luego."), true);
+
+        session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-after-nada")
                         .put("name", "end_call")
                         .put("args", new JSONObject()))))
                 .toString(), true);
