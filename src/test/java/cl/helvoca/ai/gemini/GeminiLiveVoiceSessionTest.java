@@ -341,6 +341,37 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void friendlyMaleAchirdDoesNotReceiveFemalePersona() {
+        GeminiLiveProperties properties = properties();
+        properties.setVoice("Achird");
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                mock(VoiceTransportSession.class),
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        String instructions = session.buildSetup()
+                .getJSONObject("setup").getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text");
+
+        assertTrue(instructions.contains("PERSONA VOCAL: habla como un recepcionista chileno"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertFalse(instructions.contains("habla como una recepcionista chilena joven-adulta"));
+        assertFalse(instructions.contains("la voz debe sonar femenina y joven"));
+    }
+
+    @Test
     void removesUnsupportedFieldsFromNestedGeminiToolSchemas() {
         JSONObject schema = new JSONObject()
                 .put("type", "object")
