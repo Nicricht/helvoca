@@ -131,7 +131,7 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("FECHA HABLADA = FECHA REAL"));
         assertTrue(instructions.contains("localStart/localDate"));
         assertTrue(instructions.contains("CANCELACIONES: si el cliente solicita explícitamente"));
-        assertTrue(instructions.contains("si el cliente interrumpe con otra solicitud"));
+        assertTrue(instructions.contains("Si el cliente interrumpe con otra solicitud"));
         assertTrue(instructions.contains("Evita excesos de confianza y modismos informales"));
 
         JSONArray declarations = setup.getJSONArray("tools")
