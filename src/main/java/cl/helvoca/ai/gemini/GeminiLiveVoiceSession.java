@@ -779,9 +779,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || now - lastAudio > properties.getLocalBargeInRecentAssistantAudioMs()) {
             return;
         }
-        deferredEndCallPending.set(false);
-        contextualClosingIntent.set(false);
-        awaitingAnythingElseAnswer.set(false);
+        // A local amplitude crossing is only a tentative acoustic signal.
+        // Do not erase a pending farewell or conversation intent until Gemini
+        // confirms an interruption. This protects against speaker echo/noise.
         assistantAudioFramer.clear();
         transport.clearPlayback(context.streamSid());
         log.info("VOICE_LOCAL_BARGE_IN call={} playback_age_ms={} threshold={} speech_frames={}",
