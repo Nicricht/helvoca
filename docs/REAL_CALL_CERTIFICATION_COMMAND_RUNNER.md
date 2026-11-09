@@ -371,3 +371,12 @@ The exact-HEAD differential Java coverage report identified one uncovered execut
 A package-visible kickoff-executor factory now makes the delayed task deterministic in tests. `TwilioCertificationStartupRunnerTest.startupKickoffLogsCreatedCallAndShutsDownSchedulerAfterSuccessfulCall` captures and invokes the scheduled task synchronously using a mocked Twilio HTTP response, then verifies the HTTP boundary and executor shutdown. `kickoffExecutorCreatesDaemonWorkerThread` exercises the default scheduler factory and its daemon-thread behavior.
 
 These are local tests only. They do not make a real Twilio request, enable a runner, place a call, or change the Aurora environment. Exact-HEAD CI must still prove the differential line, branch and method gates at 100%.
+
+
+## Aurora · diagnóstico seguro de bloqueo (2026-11-09)
+
+El arranque con intento único del 9 de noviembre devolvió `DEMO binding unavailable` antes de la creación de llamada. Para identificar el criterio que falta sin repetir llamadas, existe una sonda **solo lectura** activada exclusivamente en `demo-isolated` mediante `TWILIO_CERTIFICATION_DEMO_READINESS_LOG_ENABLED=true`. Se ejecuta con `TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID=` vacío y `TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED=false`. Dejarla apagada después del readback.
+
+El log `TWILIO_DEMO_BINDING_READINESS code=...` solo registra códigos predefinidos, sin teléfonos, tenants, claves ni errores SQL: `PINS_INVALID`, `PHONE_NOT_STAGED`, `PHONE_INACTIVE`, `CARRIER_BINDING_NOT_VERIFIED`, `BUSINESS_NOT_FOUND`, `BUSINESS_NOT_SCOPED`, `BUSINESS_NOT_ACTIVE`, `EXISTING_ROUTE_PIN_OR_PROOF_DENIED`, `DATABASE_QUERY_BLOCKED` o `READY`. Lee los repositorios bajo contexto SYSTEM, conserva la validación original y **no llama** a Twilio ni Google, no crea ninguna reserva ni modifica la base.
+
+Cualquier corrección del enrolamiento debe usar los endpoints autenticados de administrador existentes, incluida la comprobación real del operador Twilio y su auditoría. No insertar registros ni inventar aprobaciones para forzar que pase el guard; no crear segundo administrador. `READY` es una señal local, no una certificación de audio.

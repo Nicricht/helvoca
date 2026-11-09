@@ -12,6 +12,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class TwilioCertificationCommandBootstrapRunner implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(TwilioCertificationCommandBootstrapRunner.class);
+    @Value("${TWILIO_CERTIFICATION_DEMO_READINESS_LOG_ENABLED:false}")
+    private boolean demoReadinessLogEnabled;
+    @Value("${RAILWAY_ENVIRONMENT_NAME:}")
+    private String railwayEnvironmentName = "";
 
     private final String runId;
     private final TwilioCertificationCommandStore commands;
@@ -37,7 +41,13 @@ public class TwilioCertificationCommandBootstrapRunner implements ApplicationRun
 
     @Override
     public void run(ApplicationArguments args) {
-        if (runId == null || runId.isBlank()) return;
+        if (runId == null || runId.isBlank()) {
+            if (demoReadinessLogEnabled && "demo-isolated".equals(railwayEnvironmentName)
+                    && demoBinding != null) {
+                log.info("TWILIO_DEMO_BINDING_READINESS code={}", demoBinding.readinessBlocker());
+            }
+            return;
+        }
         String normalized = runId.trim();
         if (!TwilioCertificationCommandStore.validRunId(normalized)) {
             log.error("TWILIO_CERTIFICATION_COMMAND bootstrap blocked: invalid run id");

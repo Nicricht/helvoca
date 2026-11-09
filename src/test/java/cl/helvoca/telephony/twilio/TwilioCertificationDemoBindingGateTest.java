@@ -162,4 +162,80 @@ class TwilioCertificationDemoBindingGateTest {
         phone.setVoiceVerifiedAt(Instant.now());
         return phone;
     }
+
+    @Test
+    void diagnosticInvalidPinsNeverQueriesDatabase() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var gate = new TwilioCertificationDemoBindingGate("", FROM, ACCOUNT,
+                phones, businesses, mock(TwilioVerifiedExistingVoiceRouteGate.class),
+                new TenantDatabaseContext());
+        assertEquals("PINS_INVALID", gate.readinessBlocker());
+        verifyNoInteractions(phones, businesses);
+    }
+
+    @Test
+    void diagnosticClassifiesMissingInactiveAndUnverifiedPhoneWithoutCarrierCall() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope);
+        assertEquals("PHONE_NOT_STAGED", gate.readinessBlocker());
+        var phone = certifiedPhone(DEMO_ID);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        phone.setActive(false);
+        assertEquals("PHONE_INACTIVE", gate.readinessBlocker());
+        phone.setActive(true);
+        phone.setVoiceVerifiedAt(null);
+        assertEquals("CARRIER_BINDING_NOT_VERIFIED", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+        verifyNoInteractions(businesses, route);
+    }
+
+    @Test
+    void diagnosticClassifiesTenantScopeAndMissingRouteProof() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var phone = certifiedPhone(DEMO_ID);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope);
+        assertEquals("BUSINESS_NOT_FOUND", gate.readinessBlocker());
+        var business = new Business();
+        business.setMode(BusinessMode.CUSTOMER);
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        assertEquals("BUSINESS_NOT_SCOPED", gate.readinessBlocker());
+        business.setMode(BusinessMode.DEMO);
+        business.setStatus(BusinessStatus.SUSPENDED);
+        assertEquals("BUSINESS_NOT_ACTIVE", gate.readinessBlocker());
+        business.setStatus(BusinessStatus.ACTIVE);
+        assertEquals("EXISTING_ROUTE_PIN_OR_PROOF_DENIED", gate.readinessBlocker());
+        when(route.allows(phone)).thenReturn(true);
+        assertEquals("READY", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+    }
+
+    @Test
+    void diagnosticScopedCustomerStillRequiresExistingRouteAndCatchesDatabaseFailures() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var phone = certifiedPhone(DEMO_ID);
+        var business = new Business();
+        business.setMode(BusinessMode.CUSTOMER);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope, true);
+        assertEquals("EXISTING_ROUTE_PIN_OR_PROOF_DENIED", gate.readinessBlocker());
+        verify(route).allows(phone);
+        when(phones.findByPhoneNumber(FROM)).thenThrow(new IllegalStateException("private DB error"));
+        assertEquals("DATABASE_QUERY_BLOCKED", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+    }
 }

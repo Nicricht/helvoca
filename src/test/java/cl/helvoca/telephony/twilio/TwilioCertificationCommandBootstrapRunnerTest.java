@@ -78,4 +78,36 @@ class TwilioCertificationCommandBootstrapRunnerTest {
         assertEquals(TenantDatabaseContext.Mode.DENIED, databaseContext.currentOrDenied().mode());
     }
 
+
+    @Test
+    void diagnosticInDemoIsReadOnlyAndDoesNotEnqueueWithoutRunId() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        when(binding.readinessBlocker()).thenReturn("PHONE_NOT_STAGED");
+        var runner = new TwilioCertificationCommandBootstrapRunner("",
+                store, new TenantDatabaseContext(), binding);
+        org.springframework.test.util.ReflectionTestUtils.setField(runner, "demoReadinessLogEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(runner, "railwayEnvironmentName", "demo-isolated");
+        runner.run(mock(ApplicationArguments.class));
+        verify(binding).readinessBlocker();
+        verifyNoInteractions(store);
+    }
+
+    @Test
+    void diagnosticNeverRunsOutsideDemoOrWithoutBinding() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        var outside = new TwilioCertificationCommandBootstrapRunner("",
+                store, new TenantDatabaseContext(), binding);
+        org.springframework.test.util.ReflectionTestUtils.setField(outside, "demoReadinessLogEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(outside, "railwayEnvironmentName", "production");
+        outside.run(mock(ApplicationArguments.class));
+        verifyNoInteractions(store, binding);
+        var noBinding = new TwilioCertificationCommandBootstrapRunner("",
+                store, new TenantDatabaseContext());
+        org.springframework.test.util.ReflectionTestUtils.setField(noBinding, "demoReadinessLogEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(noBinding, "railwayEnvironmentName", "demo-isolated");
+        noBinding.run(mock(ApplicationArguments.class));
+        verifyNoInteractions(store);
+    }
 }
