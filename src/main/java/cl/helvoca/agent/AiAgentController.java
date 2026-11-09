@@ -61,6 +61,8 @@ public class AiAgentController {
         static VoiceProfileResponse from(AgentVoiceProfile profile) {
             String selection = profile == AgentVoiceProfile.SEDUCTIVE_FEMALE
                     || profile == AgentVoiceProfile.SEDUCTIVE_MALE
+                    || profile == AgentVoiceProfile.YOUTHFUL_FEMALE
+                    || profile == AgentVoiceProfile.FRIENDLY_MALE
                     ? profile.code()
                     : profile.openAiVoice();
             return new VoiceProfileResponse(
