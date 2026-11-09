@@ -127,6 +127,7 @@ app:
   commercial:
     calls:
       max-concurrent-per-business: ${HELVOCA_MAX_CONCURRENT_CALLS_PER_BUSINESS:10}
+      max-calls-per-business-per-utc-day: ${HELVOCA_MAX_CALLS_PER_BUSINESS_PER_UTC_DAY:0}
       telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
       ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
       usd-to-clp-rate: ${HELVOCA_COST_USD_TO_CLP:0}
