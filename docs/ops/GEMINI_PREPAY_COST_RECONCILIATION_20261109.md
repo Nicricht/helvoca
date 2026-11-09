@@ -2,19 +2,43 @@
 
 **Estado:** auditoría de solo lectura, conciliación *parcial*, no atribución de todos los cargos. **Cuenta:** `012EDB-BE9B10-047F71`, proyecto `RecepVoz-Gemini-Pilot`. No registrar claves, nombres completos de pacientes ni datos de tarjetas.
 
-## Evidencia financiera del proveedor (corte 9 nov 2026)
+## Conciliación financiera con el libro de Google (capturas autenticadas del 9 nov 2026)
 
-| Concepto | CLP | Grado |
-| --- | ---: | --- |
-| Prepago 29 oct 2026, correo de Google verificado | +5.000 | Pago confirmado |
-| Saldo disponible mostrado en AI Studio | -3.318 | Saldo observado (captura) |
-| Consumo neto implícito si no hubo ajustes/otros abonos | 8.318 | **Inferencia**, no sumatoria de facturas |
-| Gasto nov 1–9 en gráfico de la cuenta | ~3.170 | Vista de facturación, cifras redondeadas |
-| Diferencia por conciliar | ~5.148 | **No atribuirla** a un modelo/llamada sin detalle diario/SKU |
+**Octubre 2026: adquisición del prepago; NO asumir consumo de llamadas en octubre**
 
-Fuentes privadas: Gmail de Google *«Recibimos el pago de 012EDB-BE9B10-047F71»* 29-oct; captura AI Studio compartida por titular; vista autenticada de Billing de la misma cuenta. Comprobante de Google (solo identificador público de cuenta); no exportar datos personales de pago.
+| Movimiento 29 oct, Google Transactions | CLP |
+| --- | ---: |
+| Pago manual a Google recibido por Visa (comprobante validado en Gmail) | +5.000 |
+| «Prepago para Google Cloud» | -4.202 |
+| IVA de la compra | -798 |
+| Saldo contable final mostrado para octubre | **0** |
 
-El aviso de Google indica saldo requerido > USD 0. Los costes del gráfico pueden tener retrasos: https://docs.cloud.google.com/billing/docs/how-to/export-data-bigquery-tables/standard-usage y https://docs.cloud.google.com/billing/docs/how-to/view-history.
+El cierre contable en cero **no significa** que se agotaran los créditos de uso en octubre. El prepago fue adquirido en ese mes y aparece como crédito disponible en el periodo siguiente. Tampoco debe registrarse el traslado del crédito como *una segunda recarga*. El documento de octubre incluye factura n.º 5721287314 creada el 29 oct (el identificador sirve para cotejar, no inferir nuevos cargos).
+
+**Noviembre 2026: aplicación del prepago a las transacciones**
+
+| Movimiento Google Transactions, agrupado como «1–30 de noviembre» | CLP |
+| --- | ---: |
+| «Importe restante disponible para usarlo después» (crédito trasladado) | +5.000 |
+| Cargo «Google Cloud» antes de IVA | -6.990 |
+| IVA de noviembre (aprox. 19 % de CLP 6.990) | -1.328 |
+| **Saldo final mostrado al 9 nov** | **-3.318** |
+
+**Cierre exacto:** `+5.000 - 6.990 - 1.328 = -3.318 CLP`. Los **CLP 8.318** de cargos de noviembre, IVA incluido, explican el saldo negativo **contablemente** sin necesidad de imputar CLP 5.148 a octubre. El periodo «1–30 de noviembre» es la agrupación mensual del panel; la captura se tomó **el 9 nov**, por lo que no son transacciones del futuro.
+
+**Diferencia todavía no atribuida a un modelo/API:**
+
+| Vista | CLP |
+| --- | ---: |
+| AI Studio → «Costo de la cuenta de facturación para la API de Gemini», 1–9 nov, todos los modelos | ~3.510 |
+| Transactions → cargo «Google Cloud» 1–9 nov, antes del IVA | 6.990 |
+| **Diferencia pre-IVA entre vistas** | **~3.480** |
+
+**No confundir conciliación de saldo con atribución de SKU.** El gráfico de Gemini es aproximado (etiqueta `$3.51K`) y expresa costes de la API seleccionada; la línea «Google Cloud» representa un cargo agregado. La diferencia de ~CLP 3.480 puede deberse a otras partidas, alcance de los filtros o desfases del reporte. **No hay pruebas para adjudicársela a Gemini 3.8 Live ni a un segundo servicio concreto.** El mismo panel señala que los costos pueden tardar más de 24 horas en aparecer. También debe verificarse en las facturas el tratamiento del IVA registrado en ambos periodos; no concluir doble imposición ni cobro indebido basándose solo en estos movimientos.
+
+**Evidencias:** captura compartida por el titular del gráfico Gemini API nov 1–9 (`$3.51K`); captura de Google Transactions 1–9 nov con Google Cloud -6.990, IVA -1.328, crédito disponible +5.000 y saldo -3.318; captura Transactions 29 oct con +5.000 del pago y cargos de compra de prepago -4.202 / IVA -798; correo de Google «Recibimos el pago» validado en Gmail. No publicar capturas con datos de tarjeta, claves o datos personales completos en GitHub.
+
+**Pendiente para atribución completa:** exportación autenticada de Google Cloud Billing por **servicio, SKU, proyecto, modelo, fecha e impuestos**, con corte y moneda homogéneos, para explicar los CLP 6.990 antes de IVA y conciliar la gráfica CLP ~3.510 con los cargos agregados. Las llamadas registradas en Aurora no equivalen por sí mismas a la totalidad del consumo de la cuenta.
 
 ## Datos registrados en Aurora (NO facturas)
 
@@ -28,13 +52,13 @@ El aviso de Google indica saldo requerido > USD 0. Los costes del gráfico puede
 
 1. `GeminiLiveVoiceSession.handleInTenant` procesa audio, herramientas, transcripciones y errores, pero omite el campo documentado `BidiGenerateContentServerMessage.usageMetadata`. No quedan en el log tokens de entrada, salida, audio, texto, pensamientos ni caché por llamada.
 2. `CallLifecycleService.updateEstimatedCost` usa tasas por minuto configurables; `application.yml` define tasas por defecto 0 y en Aurora no se observaron nombres de variables de tarifa Gemini. **Un estimado de 0 no demuestra factura 0.**
-3. Falta un desglose autenticado Google por fecha, modelo/SKU, tipo de operación, deducciones y ajustes de octubre. Sin esto no se puede reconciliar cada CLP.
+3. Las transacciones del proveedor ya concilian exactamente el saldo de -3.318 CLP; falta desglose Google por servicio/SKU, modelo y fecha para atribuir CLP 6.990 de Google Cloud a las operaciones de API y explicar la diferencia de ~CLP 3.480 con el gráfico de Gemini.
 
 ## Corrección incremental autorizada
 
 PR DRAFT independiente para capturar **cada evento** `usageMetadata` con `callId`, `businessId`, `model`, números de tokens por modalidad y número de secuencia. **No sumar automáticamente eventos** hasta verificar si Google reporta acumulados o incrementales en esa versión; no registrar datos de audio, transcripciones, claves ni payloads brutos. Al cerrar emitir número de snapshots recibidos y aviso `PROVIDER_METADATA_NOT_BILLING_INVOICE`. Esta telemetría se activa solo si se integra y despliega el código; no convierte llamadas previas en medibles retroactivamente. Ver especificación oficial https://ai.google.dev/api/live.
 
-La reconciliación Google histórica sigue bloqueada hasta consultar/exportar **Transactions** y **Spend** de 29 oct–9 nov por modelo/SKU. No compras, recargas automáticas, llamadas ni cambios de producción.
+La reconciliación del **saldo** de Google ya está completa. La **atribución del costo por modelo/SKU** sigue bloqueada hasta disponer del desglose exportado de `Spend` y Google Cloud Billing por proyecto, servicio y SKU. No compras, recargas automáticas, llamadas ni cambios de producción.
 
 ## Instrumentación propuesta en PR #871 (no desplegada)
 
