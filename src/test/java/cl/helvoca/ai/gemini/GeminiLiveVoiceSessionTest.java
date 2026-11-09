@@ -502,6 +502,12 @@ class GeminiLiveVoiceSessionTest {
                 "No.", "¿Necesitas algo más?", ""));
         assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
                 "No.", "Muchas gracias por llamar. Que estés muy bien.", "¿Necesitas algo más?"));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "Nada.", "¿Necesitas algo más?", ""));
+        assertTrue(GeminiLiveVoiceSession.hasClosingIntent(
+                "No, no, no, no.", "¿Necesitas algo más?", ""));
+        assertFalse(GeminiLiveVoiceSession.hasClosingIntent(
+                "Nada.", "¿Quieres otro horario?", ""));
     }
 
     @Test
@@ -609,6 +615,59 @@ class GeminiLiveVoiceSessionTest {
         session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
                 .put("functionCalls", new JSONArray().put(new JSONObject()
                         .put("id", "end-after-no")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject()))))
+                .toString(), true);
+
+        verify(tools).prepareDeferredEndCall(context);
+    }
+
+    @Test
+    void endCallAcceptsNadaAfterAnythingElseQuestionDespiteShortAudioFragment() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject()
+                        .put("ended", false)
+                        .put("pendingPlaybackCompletion", true))
+                .put("error", JSONObject.NULL)
+                .toString());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        WebSocket providerSocket = mock(WebSocket.class);
+        session.onText(providerSocket, generationCompleteWithOutput("¿Necesitas algo más?"), true);
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "Nada."))
+                        .put("turnComplete", true))
+                .toString(), true);
+        // In the real Aurora call, a tiny ASR fragment followed "nada".
+        // It must not reopen the conversation or cause an anything-else loop.
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "En."))
+                        .put("turnComplete", true))
+                .toString(), true);
+        session.onText(providerSocket, generationCompleteWithOutput(
+                "Muchas gracias por llamar. Que estés muy bien. Hasta luego."), true);
+
+        session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-after-nada")
                         .put("name", "end_call")
                         .put("args", new JSONObject()))))
                 .toString(), true);
