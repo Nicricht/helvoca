@@ -106,6 +106,8 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("APERTURA ÚNICA"));
         assertTrue(instructions.contains("UNA SOLA VEZ al iniciar la llamada"));
         assertTrue(instructions.contains("está prohibido repetir el saludo de bienvenida"));
+        assertTrue(instructions.contains("SI ESCUCHAS SOLO EL NOMBRE DEL PRODUCTO"));
+        assertTrue(instructions.contains("NO vuelvas a saludar ni reinicies la llamada"));
         assertTrue(instructions.contains("no reinicies la conversación"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
         assertTrue(instructions.contains("CERO CALL CENTER"));
