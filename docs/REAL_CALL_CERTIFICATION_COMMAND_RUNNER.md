@@ -380,3 +380,10 @@ El arranque con intento único del 9 de noviembre devolvió `DEMO binding unavai
 El log `TWILIO_DEMO_BINDING_READINESS code=...` solo registra códigos predefinidos, sin teléfonos, tenants, claves ni errores SQL: `PINS_INVALID`, `PHONE_NOT_STAGED`, `PHONE_INACTIVE`, `CARRIER_BINDING_NOT_VERIFIED`, `BUSINESS_NOT_FOUND`, `BUSINESS_NOT_SCOPED`, `BUSINESS_NOT_ACTIVE`, `EXISTING_ROUTE_PIN_OR_PROOF_DENIED`, `DATABASE_QUERY_BLOCKED` o `READY`. Lee los repositorios bajo contexto SYSTEM, conserva la validación original y **no llama** a Twilio ni Google, no crea ninguna reserva ni modifica la base.
 
 Cualquier corrección del enrolamiento debe usar los endpoints autenticados de administrador existentes, incluida la comprobación real del operador Twilio y su auditoría. No insertar registros ni inventar aprobaciones para forzar que pase el guard; no crear segundo administrador. `READY` es una señal local, no una certificación de audio.
+
+
+## Corrección de aceptación conversacional · 2026-11-09 (C4, candidata en PR #868)
+
+La llamada real del 9-nov fue completada con Gemini/Sulafat, booking creado y reprogramado correctamente a 2026-11-18 09:00 Chile. Falló una aclaración verbal (11-nov) y no hubo `cancel_booking` durante la conversación; la limpieza de certificación no lo sustituye. C5 Mercado Pago TEST: webhook del simulador 200, entrega orgánica no acreditada. No repetir esos efectos externos por reconstrucción histórica.
+
+El nuevo delta offline evita que una marca Twilio de despedida ya interrumpida ejecute el colgado; la cancelación de marca y la aceptación de su ACK se serializan. Gemini invalida el cierre pendiente y el contexto antiguo al recibir barge-in. Sus reglas explícitas exigen hablar la fecha persistida por la herramienta tras reprogramar y solo cancelar reservas por petición del cliente. Pruebas adversariales de marca antigua, nuevo cierre legítimo, stream ajeno e interrupción cubren el cambio. No es certificación de comportamiento de voz real ni autoriza una llamada nueva; verificar CI exact-HEAD antes de cualquier despliegue DEMO y mantener `main`/producción sin cambios.
