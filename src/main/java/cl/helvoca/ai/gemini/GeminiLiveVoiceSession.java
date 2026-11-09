@@ -866,9 +866,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("endOfSpeechSensitivity", properties.getEndOfSpeechSensitivity())
                 .put("silenceDurationMs", properties.getSilenceDurationMs());
 
+        // Avoid over-biasing ambiguous phone audio toward the brand name. A real
+        // Aurora call repeatedly transcribed short caller turns as "RecepVoz"
+        // while the assistant was restarting its welcome. Keep the name in the
+        // system instructions instead of forcing the incoming recognizer.
         JSONObject inputTranscription = new JSONObject()
                 .put("languageCodes", new JSONArray().put("es-CL"))
-                .put("customVocabulary", new JSONArray().put("RecepVoz"))
                 .put("mode", "VERBATIM");
 
         JSONObject setup = new JSONObject()
