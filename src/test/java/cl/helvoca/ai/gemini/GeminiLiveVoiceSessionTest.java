@@ -521,7 +521,7 @@ class GeminiLiveVoiceSessionTest {
                         .put("functionCalls", new JSONArray().put(new JSONObject()
                                 .put("id", "end-without-goodbye")
                                 .put("name", "end_call")
-                                .put("args", new JSONObject())))
+                                .put("args", new JSONObject()))))
                 .toString(), true);
         verify(tools, never()).prepareDeferredEndCall(context);
         verify(transport, never()).endAfterPlayback();
