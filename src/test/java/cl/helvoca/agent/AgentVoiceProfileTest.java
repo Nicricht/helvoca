@@ -74,6 +74,18 @@ class AgentVoiceProfileTest {
     }
 
     @Test
+    void apiVoiceCatalogExposesAllOptionsWithPersistableSelections() {
+        for (AgentVoiceProfile profile : AgentVoiceProfile.catalog()) {
+            AiAgentController.VoiceProfileResponse option =
+                    AiAgentController.VoiceProfileResponse.from(profile);
+            assertEquals(profile.code(), option.code());
+            assertEquals(AgentVoiceProfile.normalizeForStorage(profile.code()), option.selection());
+            assertEquals(profile.displayName(), option.name());
+            assertEquals(profile.description(), option.description());
+        }
+    }
+
+    @Test
     void unknownSelectionIsRejectedOnSave() {
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,

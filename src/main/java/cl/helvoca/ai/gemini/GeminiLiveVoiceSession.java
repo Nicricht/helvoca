@@ -945,8 +945,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 No invoques herramientas por tu cuenta. Después de completar la quinta línea, el harness ejecutará end_call una sola vez.
                 """
                 : tools.buildInstructions(context);
-        boolean masculineVoice = properties.getVoice() != null
-                && MASCULINE_GEMINI_VOICES.contains(properties.getVoice().trim().toLowerCase(Locale.ROOT));
+        boolean masculineVoice = MASCULINE_GEMINI_VOICES.contains(
+                Objects.toString(properties.getVoice(), "").trim().toLowerCase(Locale.ROOT));
         String voiceIdentity = masculineVoice
                 ? "IDENTIDAD VOCAL: usa una voz claramente masculina y adulta. Debe sentirse inequívocamente como hombre, sin sonar infantil ni andrógino."
                 : "IDENTIDAD VOCAL: usa una voz claramente femenina, joven-adulta y luminosa. Debe sentirse inequívocamente como una mujer joven de Santiago, con energía alegre y segura, sin sonar infantil, masculina ni andrógina.";
