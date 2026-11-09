@@ -14,23 +14,26 @@ public class GeminiLiveProperties {
     private String voice = "Sulafat";
     private String websocketUrl = GeminiLiveModelPolicy.OFFICIAL_WEBSOCKET_URL;
 
-    // Tuned for fast phone dialogue while preserving short natural pauses.
+    // Natural phone pauses must not create phantom caller turns. Gemini owns
+    // speech boundaries and barge-in by default; its confirmed interruption
+    // event clears carrier playback. These values favor intelligibility over
+    // an aggressive few-hundred-millisecond response target.
     private String startOfSpeechSensitivity = "START_SENSITIVITY_HIGH";
     private int prefixPaddingMs = 60;
-    private String endOfSpeechSensitivity = "END_SENSITIVITY_HIGH";
-    private int silenceDurationMs = 500;
+    private String endOfSpeechSensitivity = "END_SENSITIVITY_LOW";
+    private int silenceDurationMs = 900;
 
-    // Hybrid VAD keeps Gemini's automatic speech-start detection, then lets the
-    // local detector finalize a completed caller turn with audioStreamEnd. This
-    // avoids multi-second remote end-of-turn tails while preserving a natural
-    // pause window before the turn is committed.
-    private boolean hybridVadEnabled = true;
+    // Opt-in only: sending audioStreamEnd from local amplitude detection while
+    // Gemini automatic activity detection is already enabled can commit a
+    // sentence on a natural pause. Avoid competing turn-ending authorities.
+    private boolean hybridVadEnabled = false;
 
-    // Local Twilio-side barge-in cuts queued playback before the provider round-trip
-    // confirms the interruption. The same local detector supplies Hybrid VAD end signals.
-    private boolean localBargeInEnabled = true;
+    // Opt-in only: a 40 ms local amplitude spike may be echo/noise, not a real
+    // interruption. Gemini's own serverContent.interrupted still supports a
+    // deliberate caller interruption and clears Twilio's playback.
+    private boolean localBargeInEnabled = false;
     private int localBargeInMeanAmplitudeThreshold = 900;
-    private int localBargeInSpeechFrames = 2;
+    private int localBargeInSpeechFrames = 5;
     private int localBargeInReleaseFrames = 25;
     private int localBargeInRecentAssistantAudioMs = 1800;
 

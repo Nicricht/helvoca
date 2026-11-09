@@ -493,6 +493,66 @@ class GeminiLiveVoiceSessionTest {
         verify(transport, times(2)).sendAudio(eq(context.streamSid()), anyString());
     }
 
+
+    @Test
+    void defaultVadsDoNotCutCallerPausesAndProviderCanStillInterruptPlayback() {
+        GeminiLiveProperties properties = properties();
+        assertFalse(properties.isLocalBargeInEnabled());
+        assertFalse(properties.isHybridVadEnabled());
+
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, transport, properties, tools,
+                mock(CallTranscriptService.class),
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient());
+
+        session.onOpen(socket);
+        session.onText(socket, new JSONObject().put("setupComplete", new JSONObject()).toString(), true);
+        clearInvocations(socket);
+
+        byte[] loud = new byte[160];
+        Arrays.fill(loud, PcmuAudioCodec.encodeMulaw((short) 8_000));
+        String loudBase64 = Base64.getEncoder().encodeToString(loud);
+        byte[] silence = new byte[160];
+        Arrays.fill(silence, (byte) 0xff);
+        String silenceBase64 = Base64.getEncoder().encodeToString(silence);
+
+        // Loud 60-ms acoustic fragments followed by a 600-ms natural pause
+        // must neither flush Gemini's turn nor cut queued Twilio playback.
+        for (int i = 0; i < 3; i++) session.acceptInboundAudio(loudBase64);
+        for (int i = 0; i < 30; i++) session.acceptInboundAudio(silenceBase64);
+        verify(transport, never()).clearPlayback(context.streamSid());
+        ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
+        verify(socket, atLeastOnce()).sendText(sent.capture(), eq(true));
+        assertTrue(sent.getAllValues().stream().anyMatch(payload -> {
+            JSONObject realtime = new JSONObject(payload.toString()).optJSONObject("realtimeInput");
+            return realtime != null && realtime.has("audio");
+        }), "Even brief caller words must reach Gemini; never drop 'si' or 'no' solely for duration");
+        assertFalse(sent.getAllValues().stream().anyMatch(payload -> {
+            JSONObject realtime = new JSONObject(payload.toString()).optJSONObject("realtimeInput");
+            return realtime != null && realtime.optBoolean("audioStreamEnd", false);
+        }), "With automatic Gemini VAD, local amplitude must not finalize the sentence");
+
+        // An actual upstream interruption is still honored: the assistant
+        // stops speaking and its queued phone playback is cleared.
+        session.onText(socket,
+                new JSONObject().put("serverContent", new JSONObject().put("interrupted", true)).toString(),
+                true);
+        verify(transport, times(1)).clearPlayback(context.streamSid());
+    }
+
     @Test
     void explicitClosingIntentRecognizerRejectsSimpleConfirmation() {
         assertFalse(GeminiLiveVoiceSession.hasExplicitClosingIntent("Sí."));
