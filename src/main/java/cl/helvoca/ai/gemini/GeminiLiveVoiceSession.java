@@ -83,6 +83,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final GeminiTwilioAudioFramer assistantAudioFramer = new GeminiTwilioAudioFramer();
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final GeminiToolCallLedger toolCallLedger = new GeminiToolCallLedger();
+    // Google reports usage per provider event; never assume snapshots are
+    // cumulative or additive when producing billing estimates.
+    private final GeminiLiveUsageMeter usageMeter;
     private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
     private final AtomicBoolean setupComplete = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -153,6 +156,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         this.certifications = certifications;
         this.health = health;
         this.http = http;
+        this.usageMeter = new GeminiLiveUsageMeter(context.callId(), context.businessId(), properties.getModel());
         this.localBargeInDetector = new LocalBargeInDetector(
                 properties.getLocalBargeInMeanAmplitudeThreshold(),
                 properties.getLocalBargeInSpeechFrames(),
@@ -278,6 +282,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private void handleInTenant(String payload) {
         try {
             JSONObject event = new JSONObject(payload);
+            // Record only numeric, provider-reported usage. Do not persist the
+            // provider payload or treat token snapshots as an invoice.
+            JSONObject usageMetadata = event.optJSONObject("usageMetadata");
+            if (usageMetadata != null) usageMeter.record(usageMetadata);
             if (event.has("setupComplete")) {
                 onSetupComplete();
                 return;
@@ -1110,6 +1118,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void finalizeCall() {
         if (!finalized.compareAndSet(false, true)) return;
+        usageMeter.logFinalSummary();
         try {
             summaries.generate(context.callId());
         } catch (Exception e) {
