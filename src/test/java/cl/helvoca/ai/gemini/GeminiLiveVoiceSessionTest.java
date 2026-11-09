@@ -93,7 +93,9 @@ class GeminiLiveVoiceSessionTest {
         JSONObject inputTranscription = setup.getJSONObject("inputAudioTranscription");
         assertEquals("es-CL", inputTranscription.getJSONArray("languageCodes").getString(0));
         assertEquals("VERBATIM", inputTranscription.getString("mode"));
-        assertTrue(inputTranscription.getJSONArray("customVocabulary").toList().contains("RecepVoz"));
+        assertFalse(inputTranscription.has("customVocabulary"));
+        // The assistant still knows the brand through system instructions,
+        // without biasing ambiguous caller audio into that brand name.
         assertFalse(setup.has("proactivity"));
 
         String instructions = setup.getJSONObject("systemInstruction")
