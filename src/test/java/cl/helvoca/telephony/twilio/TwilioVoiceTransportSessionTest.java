@@ -121,6 +121,28 @@ class TwilioVoiceTransportSessionTest {
         verify(socket, never()).sendMessage(any(TextMessage.class));
     }
 
+
+    @Test
+    void upstreamFailureInvalidatesQueuedFarewellBeforeItsAck() throws Exception {
+        WebSocketSession socket = mock(WebSocketSession.class);
+        TwilioCallControl control = mock(TwilioCallControl.class);
+        when(socket.isOpen()).thenReturn(true);
+        when(control.hangup("AC-test", "CA-test")).thenReturn(true);
+        TwilioVoiceTransportSession transport = new TwilioVoiceTransportSession(
+                socket, "MZ-test", "AC-test", "CA-test", control);
+
+        assertTrue(transport.endAfterPlayback());
+        ArgumentCaptor<TextMessage> sent = ArgumentCaptor.forClass(TextMessage.class);
+        verify(socket).sendMessage(sent.capture());
+        String closingMark = new JSONObject(sent.getValue().getPayload())
+                .getJSONObject("mark").getString("name");
+
+        transport.closeOnUpstreamFailure();
+        transport.onPlaybackMark(closingMark);
+        verify(control, times(1)).hangup("AC-test", "CA-test");
+        assertFalse(transport.isOpen());
+    }
+
     @Test
     void rejectedDeferredHangupReopensOutputInsteadOfLeavingDeadAir() throws Exception {
         WebSocketSession socket = mock(WebSocketSession.class);

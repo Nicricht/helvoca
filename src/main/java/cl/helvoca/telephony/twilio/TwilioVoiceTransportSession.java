@@ -103,8 +103,9 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public void closeOnUpstreamFailure() {
-        pendingHangupMark.set(null);
         synchronized (sendLock) {
+            // Keep invalidation and output close atomic with playback ACK.
+            pendingHangupMark.set(null);
             outputClosed.set(true);
             control.hangup(accountSid, callSid);
         }
@@ -136,7 +137,9 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
             // acknowledgement after barge-in must never end the call.
             String expected = pendingHangupMark.get();
             if (expected == null || !expected.equals(marker)) return;
-            if (!pendingHangupMark.compareAndSet(expected, null)) return;
+            // All writers to a pending farewell marker at this stage
+            // serialize via sendLock; a second CAS cannot fail here.
+            pendingHangupMark.set(null);
             if (outputClosed.get()) return;
             outputClosed.set(true);
             accepted = control.hangup(accountSid, callSid);
