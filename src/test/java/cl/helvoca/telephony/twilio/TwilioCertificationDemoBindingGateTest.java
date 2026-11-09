@@ -48,6 +48,29 @@ class TwilioCertificationDemoBindingGateTest {
     }
 
     @Test
+    void explicitlyScopedCustomerStillNeedsExactPhoneAndIndependentRouteEvidence() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var phone = certifiedPhone(DEMO_ID);
+        var customer = new Business();
+        customer.setMode(BusinessMode.CUSTOMER);
+        when(phones.findByPhoneNumberAndActiveTrue(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(customer));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, new TenantDatabaseContext(), true);
+        assertFalse(gate.allows(DEMO_ID));
+        assertFalse(gate.allows(UUID.randomUUID()));
+        when(route.allows(phone)).thenReturn(true);
+        assertTrue(gate.allows(DEMO_ID));
+        customer.setMode(BusinessMode.PILOT);
+        assertFalse(gate.allows(DEMO_ID), "A scoped CUSTOMER exception must never admit PILOT tenants");
+        customer.setMode(BusinessMode.CUSTOMER);
+        customer.setStatus(BusinessStatus.SUSPENDED);
+        assertFalse(gate.allows(DEMO_ID));
+    }
+
+    @Test
     void requiresVerifiedExistingRouteEvidenceAndExactTenant() {
         var phones = mock(PhoneNumberRepository.class);
         var businesses = mock(BusinessRepository.class);
@@ -138,5 +161,117 @@ class TwilioCertificationDemoBindingGateTest {
         phone.setTwilioBindingSource("VERIFIED_EXISTING");
         phone.setVoiceVerifiedAt(Instant.now());
         return phone;
+    }
+
+    @Test
+    void diagnosticInvalidPinsNeverQueriesDatabase() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var gate = new TwilioCertificationDemoBindingGate("", FROM, ACCOUNT,
+                phones, businesses, mock(TwilioVerifiedExistingVoiceRouteGate.class),
+                new TenantDatabaseContext());
+        assertEquals("PINS_INVALID", gate.readinessBlocker());
+        verifyNoInteractions(phones, businesses);
+    }
+
+    @Test
+    void diagnosticClassifiesMissingInactiveAndUnverifiedPhoneWithoutCarrierCall() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope);
+        assertEquals("PHONE_NOT_STAGED", gate.readinessBlocker());
+        var phone = certifiedPhone(DEMO_ID);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        phone.setActive(false);
+        assertEquals("PHONE_INACTIVE", gate.readinessBlocker());
+        phone.setActive(true);
+        phone.setVoiceVerifiedAt(null);
+        assertEquals("CARRIER_BINDING_NOT_VERIFIED", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+        verifyNoInteractions(businesses, route);
+    }
+
+    @Test
+    void diagnosticClassifiesTenantScopeAndMissingRouteProof() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var phone = certifiedPhone(DEMO_ID);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope);
+        assertEquals("BUSINESS_NOT_FOUND", gate.readinessBlocker());
+        var business = new Business();
+        business.setMode(BusinessMode.CUSTOMER);
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        assertEquals("BUSINESS_NOT_SCOPED", gate.readinessBlocker());
+        business.setMode(BusinessMode.DEMO);
+        business.setStatus(BusinessStatus.SUSPENDED);
+        assertEquals("BUSINESS_NOT_ACTIVE", gate.readinessBlocker());
+        business.setStatus(BusinessStatus.ACTIVE);
+        assertEquals("EXISTING_ROUTE_PIN_OR_PROOF_DENIED", gate.readinessBlocker());
+        when(route.allows(phone)).thenReturn(true);
+        assertEquals("READY", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+    }
+
+    @Test
+    void diagnosticScopedCustomerStillRequiresExistingRouteAndCatchesDatabaseFailures() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var scope = new TenantDatabaseContext();
+        var phone = certifiedPhone(DEMO_ID);
+        var business = new Business();
+        business.setMode(BusinessMode.CUSTOMER);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, scope, true);
+        assertEquals("EXISTING_ROUTE_PIN_OR_PROOF_DENIED", gate.readinessBlocker());
+        verify(route).allows(phone);
+        when(phones.findByPhoneNumber(FROM)).thenThrow(new IllegalStateException("private DB error"));
+        assertEquals("DATABASE_QUERY_BLOCKED", gate.readinessBlocker());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+    }
+
+    @Test
+    void diagnosticRejectsEachMissingOrMalformedPinBeforeAnyDatabaseRead() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var context = new TenantDatabaseContext();
+        for (String invalidFrom : new String[]{null, " "}) {
+            var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(),
+                    invalidFrom, ACCOUNT, phones, businesses, route, context);
+            assertEquals("PINS_INVALID", gate.readinessBlocker());
+        }
+        for (String invalidAccount : new String[]{null, "wrong-account"}) {
+            var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(),
+                    FROM, invalidAccount, phones, businesses, route, context);
+            assertEquals("PINS_INVALID", gate.readinessBlocker());
+        }
+        verifyNoInteractions(phones, businesses, route);
+        assertEquals(TenantDatabaseContext.Mode.DENIED, context.currentOrDenied().mode());
+    }
+
+    @Test
+    void diagnosticNeverAllowsPilotEvenWithScopedCustomerOptIn() {
+        var phones = mock(PhoneNumberRepository.class);
+        var businesses = mock(BusinessRepository.class);
+        var route = mock(TwilioVerifiedExistingVoiceRouteGate.class);
+        var phone = certifiedPhone(DEMO_ID);
+        var business = new Business();
+        business.setMode(BusinessMode.PILOT);
+        when(phones.findByPhoneNumber(FROM)).thenReturn(Optional.of(phone));
+        when(businesses.findById(DEMO_ID)).thenReturn(Optional.of(business));
+        var gate = new TwilioCertificationDemoBindingGate(DEMO_ID.toString(), FROM, ACCOUNT,
+                phones, businesses, route, new TenantDatabaseContext(), true);
+        assertEquals("BUSINESS_NOT_SCOPED", gate.readinessBlocker());
+        verifyNoInteractions(route);
     }
 }

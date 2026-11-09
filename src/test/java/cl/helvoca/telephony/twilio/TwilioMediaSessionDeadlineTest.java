@@ -13,6 +13,17 @@ import static org.mockito.Mockito.*;
 class TwilioMediaSessionDeadlineTest {
 
     @Test
+    void configuredConstructorDisablesDeadlineAtZeroAndEnablesEmergencyOverrideWhenPositive() {
+        TwilioMediaSessionDeadline disabled = new TwilioMediaSessionDeadline(0);
+        assertNull(disabled.schedule(() -> fail("zero must disable the wall-clock deadline")));
+        disabled.stop();
+
+        TwilioMediaSessionDeadline emergency = new TwilioMediaSessionDeadline(30);
+        assertNotNull(emergency.schedule(() -> { }));
+        emergency.stop();
+    }
+
+    @Test
     void schedulesAtConfiguredBoundWithoutExecutingEarly() {
         ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
         @SuppressWarnings("unchecked")
@@ -29,11 +40,22 @@ class TwilioMediaSessionDeadlineTest {
     }
 
     @Test
-    void acceptsMinAndMaxButRejectsUnsafeOrUnlimitedValues() {
+    void zeroDisablesTheAbsoluteMediaSessionDeadlineWithoutScheduling() {
+        ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
+        TwilioMediaSessionDeadline deadline = new TwilioMediaSessionDeadline(0, scheduler);
+
+        assertNull(deadline.schedule(() -> fail("disabled deadline must not execute")));
+        deadline.stop();
+
+        verifyNoInteractions(scheduler);
+    }
+
+    @Test
+    void acceptsEmergencyBoundsAndRejectsUnsafeValues() {
         ScheduledExecutorService scheduler = mock(ScheduledExecutorService.class);
         assertDoesNotThrow(() -> new TwilioMediaSessionDeadline(30, scheduler));
         assertDoesNotThrow(() -> new TwilioMediaSessionDeadline(3600, scheduler));
-        for (int invalid : new int[]{-1, 0, 1, 29, 3601, Integer.MAX_VALUE}) {
+        for (int invalid : new int[]{-1, 1, 29, 3601, Integer.MAX_VALUE}) {
             assertThrows(IllegalArgumentException.class,
                     () -> new TwilioMediaSessionDeadline(invalid, scheduler));
         }

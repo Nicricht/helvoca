@@ -61,7 +61,13 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     @Override
     public void clearPlayback(String streamId) {
         if (!matches(streamId)) return;
-        send(new JSONObject().put("event", "clear").put("streamSid", streamSid));
+        // A Twilio "clear" acknowledges queued marks too. Invalidate an
+        // outstanding farewell marker before that acknowledgement can hang up
+        // a caller who interrupted with another request.
+        synchronized (sendLock) {
+            pendingHangupMark.set(null);
+            send(new JSONObject().put("event", "clear").put("streamSid", streamSid));
+        }
     }
 
     @Override
@@ -97,8 +103,9 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
 
     @Override
     public void closeOnUpstreamFailure() {
-        pendingHangupMark.set(null);
         synchronized (sendLock) {
+            // Keep invalidation and output close atomic with playback ACK.
+            pendingHangupMark.set(null);
             outputClosed.set(true);
             control.hangup(accountSid, callSid);
         }
@@ -124,12 +131,15 @@ final class TwilioVoiceTransportSession implements VoiceTransportSession {
     }
 
     private void completeDeferredHangup(String marker, String reason) {
-        String expected = pendingHangupMark.get();
-        if (expected == null || !expected.equals(marker)) return;
-        if (!pendingHangupMark.compareAndSet(expected, null)) return;
-
         boolean accepted;
         synchronized (sendLock) {
+            // Serialize marker acceptance with clearPlayback: a stale
+            // acknowledgement after barge-in must never end the call.
+            String expected = pendingHangupMark.get();
+            if (expected == null || !expected.equals(marker)) return;
+            // All writers to a pending farewell marker at this stage
+            // serialize via sendLock; a second CAS cannot fail here.
+            pendingHangupMark.set(null);
             if (outputClosed.get()) return;
             outputClosed.set(true);
             accepted = control.hangup(accountSid, callSid);

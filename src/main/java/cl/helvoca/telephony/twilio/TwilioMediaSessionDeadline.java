@@ -12,9 +12,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Hard, wall-clock limit on the Twilio-to-AI media session. Not a billing
- * guarantee: carrier billing can continue during a delayed hangup, and Twilio
- * provider-side limits and alerts must be verified separately.
+ * Optional absolute wall-clock limit on a Twilio-to-AI media session.
+ * Disabled by default. A positive value is an explicit emergency override,
+ * not the normal call-duration policy or a billing guarantee.
  */
 @Component
 final class TwilioMediaSessionDeadline {
@@ -22,23 +22,24 @@ final class TwilioMediaSessionDeadline {
     private final ScheduledExecutorService scheduler;
 
     @Autowired
-    TwilioMediaSessionDeadline(@Value("${app.telephony.twilio.max-media-session-seconds:600}")
+    TwilioMediaSessionDeadline(@Value("${app.telephony.twilio.max-media-session-seconds:0}")
                                int seconds) {
-        this(seconds, scheduler());
+        this(seconds, seconds == 0 ? null : scheduler());
     }
 
     // Enables deterministic tests without waiting or contacting Twilio.
     TwilioMediaSessionDeadline(int seconds, ScheduledExecutorService scheduler) {
-        if (seconds < 30 || seconds > 3600) {
-            throw new IllegalArgumentException("max-media-session-seconds must be 30..3600");
+        if (seconds < 0 || (seconds > 0 && (seconds < 30 || seconds > 3600))) {
+            throw new IllegalArgumentException("max-media-session-seconds must be 0 or 30..3600");
         }
         this.seconds = seconds;
-        this.scheduler = Objects.requireNonNull(scheduler, "deadline scheduler");
+        this.scheduler = seconds == 0 ? null : Objects.requireNonNull(scheduler, "deadline scheduler");
     }
 
     ScheduledFuture<?> schedule(Runnable cutOff) {
-        return scheduler.schedule(Objects.requireNonNull(cutOff, "cutoff"),
-                seconds, TimeUnit.SECONDS);
+        Objects.requireNonNull(cutOff, "cutoff");
+        if (seconds == 0) return null;
+        return scheduler.schedule(cutOff, seconds, TimeUnit.SECONDS);
     }
 
     private static ScheduledExecutorService scheduler() {
@@ -54,6 +55,6 @@ final class TwilioMediaSessionDeadline {
 
     @PreDestroy
     void stop() {
-        scheduler.shutdownNow();
+        if (scheduler != null) scheduler.shutdownNow();
     }
 }

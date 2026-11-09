@@ -128,6 +128,11 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("nunca menciones UUID"));
         assertTrue(instructions.contains("success=true sin bookingId es solo una propuesta pendiente de confirmación"));
         assertTrue(instructions.contains("Solo puedes afirmar que la reserva existe"));
+        assertTrue(instructions.contains("FECHA HABLADA = FECHA REAL"));
+        assertTrue(instructions.contains("localStart/localDate"));
+        assertTrue(instructions.contains("CANCELACIONES: si el cliente solicita explícitamente"));
+        assertTrue(instructions.contains("Si el cliente interrumpe con otra solicitud"));
+        assertTrue(instructions.contains("Evita excesos de confianza y modismos informales"));
 
         JSONArray declarations = setup.getJSONArray("tools")
                 .getJSONObject(0).getJSONArray("functionDeclarations");
@@ -493,6 +498,35 @@ class GeminiLiveVoiceSessionTest {
         verify(transport, never()).endAfterPlayback();
     }
 
+
+    @Test
+    void bareNoWithoutPriorAnythingElseQuestionCannotAuthorizeHangup() {
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, transport, properties(), tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        WebSocket providerSocket = mock(WebSocket.class);
+        session.onText(providerSocket, new JSONObject()
+                .put("serverContent", new JSONObject()
+                        .put("inputTranscription", new JSONObject().put("text", "No."))
+                        .put("turnComplete", true))
+                .toString(), true);
+
+        session.onText(providerSocket, new JSONObject()
+                .put("toolCall", new JSONObject()
+                        .put("functionCalls", new JSONArray().put(new JSONObject()
+                                .put("id", "end-without-goodbye")
+                                .put("name", "end_call")
+                                .put("args", new JSONObject()))))
+                .toString(), true);
+        verify(tools, never()).prepareDeferredEndCall(context);
+        verify(transport, never()).endAfterPlayback();
+    }
+
     @Test
     void endCallAcceptsNoAfterAnythingElseQuestion() {
         GeminiLiveProperties properties = properties();
@@ -589,6 +623,51 @@ class GeminiLiveVoiceSessionTest {
 
         verify(transport).endAfterPlayback();
         verify(tools, never()).execute(eq(context), eq("end_call"), anyString());
+    }
+
+
+    @Test
+    void interruptionDuringFarewellCancelsPendingHangupAndStaleClosingIntent() {
+        GeminiLiveProperties properties = properties();
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        when(tools.prepareDeferredEndCall(context)).thenReturn(new JSONObject()
+                .put("success", true)
+                .put("data", new JSONObject().put("pendingPlaybackCompletion", true))
+                .toString());
+
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, transport, properties, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        WebSocket providerSocket = mock(WebSocket.class);
+        session.onText(providerSocket, new JSONObject().put("serverContent", new JSONObject()
+                .put("inputTranscription", new JSONObject().put("text", "No, gracias. Eso es todo."))
+                .put("turnComplete", true)).toString(), true);
+        session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-before-interruption")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject())))).toString(), true);
+        verify(tools).prepareDeferredEndCall(context);
+
+        session.onText(providerSocket, new JSONObject().put("serverContent", new JSONObject()
+                .put("interrupted", true)
+                .put("inputTranscription", new JSONObject()
+                        .put("text", "Espera, quiero cambiar la hora de mi reserva."))
+                .put("turnComplete", true)).toString(), true);
+
+        verify(transport).clearPlayback(context.streamSid());
+        verify(transport, never()).endAfterPlayback();
+
+        session.onText(providerSocket, new JSONObject().put("toolCall", new JSONObject()
+                .put("functionCalls", new JSONArray().put(new JSONObject()
+                        .put("id", "end-after-new-request")
+                        .put("name", "end_call")
+                        .put("args", new JSONObject())))).toString(), true);
+        verify(tools, times(1)).prepareDeferredEndCall(context);
     }
 
     @Test
