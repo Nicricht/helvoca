@@ -101,6 +101,10 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Reglas oficiales del negocio"));
         assertTrue(instructions.contains("RecepVoz"));
         assertTrue(instructions.contains("[RECEPVOZ_CALL_CONNECTED]"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertTrue(instructions.contains("UNA SOLA VEZ al iniciar la llamada"));
+        assertTrue(instructions.contains("está prohibido repetir el saludo de bienvenida"));
+        assertTrue(instructions.contains("no reinicies la conversación"));
         assertTrue(instructions.contains("ESPAÑOL DE CHILE"));
         assertTrue(instructions.contains("CERO CALL CENTER"));
         assertTrue(instructions.contains("NO vuelvas a ejecutar la misma herramienta"));
@@ -326,8 +330,12 @@ class GeminiLiveVoiceSessionTest {
                 .getString("text");
 
         assertTrue(instructions.contains("voz claramente masculina y adulta"));
+        assertTrue(instructions.contains("PERSONA VOCAL: habla como un recepcionista chileno"));
         assertTrue(instructions.contains("mismo género"));
-        assertFalse(instructions.contains("primera frase debe usar de inmediato una voz claramente femenina"));
+        assertTrue(instructions.contains("APERTURA ÚNICA"));
+        assertFalse(instructions.contains("la voz debe sonar femenina y joven"));
+        assertFalse(instructions.contains("mujer joven de Santiago"));
+        assertFalse(instructions.contains("misma identidad femenina joven-adulta"));
     }
 
     @Test
