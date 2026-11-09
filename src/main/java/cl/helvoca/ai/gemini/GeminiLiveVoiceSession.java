@@ -649,11 +649,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 if (!context.voiceBakeOff()
                         && !properties.isCertificationSimulation()
                         && !contextualClosingIntent.get()
-                        && !hasExplicitClosingIntent(lastUserUtterance)) {
+                        && !hasClosingIntent(lastUserUtterance, lastAssistantUtterance, previousAssistantUtterance)) {
                     log.info("Blocked premature end_call call={} last_user={}",
                             context.callId(), truncate(lastUserUtterance));
                     return toolFailure("END_CALL_REQUIRES_EXPLICIT_CLOSING",
-                            "El cliente todavía no expresó una intención clara de terminar. Pregunta si necesita algo más y no cierres la llamada todavía.");
+                            "El cliente todavía no confirmó el cierre. Si ya preguntaste si necesita algo más, NO repitas esa pregunta, la bienvenida ni la despedida. Escucha la siguiente intervención y permite corregir o cambiar la reserva; no cuelgues sin una respuesta clara.");
                 }
                 result = new JSONObject(tools.prepareDeferredEndCall(context));
                 JSONObject data = result.optJSONObject("data");
@@ -705,7 +705,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     static boolean hasClosingIntent(String userText, String lastAssistantText, String previousAssistantText) {
         if (hasExplicitClosingIntent(userText)) return true;
         String user = normalizeSpeech(userText);
-        if (!Set.of("no", "nop", "nope").contains(user)) return false;
+        if (!isNegativeClosingReply(user)) return false;
         return asksIfAnythingElse(lastAssistantText) || asksIfAnythingElse(previousAssistantText);
     }
 
@@ -722,8 +722,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private static boolean isNegativeClosingReply(String text) {
-        return Set.of("no", "nop", "nope", "no gracias", "nada mas")
-                .contains(normalizeSpeech(text));
+        String normalized = normalizeSpeech(text);
+        return Set.of("no", "nop", "nope", "no gracias", "nada", "nada mas",
+                "nada mas gracias", "ninguna", "ninguna otra cosa").contains(normalized)
+                || normalized.matches("no(?: no){1,4}");
+    }
+
+    private static boolean isMeaningfulNewRequest(String text) {
+        // Tiny ASR fragments ("en", "a") must not erase a confirmed goodbye.
+        return normalizeSpeech(text).length() >= 4;
     }
 
     private static String bufferText(StringBuilder buffer) {
@@ -952,7 +959,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 : "IDENTIDAD VOCAL: usa una voz claramente femenina, joven-adulta y luminosa. Debe sentirse inequívocamente como una mujer joven de Santiago, con energía alegre y segura, sin sonar infantil, masculina ni andrógina.";
         String voicePersona = masculineVoice
                 ? "PERSONA VOCAL: habla como un recepcionista chileno de Santiago, adulto, cordial, despierto y profesional. La impresión debe ser de confianza, cercanía y agilidad, sin sonar infantil, exageradamente sensual ni como locutor de call center."
-                : "PERSONA VOCAL: habla como una recepcionista chilena joven-adulta de Santiago, alegre, despierta, cercana y con presencia premium. La impresión debe ser \"qué agradable hablar con ella\", no \"estoy hablando con una operadora\". Usa una sonrisa audible real, energía luminosa, seguridad relajada y curiosidad genuina por ayudar. La voz debe sonar femenina y joven, con resonancia ligera y clara, nunca infantil, susurrada, empalagosa ni forzadamente sensual.";
+                : "PERSONA VOCAL: habla como una recepcionista chilena joven-adulta de Santiago, alegre, despierta, cercana y con presencia premium. La impresión debe ser \"qué agradable hablar con ella\", no \"estoy hablando con una operadora\". Usa calidez natural, energía moderada y curiosidad genuina por ayudar, sin exagerar la sonrisa ni teatralizar la entonación. La voz debe sonar femenina y joven-adulta, con resonancia clara, nunca infantil, susurrada, empalagosa ni forzadamente sensual.";
         return bakeOffPrelude + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
@@ -978,7 +985,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 SI ESCUCHAS SOLO EL NOMBRE DEL PRODUCTO: si la entrada del cliente se transcribe únicamente como "RecepVoz" o como un fragmento sin solicitud, NO vuelvas a saludar ni reinicies la llamada. Pregunta brevemente qué necesita y espera a que termine su frase. No conviertas un ruido ambiguo en un nuevo comienzo de conversación.
                 APERTURA ÚNICA: [RECEPVOZ_CALL_CONNECTED] es una señal técnica de conexión, no palabras del cliente. Pronuncia el saludo del negocio UNA SOLA VEZ al iniciar la llamada. Desde la primera palabra conserva la identidad vocal seleccionada, el tono cordial y el acento de Santiago. El saludo debe ser breve, por ejemplo "Hola, gracias por llamar a [negocio]. Ya, cuéntame, ¿en qué te ayudo?". Después de saludar, nunca vuelvas al inicio: si escuchas otro marcador, una pausa, una interrupción o una reconexión, continúa la conversación desde el último turno del paciente. Si te preguntan quién habla, responde sin repetir la bienvenida. No sobreactúes el saludo.
                 BAKE-OFF/FINALIST: si recibes uno de los marcadores [RECEPVOZ_VOICE_BAKEOFF_LINE_1] a [RECEPVOZ_VOICE_BAKEOFF_LINE_5], obedece únicamente la línea exacta asignada. No hagas preguntas adicionales, no uses herramientas por tu cuenta y no reacciones al audio del teléfono.
-                CIERRE: completar una reserva, venta o consulta NO significa que la llamada terminó. Después de resolverla, pregunta UNA sola vez "¿Necesitas algo más?". Si el cliente responde "no", "no gracias", "nada más" o equivalente, NO vuelvas a preguntar nada: di UNA sola despedida chilena completa, por ejemplo "Gracias por llamar, que estés muy bien. Chao.", y luego invoca end_call una sola vez. Nunca repitas la despedida. Termina de pronunciar todas sus palabras antes de invocar end_call. Si el cliente interrumpe con otra solicitud mientras te despides, atiende esa solicitud y no intentes colgar hasta que vuelva a indicar que terminó.
+                CIERRE: completar una reserva, venta o consulta NO significa que la llamada terminó. Después de resolverla, pregunta UNA sola vez "¿Necesitas algo más?". Si el cliente responde "no", "no gracias", "nada", "nada más" o equivalente, NO vuelvas a preguntar nada: di UNA sola despedida chilena completa, por ejemplo "Gracias por llamar, que estés muy bien. Chao.", y luego invoca end_call una sola vez. Nunca combines "Chao" con "¿Necesitas algo más?" ni repitas la despedida. Termina de pronunciar todas sus palabras antes de invocar end_call. Si el cliente interrumpe con otra solicitud mientras te despides, atiende esa solicitud y no intentes colgar hasta que vuelva a indicar que terminó.
                 IDENTIDAD: si te preguntan si eres una IA o asistente virtual, responde con honestidad y continúa ayudando.
                 """.formatted(voiceIdentity, voicePersona);
     }
@@ -1075,8 +1082,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 boolean negative = isNegativeClosingReply(text);
                 if (awaitingAnythingElseAnswer.getAndSet(false) && negative) {
                     contextualClosingIntent.set(true);
-                } else if (!negative) {
-                    // A new request supersedes an earlier "no, thanks".
+                } else if (!negative && isMeaningfulNewRequest(text)) {
+                    // A meaningful new request supersedes an earlier "no, thanks".
                     contextualClosingIntent.set(false);
                 }
             } else if ("ASSISTANT".equals(speaker)) {
