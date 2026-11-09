@@ -12,12 +12,12 @@ class GeminiLivePropertiesLatencyTest {
 
         assertEquals("START_SENSITIVITY_HIGH", properties.getStartOfSpeechSensitivity());
         assertEquals(60, properties.getPrefixPaddingMs());
-        assertEquals("END_SENSITIVITY_HIGH", properties.getEndOfSpeechSensitivity());
-        assertEquals(500, properties.getSilenceDurationMs());
-        assertTrue(properties.isHybridVadEnabled());
-        assertTrue(properties.isLocalBargeInEnabled());
+        assertEquals("END_SENSITIVITY_LOW", properties.getEndOfSpeechSensitivity());
+        assertEquals(900, properties.getSilenceDurationMs());
+        assertFalse(properties.isHybridVadEnabled());
+        assertFalse(properties.isLocalBargeInEnabled());
         assertEquals(900, properties.getLocalBargeInMeanAmplitudeThreshold());
-        assertEquals(2, properties.getLocalBargeInSpeechFrames());
+        assertEquals(5, properties.getLocalBargeInSpeechFrames());
         assertEquals(25, properties.getLocalBargeInReleaseFrames());
         assertEquals(1800, properties.getLocalBargeInRecentAssistantAudioMs());
     }
