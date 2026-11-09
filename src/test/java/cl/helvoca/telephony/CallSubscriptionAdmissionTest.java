@@ -11,11 +11,14 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.mockito.ArgumentCaptor;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -90,6 +93,107 @@ class CallSubscriptionAdmissionTest {
                 "twilio", "CA-missing-commercial", "+56910000002", "+14355551002"));
         verify(calls, never()).countByBusinessIdAndStatusIn(eq(businessId), anyCollection());
         verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+
+    @Test
+    void perTenantUtcDayLimitBlocksNewCallBeforePersistingOrContactingAi() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551003")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-daily-full")).thenReturn(Optional.empty());
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+        when(calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                eq(businessId), any(Instant.class), any(Instant.class))).thenReturn(8L);
+
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxCallsPerBusinessPerUtcDay(8);
+        CallLifecycleService lifecycle = lifecycle(phones, calls, properties);
+        lifecycle.setSubscriptions(subscriptions);
+
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-daily-full", "+56910000003", "+14355551003"));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+        ArgumentCaptor<Instant> from = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Instant> to = ArgumentCaptor.forClass(Instant.class);
+        verify(calls).countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                eq(businessId), from.capture(), to.capture());
+        assertEquals(from.getValue().truncatedTo(ChronoUnit.DAYS), from.getValue());
+        assertEquals(from.getValue().plus(1, ChronoUnit.DAYS), to.getValue());
+    }
+
+    @Test
+    void belowDailyThresholdAdmitsCallerAndDoesNotResetCounterForFailedCalls() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551004")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-daily-seventh")).thenReturn(Optional.empty());
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+        when(calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                eq(businessId), any(Instant.class), any(Instant.class))).thenReturn(7L);
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(a -> a.getArgument(0));
+
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxCallsPerBusinessPerUtcDay(8);
+        CallLifecycleService lifecycle = lifecycle(phones, calls, properties);
+        lifecycle.setSubscriptions(subscriptions);
+        lifecycle.startInboundCall("twilio", "CA-daily-seventh", "+56910000004", "+14355551004");
+
+        verify(calls, times(1)).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void disabledDailyLimitLeavesPriorCallAdmittanceUnchanged() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551005")).thenReturn(Optional.of(phone));
+        when(calls.findByProviderCallId("CA-unlimited")).thenReturn(Optional.empty());
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(a -> a.getArgument(0));
+
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxCallsPerBusinessPerUtcDay(-20);
+        assertEquals(0, properties.getMaxCallsPerBusinessPerUtcDay());
+        CallLifecycleService lifecycle = lifecycle(phones, calls, properties);
+        lifecycle.setSubscriptions(subscriptions);
+        lifecycle.startInboundCall("twilio", "CA-unlimited", "+56910000005", "+14355551005");
+
+        verify(calls, never()).countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                any(UUID.class), any(Instant.class), any(Instant.class));
+        verify(calls).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void sameCarrierSidRemainsIdempotentEvenWhenDailyLimitReached() {
+        UUID businessId = UUID.randomUUID();
+        UUID savedCallId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallSession existing = mock(CallSession.class);
+        when(existing.getId()).thenReturn(savedCallId);
+        when(calls.findByProviderCallId("CA-existing-idempotent")).thenReturn(Optional.of(existing));
+
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setMaxCallsPerBusinessPerUtcDay(1);
+        CallLifecycleService lifecycle = lifecycle(phones, calls, properties);
+        assertEquals(savedCallId, lifecycle.startInboundCall(
+                "twilio", "CA-existing-idempotent", "+56910000006", "+14355551006"));
+        verify(calls, never()).countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                any(UUID.class), any(Instant.class), any(Instant.class));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+        verifyNoInteractions(phones);
     }
 
     private static BusinessSubscriptionService.SubscriptionView view(UUID businessId,

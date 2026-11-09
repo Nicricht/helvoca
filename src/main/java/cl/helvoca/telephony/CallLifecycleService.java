@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -114,6 +115,21 @@ public class CallLifecycleService {
         if (activeCalls >= limit) {
             metrics.counter("helvoca.calls.rejected", "reason", "capacity").increment();
             throw new CallCapacityExceededException("Concurrent call capacity reached for business");
+        }
+
+        // The existing business advisory transaction lock serializes concurrent
+        // admissions across app replicas. Count ALL starts (including failures
+        // and test calls), not only billable/completed calls, to stop call storms.
+        // The guard never disconnects an established call or creates a timer.
+        int maxCallsPerUtcDay = commercial.getMaxCallsPerBusinessPerUtcDay();
+        if (maxCallsPerUtcDay > 0) {
+            Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS);
+            long callsToday = calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                    businessId, dayStart, dayStart.plus(1, ChronoUnit.DAYS));
+            if (callsToday >= maxCallsPerUtcDay) {
+                metrics.counter("helvoca.calls.rejected", "reason", "daily_call_safety_limit").increment();
+                throw new CallCapacityExceededException("Daily call safety limit reached for business");
+            }
         }
 
         String normalizedProvider = normalizeProvider(telephonyProvider);

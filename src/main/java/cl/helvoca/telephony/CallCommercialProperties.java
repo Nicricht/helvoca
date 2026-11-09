@@ -12,6 +12,9 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.commercial.calls")
 public class CallCommercialProperties {
     private int maxConcurrentPerBusiness = 10;
+    // Optional spending-abuse safety gate for new call starts. Zero preserves
+    // unlimited admission; no time limit is imposed on a connected call.
+    private int maxCallsPerBusinessPerUtcDay = 0;
     private BigDecimal telephonyCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal aiCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal usdToClpRate = BigDecimal.ZERO;
@@ -26,6 +29,14 @@ public class CallCommercialProperties {
 
     public void setMaxConcurrentPerBusiness(int maxConcurrentPerBusiness) {
         this.maxConcurrentPerBusiness = Math.max(0, maxConcurrentPerBusiness);
+    }
+
+    public int getMaxCallsPerBusinessPerUtcDay() {
+        return maxCallsPerBusinessPerUtcDay;
+    }
+
+    public void setMaxCallsPerBusinessPerUtcDay(int maxCallsPerBusinessPerUtcDay) {
+        this.maxCallsPerBusinessPerUtcDay = Math.max(0, maxCallsPerBusinessPerUtcDay);
     }
 
     public BigDecimal getTelephonyCostPerMinuteUsd() {
