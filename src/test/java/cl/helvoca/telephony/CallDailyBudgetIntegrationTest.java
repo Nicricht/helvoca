@@ -63,8 +63,9 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         assertNotNull(secondCall);
         lifecycle.updateStatus("CA-budget-first-2", "completed", 0);
 
-        assertThrows(CallCapacityExceededException.class,
+        CallCapacityExceededException denied = assertThrows(CallCapacityExceededException.class,
                 () -> admit(first, "CA-budget-first-3"));
+        assertEquals("Estimated daily call budget reached for business", denied.getMessage());
         // A different tenant has its own budget and cannot be blocked by A.
         assertNotNull(admit(second, "CA-budget-second-1"));
         assertEquals(firstCall, admit(first, "CA-budget-first-1"));
@@ -79,9 +80,15 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         admit(fixture, "CA-budget-higher-1");
         // 180 s x USD 0.10/min = USD 0.30 > reservation USD 0.20
         lifecycle.updateStatus("CA-budget-higher-1", "completed", 180);
+        assertEquals(0, calls.findByProviderCallId("CA-budget-higher-1")
+                .orElseThrow().getEstimatedTotalCostUsd()
+                .compareTo(new java.math.BigDecimal("0.30")));
         admit(fixture, "CA-budget-higher-2"); // 0.30 + 0.20 exactly ceiling 0.50
-        assertThrows(CallCapacityExceededException.class,
+        // Complete this call so the next rejection CANNOT come from concurrency.
+        lifecycle.updateStatus("CA-budget-higher-2", "completed", 0);
+        CallCapacityExceededException denied = assertThrows(CallCapacityExceededException.class,
                 () -> admit(fixture, "CA-budget-higher-3"));
+        assertEquals("Estimated daily call budget reached for business", denied.getMessage());
     }
 
     private UUID admit(Fixture tenant, String providerCallSid) {
