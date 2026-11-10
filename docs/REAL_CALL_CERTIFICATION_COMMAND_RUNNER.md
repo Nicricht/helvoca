@@ -29,6 +29,31 @@ Acceptance before staging production: explicit isolated demo-tenant binding thro
 
 ## Safety invariants
 
+### Isolated exact-run mode (Aurora certification, 2026-11-09)
+
+Set `TWILIO_CERTIFICATION_COMMAND_ONLY_RUN_ID` to a single new run ID **only** in
+`demo-isolated`, with the generic command runner enabled. This optional mode is
+OFF by default (empty value). When present, the worker never calls `claimNext`:
+it requires a valid run ID, the pinned DEMO business and carrier binding, and
+atomically claims only a `PENDING` row matching the exact ID, business UUID and
+`requested_by='startup-bootstrap'`. A malformed nonempty pin or missing DEMO
+binding fails closed. Other pending rows remain untouched. The PostgreSQL
+status transition prevents a second claim after restart or concurrent polls.
+
+Prepare the new command through the existing idempotent
+`TWILIO_CERTIFICATION_COMMAND_BOOTSTRAP_RUN_ID` with the same ID. Keep the
+startup **caller** (`TWILIO_CERTIFICATION_CALL_ON_STARTUP`) OFF. Ensure the
+global Gemini flag is OFF and the Aurora-scoped flag and daily limit are
+verified before enabling the worker. Inspect the one run and Twilio before
+declaring a carrier result; on an ambiguous provider exception the command is
+marked FAILED and must **never** be recreated or redialed. Disable the worker
+first after the attempt, then clear both run ID variables and the scoped
+Gemini flag. Never leave an enabled generic worker after removing the pin.
+
+This mode does not create a new platform API, quota or call mechanism. A
+successful database claim is only an attempt; it is not proof that Twilio or
+Gemini connected. Do not infer conversation, token usage or costs from CI.
+
 - The worker is disabled by default with `TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED=false`.
 - A command contains only a unique `run_id`. It cannot choose a phone number.
 - The destination is always `TWILIO_TEST_TO`.

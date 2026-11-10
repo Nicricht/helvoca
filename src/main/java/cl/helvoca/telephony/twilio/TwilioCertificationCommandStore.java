@@ -86,6 +86,35 @@ public class TwilioCertificationCommandStore {
         return claimNextForActorScope(false, null);
     }
 
+    /** One authorized bootstrap command; an uncertain carrier result is never made PENDING again. */
+    public Optional<ClaimedCommand> claimExactRunId(String runId, UUID businessId, String actor) {
+        if (!validRunId(runId) || businessId == null || !"startup-bootstrap".equals(actor)) {
+            return Optional.empty();
+        }
+        String token = UUID.randomUUID().toString();
+        List<ClaimedCommand> rows = jdbc.query("""
+                WITH exact_command AS (
+                    SELECT c.run_id, c.business_id
+                      FROM twilio_certification_command c
+                     WHERE c.run_id = ?
+                       AND c.business_id = ?
+                       AND c.requested_by = ?
+                       AND c.status = 'PENDING'
+                     FOR UPDATE OF c SKIP LOCKED
+                )
+                UPDATE twilio_certification_command c
+                   SET status = 'CLAIMED', callback_token = ?,
+                       claimed_at = CURRENT_TIMESTAMP,
+                       expires_at = CURRENT_TIMESTAMP + (? * INTERVAL '1 second')
+                  FROM exact_command n
+                 WHERE c.run_id = n.run_id AND c.status = 'PENDING'
+                RETURNING c.run_id, c.business_id
+                "", (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
+                        rs.getObject(2, UUID.class)),
+                runId.trim(), businessId, actor, token, TOKEN_TTL.toSeconds());
+        return rows.stream().findFirst();
+    }
+
     public Optional<ClaimedCommand> claimNextForChatGptAurora(UUID businessId) {
         if (businessId == null) return Optional.empty();
         return claimNextForActorScope(true, businessId);
