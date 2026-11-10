@@ -37,6 +37,12 @@ public class GeminiLiveProperties {
     private int localBargeInReleaseFrames = 25;
     private int localBargeInRecentAssistantAudioMs = 1800;
 
+    // Opt-in: cap the per-turn Gemini Live context window without stopping a call.
+    // Defaults are conservative, and compression must be tested in DEMO before use.
+    private boolean contextWindowCompressionEnabled = false;
+    private int contextWindowCompressionTriggerTokens = 25_000;
+    private int contextWindowCompressionTargetTokens = 12_000;
+
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
     private int toolLatencyBudgetMs = 1200;
@@ -100,6 +106,24 @@ public class GeminiLiveProperties {
     public void setLocalBargeInRecentAssistantAudioMs(int value) {
         this.localBargeInRecentAssistantAudioMs = value;
     }
+    public boolean isContextWindowCompressionEnabled() { return contextWindowCompressionEnabled; }
+    public void setContextWindowCompressionEnabled(boolean enabled) {
+        this.contextWindowCompressionEnabled = enabled;
+    }
+    public int getContextWindowCompressionTriggerTokens() {
+        return clamp(contextWindowCompressionTriggerTokens, 16_000, 64_000);
+    }
+    public void setContextWindowCompressionTriggerTokens(int value) {
+        this.contextWindowCompressionTriggerTokens = value;
+    }
+    public int getContextWindowCompressionTargetTokens() {
+        return clamp(contextWindowCompressionTargetTokens, 4_000,
+                getContextWindowCompressionTriggerTokens() - 4_000);
+    }
+    public void setContextWindowCompressionTargetTokens(int value) {
+        this.contextWindowCompressionTargetTokens = value;
+    }
+
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }
     public void setToolLatencyBudgetMs(int value) { this.toolLatencyBudgetMs = value; }
     public int getToolBatchLatencyBudgetMs() { return clamp(toolBatchLatencyBudgetMs, 100, 30_000); }

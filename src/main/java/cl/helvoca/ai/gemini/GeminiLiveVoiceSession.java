@@ -902,6 +902,17 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("outputAudioTranscription", new JSONObject())
                 .put("tools", new JSONArray().put(new JSONObject()
                         .put("functionDeclarations", geminiFunctionDeclarations())));
+        if (properties.isContextWindowCompressionEnabled()) {
+            // Live API uses int64-encoded strings for both token counts.
+            // This opt-in retains the system instructions, tool definitions and
+            // most recent turns; it never imposes a call-duration cutoff.
+            setup.put("contextWindowCompression", new JSONObject()
+                    .put("triggerTokens",
+                            Integer.toString(properties.getContextWindowCompressionTriggerTokens()))
+                    .put("slidingWindow", new JSONObject()
+                            .put("targetTokens",
+                                    Integer.toString(properties.getContextWindowCompressionTargetTokens()))));
+        }
         return new JSONObject().put("setup", setup);
     }
 

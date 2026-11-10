@@ -77,5 +77,57 @@ class GeminiLiveLowLatencySetupTest {
         assertEquals(900, activity.getInt("silenceDurationMs"));
         assertEquals("START_OF_ACTIVITY_INTERRUPTS", realtimeInput.getString("activityHandling"));
         assertFalse(setup.has("proactivity"));
+        assertFalse(setup.has("contextWindowCompression"), "disabled by default");
     }
+    @Test
+    void compressionIsOptInUsesBoundedSlidingWindowAndPreservesSulafat() {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        assertFalse(properties.isContextWindowCompressionEnabled());
+        assertEquals(25_000, properties.getContextWindowCompressionTriggerTokens());
+        assertEquals(12_000, properties.getContextWindowCompressionTargetTokens());
+        properties.setContextWindowCompressionEnabled(true);
+        properties.setApiKey("test-key");
+        properties.setEnabled(true);
+
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56911111111", "+14355652512", "MZ-compression-contract");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, mock(VoiceTransportSession.class), properties, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+
+        JSONObject setup = session.buildSetup().getJSONObject("setup");
+        JSONObject compression = setup.getJSONObject("contextWindowCompression");
+        assertEquals("25000", compression.getString("triggerTokens"));
+        assertEquals("12000", compression.getJSONObject("slidingWindow").getString("targetTokens"));
+        assertEquals("Sulafat", setup.getJSONObject("generationConfig")
+                .getJSONObject("speechConfig").getJSONObject("voiceConfig")
+                .getJSONObject("prebuiltVoiceConfig").getString("voiceName"));
+        assertEquals("START_OF_ACTIVITY_INTERRUPTS",
+                setup.getJSONObject("realtimeInputConfig").getString("activityHandling"));
+        assertEquals("Reglas oficiales del negocio", setup.getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text").contains("Reglas oficiales del negocio")
+                ? "Reglas oficiales del negocio" : "missing");
+
+        properties.setContextWindowCompressionTriggerTokens(1);
+        properties.setContextWindowCompressionTargetTokens(1);
+        compression = session.buildSetup().getJSONObject("setup").getJSONObject("contextWindowCompression");
+        assertEquals("16000", compression.getString("triggerTokens"));
+        assertEquals("4000", compression.getJSONObject("slidingWindow").getString("targetTokens"));
+
+        properties.setContextWindowCompressionTriggerTokens(1_000_000);
+        properties.setContextWindowCompressionTargetTokens(1_000_000);
+        compression = session.buildSetup().getJSONObject("setup").getJSONObject("contextWindowCompression");
+        assertEquals("64000", compression.getString("triggerTokens"));
+        assertEquals("60000", compression.getJSONObject("slidingWindow").getString("targetTokens"));
+
+        properties.setContextWindowCompressionEnabled(false);
+        assertFalse(session.buildSetup().getJSONObject("setup").has("contextWindowCompression"));
+    }
+
 }

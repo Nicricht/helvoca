@@ -212,6 +212,10 @@ app:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_LIVE_MODEL:gemini-3.8-live}
       voice: ${GEMINI_LIVE_VOICE:Sulafat}
+      # OFF until a cost/quality A-B acceptance on the isolated Aurora pilot.
+      context-window-compression-enabled: ${GEMINI_LIVE_CONTEXT_COMPRESSION_ENABLED:false}
+      context-window-compression-trigger-tokens: ${GEMINI_LIVE_CONTEXT_COMPRESSION_TRIGGER_TOKENS:25000}
+      context-window-compression-target-tokens: ${GEMINI_LIVE_CONTEXT_COMPRESSION_TARGET_TOKENS:12000}
       websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
       start-of-speech-sensitivity: ${GEMINI_LIVE_START_SENSITIVITY:START_SENSITIVITY_HIGH}
       prefix-padding-ms: ${GEMINI_LIVE_PREFIX_PADDING_MS:60}

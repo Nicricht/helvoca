@@ -1234,6 +1234,41 @@ class RealtimeToolServiceTest {
         assertTrue(result.getJSONObject("error").getString("message").contains("futuro"));
     }
 
+    @Test
+    void optionalWeekScopeBranchesFailClosedWithoutMutatingAgenda() {
+        UUID businessId = UUID.randomUUID();
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        BookingRepository bookings = mock(BookingRepository.class);
+        BusinessScheduleService schedule = mock(BusinessScheduleService.class);
+        RealtimeToolService tools = new RealtimeToolService(
+                businesses, mock(CustomerRepository.class), mock(ServiceItemRepository.class),
+                mock(KnowledgeItemRepository.class), bookings, mock(CallSessionRepository.class),
+                schedule, mock(BusinessRequestService.class), mock(UnansweredQuestionService.class));
+        when(businesses.findById(businessId)).thenReturn(Optional.of(business("America/Santiago")));
+        Instant appointment = ZonedDateTime.of(LocalDate.now(ZoneId.of("America/Santiago")).plusWeeks(1),
+                LocalTime.NOON, ZoneId.of("America/Santiago")).toInstant();
+
+        assertNull(tools.requestedWeekdayError(businessId, appointment, new JSONObject()),
+                "No explicit weekday or week scope preserves backward compatibility");
+        JSONObject onlyWeek = new JSONObject().put("requestedWeekScope", "NEXT_WEEK");
+        assertEquals("INVALID_REQUESTED_WEEKDAY",
+                tools.requestedWeekdayError(businessId, appointment, onlyWeek)
+                        .getJSONObject("error").getString("code"));
+        assertNull(tools.requestedWeekdayError(businessId,
+                new JSONObject().put("startAt", appointment.toString())));
+        assertEquals("INVALID_REQUESTED_WEEKDAY",
+                tools.requestedWeekdayError(businessId,
+                        new JSONObject().put("startAt", appointment.toString())
+                                .put("requestedWeekScope", "NEXT_WEEK"))
+                        .getJSONObject("error").getString("code"));
+        assertEquals("INVALID_REQUESTED_WEEKDAY",
+                tools.requestedWeekdayError(businessId,
+                        new JSONObject().put("startAt", appointment.toString())
+                                .put("requestedWeekday", ""))
+                        .getJSONObject("error").getString("code"));
+        verifyNoInteractions(bookings, schedule);
+    }
+
     private static RealtimeToolService service() {
         return new RealtimeToolService(
                 mock(BusinessRepository.class), mock(CustomerRepository.class), mock(ServiceItemRepository.class),
