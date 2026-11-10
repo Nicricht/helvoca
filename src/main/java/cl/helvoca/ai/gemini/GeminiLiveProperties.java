@@ -43,6 +43,10 @@ public class GeminiLiveProperties {
     private int contextWindowCompressionTriggerTokens = 25_000;
     private int contextWindowCompressionTargetTokens = 12_000;
 
+    // Opt-in only: shorten Gemini Live tool descriptions without changing the
+    // validated tool names, argument schemas or business/provider contract.
+    private boolean compactToolDescriptionsEnabled = false;
+
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
     private int toolLatencyBudgetMs = 1200;
@@ -122,6 +126,11 @@ public class GeminiLiveProperties {
     }
     public void setContextWindowCompressionTargetTokens(int value) {
         this.contextWindowCompressionTargetTokens = value;
+    }
+
+    public boolean isCompactToolDescriptionsEnabled() { return compactToolDescriptionsEnabled; }
+    public void setCompactToolDescriptionsEnabled(boolean enabled) {
+        this.compactToolDescriptionsEnabled = enabled;
     }
 
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }

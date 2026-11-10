@@ -9,6 +9,7 @@ import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.telephony.CallLifecycleService;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import cl.helvoca.voice.VoiceTransportSession;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 
@@ -17,6 +18,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -128,6 +130,101 @@ class GeminiLiveLowLatencySetupTest {
 
         properties.setContextWindowCompressionEnabled(false);
         assertFalse(session.buildSetup().getJSONObject("setup").has("contextWindowCompression"));
+    }
+
+
+    @Test
+    void compactToolDescriptionsPreserveCriticalBookingContractAndVoice() {
+        GeminiLiveProperties properties = new GeminiLiveProperties();
+        assertFalse(properties.isCompactToolDescriptionsEnabled());
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56911111111", "+14355652512", "MZ-lean-tool-contract");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Horarios oficiales, agenda real y política de reservas");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, mock(VoiceTransportSession.class), properties, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+
+        JSONObject ordinary = session.buildSetup().getJSONObject("setup");
+        JSONArray ordinaryTools = ordinary.getJSONArray("tools").getJSONObject(0)
+                .getJSONArray("functionDeclarations");
+        properties.setCompactToolDescriptionsEnabled(true);
+        assertTrue(properties.isCompactToolDescriptionsEnabled());
+        JSONObject compact = session.buildSetup().getJSONObject("setup");
+        JSONArray compactTools = compact.getJSONArray("tools").getJSONObject(0)
+                .getJSONArray("functionDeclarations");
+
+        assertEquals(ordinaryTools.length(), compactTools.length());
+        assertTrue(ordinaryTools.toString().length() - compactTools.toString().length() >= 1500,
+                "Live declarations should actually save at least 1500 characters");
+        assertEquals(ordinary.getJSONObject("systemInstruction").toString(),
+                compact.getJSONObject("systemInstruction").toString());
+        assertEquals(ordinary.getJSONObject("generationConfig").toString(),
+                compact.getJSONObject("generationConfig").toString());
+        assertEquals("START_OF_ACTIVITY_INTERRUPTS",
+                compact.getJSONObject("realtimeInputConfig").getString("activityHandling"));
+
+        for (int i = 0; i < ordinaryTools.length(); i++) {
+            JSONObject before = ordinaryTools.getJSONObject(i);
+            JSONObject after = compactTools.getJSONObject(i);
+            assertEquals(before.getString("name"), after.getString("name"));
+            assertEquals(before.getString("behavior"), after.getString("behavior"));
+            JSONObject originalSchema = before.getJSONObject("parameters");
+            JSONObject compactSchema = after.getJSONObject("parameters");
+            assertEquals(originalSchema.keySet(), compactSchema.keySet());
+            assertEquals(originalSchema.getString("type"), compactSchema.getString("type"));
+            JSONObject originalFields = originalSchema.getJSONObject("properties");
+            JSONObject compactFields = compactSchema.getJSONObject("properties");
+            assertEquals(originalFields.keySet(), compactFields.keySet());
+            JSONArray originallyRequired = originalSchema.optJSONArray("required");
+            JSONArray nowRequired = compactSchema.optJSONArray("required");
+            assertEquals(originallyRequired == null ? null : originallyRequired.toString(),
+                    nowRequired == null ? null : nowRequired.toString());
+            for (String field : originalFields.keySet()) {
+                JSONObject previousArgument = originalFields.getJSONObject(field);
+                JSONObject currentArgument = compactFields.getJSONObject(field);
+                assertEquals(previousArgument.keySet(), currentArgument.keySet());
+                assertEquals(previousArgument.getString("type"), currentArgument.getString("type"));
+            }
+        }
+        JSONObject availability = toolByName(compactTools, "list_available_slots");
+        assertTrue(availability.getString("description").contains("nextAvailableSlots"));
+        assertTrue(availability.getString("description").contains("customerSafeExplanation"));
+        JSONObject booking = toolByName(compactTools, "create_booking");
+        assertTrue(booking.getString("description").contains("FASE 1"));
+        assertTrue(booking.getString("description").contains("FASE 2"));
+        assertTrue(booking.getString("description").contains("bookingId"));
+        assertTrue(booking.getJSONObject("parameters").getJSONObject("properties")
+                .getJSONObject("requestedWeekScope").getString("description")
+                .contains("NEXT_WEEK"));
+        assertTrue(booking.getJSONObject("parameters").getJSONObject("properties")
+                .getJSONObject("requestedWeekday").getString("description")
+                .contains("dayOfWeek"));
+        JSONObject cancellation = toolByName(compactTools, "cancel_booking");
+        assertTrue(cancellation.getString("description").contains("solo cuando el cliente"));
+        assertTrue(cancellation.getString("description").contains("success=true"));
+        // No change to the end-call contract or an unrelated tool.
+        assertEquals(toolByName(ordinaryTools, "end_call").getString("description"),
+                toolByName(compactTools, "end_call").getString("description"));
+        assertEquals(toolByName(ordinaryTools, "send_whatsapp_operation").toString().length(),
+                toolByName(compactTools, "send_whatsapp_operation").toString().length());
+
+        properties.setCompactToolDescriptionsEnabled(false);
+        assertEquals(ordinaryTools.toString().length(), session.buildSetup().getJSONObject("setup")
+                .getJSONArray("tools").getJSONObject(0).getJSONArray("functionDeclarations")
+                .toString().length());
+    }
+
+    private static JSONObject toolByName(JSONArray tools, String name) {
+        for (int i = 0; i < tools.length(); i++) {
+            JSONObject tool = tools.getJSONObject(i);
+            if (name.equals(tool.getString("name"))) return tool;
+        }
+        throw new AssertionError("Missing tool " + name);
     }
 
 }

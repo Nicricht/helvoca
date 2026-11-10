@@ -923,11 +923,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         for (int i = 0; i < source.length(); i++) {
             JSONObject tool = source.getJSONObject(i);
             if (context.voiceBakeOff() && !"end_call".equals(tool.optString("name"))) continue;
-            out.put(new JSONObject()
+            JSONObject declaration = new JSONObject()
                     .put("name", tool.getString("name"))
                     .put("description", tool.optString("description", ""))
                     .put("behavior", "BLOCKING")
-                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters"))));
+                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters")));
+            if (properties.isCompactToolDescriptionsEnabled()) {
+                GeminiLiveCompactToolDescriptions.compact(declaration);
+            }
+            out.put(declaration);
         }
         return out;
     }
