@@ -60,6 +60,12 @@ class TwilioCertificationDemoCommandPostgresIntegrationTest {
             assertEquals("CLAIMED", scope.callAsSystem(() -> commands.find(target).orElseThrow().status()));
         } finally {
             pool.shutdownNow();
+            owner.update("""
+                    UPDATE twilio_certification_command
+                       SET status = 'FAILED', failure_reason = 'synthetic test cleanup',
+                           completed_at = CURRENT_TIMESTAMP
+                     WHERE run_id IN (?, ?, ?) AND status = 'PENDING'
+                    """, target, older, foreign);
         }
     }
     @Container

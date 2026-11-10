@@ -52,6 +52,12 @@ class TwilioCertificationCommandWorkerTest {
                 launcher, new TenantDatabaseContext(), binding).poll();
         new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
                 launcher, new TenantDatabaseContext(), binding).poll();
+        new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), null).poll();
+        UUID business = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(business);
+        new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding).poll();
         verifyNoInteractions(store, launcher);
     }
 
@@ -75,6 +81,17 @@ class TwilioCertificationCommandWorkerTest {
         verify(launcher, times(1)).launch(command.callbackToken());
         verify(store).markFailed(run, "timeout");
         verify(store, never()).claimNext();
+    }
+
+    @Test
+    void absentPinKeepsLegacyWorkerBehavior() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var worker = new TwilioCertificationCommandWorker(true, null, "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), null);
+        worker.poll();
+        verify(store).claimNext();
+        verifyNoInteractions(launcher);
     }
 
     @Test
