@@ -157,6 +157,28 @@ class GeminiLiveLowLatencySetupTest {
         JSONObject compact = session.buildSetup().getJSONObject("setup");
         JSONArray compactTools = compact.getJSONArray("tools").getJSONObject(0)
                 .getJSONArray("functionDeclarations");
+        JSONObject originalSizes = GeminiLiveVoiceSession.setupSizes(
+                new JSONObject().put("setup", ordinary));
+        JSONObject compactSizes = GeminiLiveVoiceSession.setupSizes(
+                new JSONObject().put("setup", compact));
+
+        assertEquals(ordinaryTools.length(), originalSizes.getInt("toolCount"));
+        assertEquals(compactTools.length(), compactSizes.getInt("toolCount"));
+        assertEquals(ordinaryTools.toString().length(),
+                originalSizes.getInt("toolDeclarationsChars"));
+        assertEquals(compactTools.toString().length(),
+                compactSizes.getInt("toolDeclarationsChars"));
+        assertEquals(ordinary.getJSONObject("systemInstruction").getJSONArray("parts")
+                        .getJSONObject(0).getString("text").length(),
+                originalSizes.getInt("systemInstructionChars"));
+        assertEquals(originalSizes.getInt("systemInstructionChars"),
+                compactSizes.getInt("systemInstructionChars"));
+        assertTrue(originalSizes.getInt("toolDeclarationsChars")
+                        - compactSizes.getInt("toolDeclarationsChars") >= 1500);
+        assertTrue(originalSizes.getInt("messageChars")
+                        > compactSizes.getInt("messageChars"));
+        assertTrue(originalSizes.getInt("messageChars")
+                        > originalSizes.getInt("toolDeclarationsChars"));
 
         assertEquals(ordinaryTools.length(), compactTools.length());
         assertTrue(ordinaryTools.toString().length() - compactTools.toString().length() >= 1500,

@@ -913,7 +913,33 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                             .put("targetTokens",
                                     Integer.toString(properties.getContextWindowCompressionTargetTokens()))));
         }
-        return new JSONObject().put("setup", setup);
+        JSONObject message = new JSONObject().put("setup", setup);
+        JSONObject sizes = setupSizes(message);
+        // Numbers only: no tenant instructions, tool schemas or customer data in logs.
+        log.info("GEMINI_LIVE_SETUP_SIZE call_id={} model={} compact_tools={} compression={} "
+                        + "system_chars={} declarations_chars={} tool_count={} message_chars={} "
+                        + "kind=CHARACTERS_NOT_TOKENS",
+                context.callId(), properties.getModel(),
+                properties.isCompactToolDescriptionsEnabled(),
+                properties.isContextWindowCompressionEnabled(),
+                sizes.getInt("systemInstructionChars"),
+                sizes.getInt("toolDeclarationsChars"),
+                sizes.getInt("toolCount"),
+                sizes.getInt("messageChars"));
+        return message;
+    }
+
+    static JSONObject setupSizes(JSONObject message) {
+        JSONObject setup = message.getJSONObject("setup");
+        JSONArray declarations = setup.getJSONArray("tools").getJSONObject(0)
+                .getJSONArray("functionDeclarations");
+        String instructions = setup.getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        return new JSONObject()
+                .put("systemInstructionChars", instructions.length())
+                .put("toolDeclarationsChars", declarations.toString().length())
+                .put("toolCount", declarations.length())
+                .put("messageChars", message.toString().length());
     }
 
     private JSONArray geminiFunctionDeclarations() {
