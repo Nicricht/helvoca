@@ -115,6 +115,64 @@ class CallSubscriptionAdmissionTest {
 
 
     @Test
+    void estimatedDailyBudgetRejectsMisconfigurationBeforeAnyDbSpendRead() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551901"))
+                .thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+        CallCommercialProperties props = new CallCommercialProperties();
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new java.math.BigDecimal("0.50"));
+        CallLifecycleService lifecycle = lifecycle(phones, calls, props);
+        lifecycle.setSubscriptions(subscriptions);
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-budget-invalid", "+56910001901", "+14355551901"));
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.51"));
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-budget-invalid-2", "+56910001901", "+14355551901"));
+        verify(calls, never()).sumReservedEstimatedCostByBusinessAndUtcDay(
+                any(UUID.class), any(Instant.class), any(Instant.class),
+                any(java.math.BigDecimal.class));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void estimatedDailyBudgetRespectsInclusiveThresholdAndFailClosedUnknownTotals() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551902"))
+                .thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+        CallCommercialProperties props = new CallCommercialProperties();
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new java.math.BigDecimal("0.90"));
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.20"));
+        CallLifecycleService lifecycle = lifecycle(phones, calls, props);
+        lifecycle.setSubscriptions(subscriptions);
+        when(calls.sumReservedEstimatedCostByBusinessAndUtcDay(eq(businessId),
+                any(Instant.class), any(Instant.class),
+                eq(new java.math.BigDecimal("0.20"))))
+                .thenReturn(new java.math.BigDecimal("0.80"))
+                .thenReturn(new java.math.BigDecimal("0.70"))
+                .thenReturn(null);
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-budget-over", "+56910001902", "+14355551902"));
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(i -> i.getArgument(0));
+        lifecycle.startInboundCall("twilio", "CA-budget-equal", "+56910001902", "+14355551902");
+        verify(calls, times(1)).saveAndFlush(any(CallSession.class));
+        assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-budget-unknown", "+56910001902", "+14355551902"));
+        verify(calls, times(1)).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
     void perTenantUtcDayLimitBlocksNewCallBeforePersistingOrContactingAi() {
         UUID businessId = UUID.randomUUID();
         PhoneNumberRepository phones = mock(PhoneNumberRepository.class);

@@ -241,6 +241,100 @@ class GeminiLiveLowLatencySetupTest {
                 .toString().length());
     }
 
+    @Test
+    void leanInstructionsAreOptInShrinkVoiceProseWithoutChangingBusinessRulesOrTools() {
+        GeminiLiveProperties props = new GeminiLiveProperties();
+        assertFalse(props.isLeanSystemInstructionsEnabled());
+        props.setVoice("Sulafat");
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null, "+56911111111",
+                "+14355652512", "MZ-lean-system");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        String rules = "REGLAS OFICIALES DE NEGOCIO. FECHA REAL, TOKEN SEGURO, AISLAMIENTO DE TENANTS.";
+        when(tools.buildInstructions(context)).thenReturn(rules);
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, mock(VoiceTransportSession.class), props, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+
+        JSONObject original = session.buildSetup();
+        String originalInstructions = original.getJSONObject("setup")
+                .getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        assertTrue(originalInstructions.contains(rules));
+        assertTrue(originalInstructions.contains("REGLAS DE VOZ DE RECEPVOZ:"));
+
+        props.setLeanSystemInstructionsEnabled(true);
+        JSONObject lean = session.buildSetup();
+        String compact = lean.getJSONObject("setup").getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text");
+        assertTrue(compact.startsWith(rules));
+        assertTrue(compact.contains("FASE 1"));
+        assertTrue(compact.contains("FASE 2"));
+        assertTrue(compact.contains("confirmationToken"));
+        assertTrue(compact.contains("bookingId"));
+        assertTrue(compact.contains("NEXT_WEEK"));
+        assertTrue(compact.contains("THIS_WEEK"));
+        assertTrue(compact.contains("requestedWeekday"));
+        assertTrue(compact.contains("list_available_slots"));
+        assertTrue(compact.contains("localStart/localDate"));
+        assertTrue(compact.contains("cancel_booking"));
+        assertTrue(compact.contains("solo si el paciente la pide"));
+        assertTrue(compact.contains("no inventes UUID"));
+        assertTrue(compact.contains("end_call"));
+        assertTrue(compact.contains("interrumpan"));
+        assertTrue(compact.contains("español de Chile"));
+        assertTrue(compact.contains("te tinca"));
+        assertTrue(compact.contains("femenina"));
+        assertTrue(originalInstructions.length() - compact.length() > 3000);
+        assertEquals(original.getJSONObject("setup").getJSONArray("tools").toString(),
+                lean.getJSONObject("setup").getJSONArray("tools").toString());
+        assertEquals(original.getJSONObject("setup").getJSONObject("generationConfig").toString(),
+                lean.getJSONObject("setup").getJSONObject("generationConfig").toString());
+
+        props.setLeanSystemInstructionsEnabled(false);
+        assertEquals(originalInstructions, session.buildSetup().getJSONObject("setup")
+                .getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text"));
+    }
+
+    @Test
+    void leanVoiceModeNeverOverridesVoiceBakeOffOrAssistantGenderChoice() {
+        GeminiLiveProperties props = new GeminiLiveProperties();
+        props.setLeanSystemInstructionsEnabled(true);
+        RealtimeCallContext normal = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null, "+56911111111",
+                "+14355652512", "MZ-lean-gender");
+        RealtimeCallContext bakeOff = normal.withVoiceOverride("Sulafat");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(normal)).thenReturn("POLITICAS DEL NEGOCIO");
+        when(tools.toolDefinitions(normal)).thenReturn(RealtimeToolDefinitions.all());
+        when(tools.toolDefinitions(bakeOff)).thenReturn(RealtimeToolDefinitions.all());
+        GeminiLiveVoiceSession sample = new GeminiLiveVoiceSession(
+                normal, mock(VoiceTransportSession.class), props, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        props.setVoice("Charon");
+        String masculine = sample.buildSetup().getJSONObject("setup")
+                .getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        assertTrue(masculine.contains("masculina"));
+        assertTrue(masculine.contains("POLITICAS DEL NEGOCIO"));
+        GeminiLiveVoiceSession finalist = new GeminiLiveVoiceSession(
+                bakeOff, mock(VoiceTransportSession.class), props, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        String finalistInstructions = finalist.buildSetup().getJSONObject("setup")
+                .getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        assertTrue(finalistInstructions.contains("MODO VOICE FINALIST"));
+        assertFalse(finalistInstructions.contains("RECEPVOZ VOZ CHILENA, PROFESIONAL Y BREVE:"));
+    }
+
     private static JSONObject toolByName(JSONArray tools, String name) {
         for (int i = 0; i < tools.length(); i++) {
             JSONObject tool = tools.getJSONObject(i);

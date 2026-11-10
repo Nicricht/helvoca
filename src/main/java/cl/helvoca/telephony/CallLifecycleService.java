@@ -132,6 +132,10 @@ public class CallLifecycleService {
             }
         }
 
+        // Same transaction + business advisory lock as the concurrency guard:
+        // another replica cannot race this budget admission decision.
+        enforceEstimatedDailyBudget(businessId);
+
         String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
         call.setBusinessId(businessId);
@@ -154,6 +158,25 @@ public class CallLifecycleService {
         CallSession saved = calls.saveAndFlush(call);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
         return saved.getId();
+    }
+
+    private void enforceEstimatedDailyBudget(UUID businessId) {
+        BigDecimal ceiling = commercial.getMaxEstimatedCostPerBusinessPerUtcDayUsd();
+        if (ceiling.signum() <= 0) return;
+        BigDecimal reservation = commercial.getEstimatedNewCallReservationUsd();
+        // A zero reserve is a bypass: reject a misconfigured enabled budget.
+        if (reservation.signum() <= 0 || reservation.compareTo(ceiling) > 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_config").increment();
+            throw new CallCapacityExceededException("Estimated daily budget is not configured safely");
+        }
+
+        Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        BigDecimal accrued = calls.sumReservedEstimatedCostByBusinessAndUtcDay(
+                businessId, dayStart, dayStart.plus(1, ChronoUnit.DAYS), reservation);
+        if (accrued == null || accrued.add(reservation).compareTo(ceiling) > 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_limit").increment();
+            throw new CallCapacityExceededException("Estimated daily call budget reached for business");
+        }
     }
 
     @Transactional

@@ -46,6 +46,8 @@ public class GeminiLiveProperties {
     // Opt-in only: shorten Gemini Live tool descriptions without changing the
     // validated tool names, argument schemas or business/provider contract.
     private boolean compactToolDescriptionsEnabled = false;
+    // Opt-in lean voice instructions; authoritative tenant rules stay verbatim.
+    private boolean leanSystemInstructionsEnabled = false;
 
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
@@ -132,6 +134,9 @@ public class GeminiLiveProperties {
     public void setCompactToolDescriptionsEnabled(boolean enabled) {
         this.compactToolDescriptionsEnabled = enabled;
     }
+
+    public boolean isLeanSystemInstructionsEnabled() { return leanSystemInstructionsEnabled; }
+    public void setLeanSystemInstructionsEnabled(boolean enabled) { this.leanSystemInstructionsEnabled = enabled; }
 
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }
     public void setToolLatencyBudgetMs(int value) { this.toolLatencyBudgetMs = value; }

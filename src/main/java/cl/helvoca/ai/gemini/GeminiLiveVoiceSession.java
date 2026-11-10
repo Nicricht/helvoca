@@ -1009,6 +1009,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         String voicePersona = masculineVoice
                 ? "PERSONA VOCAL: habla como un recepcionista chileno de Santiago, adulto, cordial, despierto y profesional. La impresión debe ser de confianza, cercanía y agilidad, sin sonar infantil, exageradamente sensual ni como locutor de call center."
                 : "PERSONA VOCAL: habla como una recepcionista chilena joven-adulta de Santiago, alegre, despierta, cercana y con presencia premium. La impresión debe ser \"qué agradable hablar con ella\", no \"estoy hablando con una operadora\". Usa calidez natural, energía moderada y curiosidad genuina por ayudar, sin exagerar la sonrisa ni teatralizar la entonación. La voz debe sonar femenina y joven-adulta, con resonancia clara, nunca infantil, susurrada, empalagosa ni forzadamente sensual.";
+        if (!context.voiceBakeOff() && properties.isLeanSystemInstructionsEnabled()) {
+            return GeminiLiveLeanSystemInstructions.build(bakeOffPrelude, voiceIdentity, voicePersona);
+        }
         return bakeOffPrelude + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.

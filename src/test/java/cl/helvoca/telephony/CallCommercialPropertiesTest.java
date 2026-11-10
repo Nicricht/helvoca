@@ -68,6 +68,21 @@ class CallCommercialPropertiesTest {
     }
 
     @Test
+    void estimatedBudgetDefaultsOffAndRejectsInvalidNegativeAmounts() {
+        CallCommercialProperties props = new CallCommercialProperties();
+        assertEquals(BigDecimal.ZERO, props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(BigDecimal.ZERO, props.getEstimatedNewCallReservationUsd());
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new BigDecimal("-1"));
+        props.setEstimatedNewCallReservationUsd(null);
+        assertEquals(BigDecimal.ZERO, props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(BigDecimal.ZERO, props.getEstimatedNewCallReservationUsd());
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new BigDecimal("0.900000"));
+        props.setEstimatedNewCallReservationUsd(new BigDecimal("0.200000"));
+        assertEquals(new BigDecimal("0.900000"), props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(new BigDecimal("0.200000"), props.getEstimatedNewCallReservationUsd());
+    }
+
+    @Test
     void nullRateMapsRemainSafeAndEmpty() {
         CallCommercialProperties properties = new CallCommercialProperties();
         properties.setAiProviderCostPerMinuteUsd(null);

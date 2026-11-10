@@ -128,6 +128,9 @@ app:
     calls:
       max-concurrent-per-business: ${HELVOCA_MAX_CONCURRENT_CALLS_PER_BUSINESS:10}
       max-calls-per-business-per-utc-day: ${HELVOCA_MAX_CALLS_PER_BUSINESS_PER_UTC_DAY:0}
+      # Advisory USD estimate per business/day, NOT a provider hard spending cap.
+      max-estimated-cost-per-business-per-utc-day-usd: ${HELVOCA_MAX_ESTIMATED_COST_PER_BUSINESS_PER_UTC_DAY_USD:0}
+      estimated-new-call-reservation-usd: ${HELVOCA_ESTIMATED_NEW_CALL_RESERVATION_USD:0}
       telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
       ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
       usd-to-clp-rate: ${HELVOCA_COST_USD_TO_CLP:0}
@@ -218,6 +221,8 @@ app:
       context-window-compression-target-tokens: ${GEMINI_LIVE_CONTEXT_COMPRESSION_TARGET_TOKENS:12000}
       # Off by default. Affects only Gemini Live tool setup prose, never backend authorization.
       compact-tool-descriptions-enabled: ${GEMINI_LIVE_COMPACT_TOOL_DESCRIPTIONS_ENABLED:false}
+      # Shorten only the voice prose; keep business, privacy and date/booking rules.
+      lean-system-instructions-enabled: ${GEMINI_LIVE_LEAN_SYSTEM_INSTRUCTIONS_ENABLED:false}
       websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
       start-of-speech-sensitivity: ${GEMINI_LIVE_START_SENSITIVITY:START_SENSITIVITY_HIGH}
       prefix-padding-ms: ${GEMINI_LIVE_PREFIX_PADDING_MS:60}
