@@ -3,6 +3,7 @@ package cl.helvoca.telephony;
 import cl.helvoca.billing.BusinessSubscriptionService;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
+import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
@@ -25,6 +26,23 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class CallSubscriptionAdmissionTest {
+
+
+    @Test
+    void unknownDestinationRejectsBeforeAnyCallOrSubscriptionIsCreated() {
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        when(calls.findByProviderCallId("CA-unregistered-destination")).thenReturn(Optional.empty());
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551009")).thenReturn(Optional.empty());
+
+        CallLifecycleService lifecycle = lifecycle(phones, calls);
+
+        assertThrows(NotFoundException.class, () -> lifecycle.startInboundCall(
+                "twilio", "CA-unregistered-destination", "+56910000009", "+14355551009"));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+        verify(calls, never()).countByBusinessIdAndStatusIn(any(UUID.class), anyCollection());
+        verify(phones).findByPhoneNumberAndActiveTrue("+14355551009");
+    }
 
     @Test
     void suspendedSubscriptionRejectsBeforePersistingCall() {
