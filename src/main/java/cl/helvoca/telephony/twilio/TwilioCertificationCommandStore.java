@@ -109,7 +109,7 @@ public class TwilioCertificationCommandStore {
                   FROM exact_command n
                  WHERE c.run_id = n.run_id AND c.status = 'PENDING'
                 RETURNING c.run_id, c.business_id
-                "", (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
+                """, (rs, rowNum) -> new ClaimedCommand(rs.getString(1), token,
                         rs.getObject(2, UUID.class)),
                 runId.trim(), businessId, actor, token, TOKEN_TTL.toSeconds());
         return rows.stream().findFirst();
