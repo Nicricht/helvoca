@@ -146,6 +146,9 @@ class GeminiLiveVoiceSessionTest {
         assertTrue(instructions.contains("Solo puedes afirmar que la reserva existe"));
         assertTrue(instructions.contains("FECHA HABLADA = FECHA REAL"));
         assertTrue(instructions.contains("localStart/localDate"));
+        assertTrue(instructions.contains("requestedWeekScope=NEXT_WEEK"));
+        assertTrue(instructions.contains("SEMANA CALENDARIO SIGUIENTE"));
+        assertTrue(instructions.contains("NO OFRECER HORAS PASADAS"));
         assertTrue(instructions.contains("CANCELACIONES: si el cliente solicita explícitamente"));
         assertTrue(instructions.contains("Si el cliente interrumpe con otra solicitud"));
         assertTrue(instructions.contains("Evita excesos de confianza y modismos informales"));
