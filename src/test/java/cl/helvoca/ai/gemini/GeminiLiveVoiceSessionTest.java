@@ -27,6 +27,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -1734,5 +1735,62 @@ class GeminiLiveVoiceSessionTest {
             if (name.equals(declarations.getJSONObject(i).optString("name"))) return true;
         }
         return false;
+    }
+
+    @Test
+    void textOnlyContinuationAcceptsExternalTranscriptAndReturnsTextWithoutRepeatingWelcome() {
+        GeminiLiveProperties properties = properties();
+        properties.setTextOutputMode(true);
+        properties.setSuppressWelcome(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        when(tools.buildInstructions(context)).thenReturn("Reglas oficiales del negocio");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        AtomicReference<String> spokenText = new AtomicReference<>();
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context,
+                transport,
+                properties,
+                tools,
+                transcripts,
+                mock(CallSummaryService.class),
+                mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(),
+                HttpClient.newHttpClient(),
+                new cl.helvoca.security.TenantDatabaseContext(),
+                spokenText::set);
+
+        JSONObject setup = session.buildSetup().getJSONObject("setup");
+        assertEquals("TEXT", setup.getJSONObject("generationConfig")
+                .getJSONArray("responseModalities").getString(0));
+        assertFalse(setup.getJSONObject("generationConfig").has("speechConfig"));
+        String instructions = setup.getJSONObject("systemInstruction")
+                .getJSONArray("parts").getJSONObject(0).getString("text");
+        assertTrue(instructions.contains("CONTINUIDAD DE LLAMADA"));
+        assertTrue(instructions.contains("No vuelvas a saludar"));
+
+        session.acceptInboundText("¿Dónde quedan?");
+        WebSocket socket = mock(WebSocket.class);
+        when(socket.sendText(any(CharSequence.class), anyBoolean()))
+                .thenReturn(CompletableFuture.completedFuture(socket));
+        session.onOpen(socket);
+        session.onText(socket, "{\"setupComplete\":{}}", true);
+
+        ArgumentCaptor<CharSequence> sent = ArgumentCaptor.forClass(CharSequence.class);
+        verify(socket, atLeast(2)).sendText(sent.capture(), eq(true));
+        List<String> messages = sent.getAllValues().stream().map(Object::toString).toList();
+        assertTrue(messages.stream().anyMatch(value -> value.contains("clientContent")
+                && value.contains("¿Dónde quedan?")));
+        assertFalse(messages.stream().anyMatch(value -> value.contains("RECEPVOZ_CALL_CONNECTED")));
+
+        session.onText(socket,
+                "{\"serverContent\":{\"modelTurn\":{\"parts\":[{\"text\":\"Estamos en Providencia.\"}]},\"turnComplete\":true}}",
+                true);
+        assertEquals("Estamos en Providencia.", spokenText.get());
+        verify(transcripts).append(context.callId(), "USER", "¿Dónde quedan?");
+        verify(transcripts).append(context.callId(), "ASSISTANT", "Estamos en Providencia.");
     }
 }
