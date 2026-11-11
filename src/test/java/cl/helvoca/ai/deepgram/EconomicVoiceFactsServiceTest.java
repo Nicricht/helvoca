@@ -110,16 +110,16 @@ class EconomicVoiceFactsServiceTest {
         profile.setDefaultCurrency("CLP");
         when(profiles.findById(businessId)).thenReturn(Optional.of(profile));
         ServiceItem first = new ServiceItem();
-        first.setName("Psicología");
+        first.setName("Medicina");
         first.setActive(true);
         first.setPrice(new BigDecimal("35000"));
         ServiceItem second = new ServiceItem();
-        second.setName("Psicología Infantil");
+        second.setName("Medicina General");
         second.setActive(true);
         second.setPrice(new BigDecimal("40000"));
         when(services.findAllByBusinessIdOrderByNameAsc(businessId)).thenReturn(List.of(first, second));
 
-        assertTrue(facts.answer(context, "¿Cuánto cuesta psicología?").isEmpty());
+        assertTrue(facts.answer(context, "¿Cuánto cuesta medicina general?").isEmpty());
         assertTrue(facts.answer(context, "¿Cuánto cuesta pediatría?").isEmpty());
     }
 
