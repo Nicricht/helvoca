@@ -2,7 +2,6 @@ package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.deepgram.DeepgramVoiceProperties;
 import cl.helvoca.ai.deepgram.DeepgramVoiceProtocol;
-import cl.helvoca.ai.deepgram.DeepgramHybridVoiceProvider;
 import cl.helvoca.ai.deepgram.EconomicVoiceFactsService;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
@@ -20,7 +19,6 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -42,6 +40,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Composed voice session:
@@ -86,7 +85,6 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
     private final AtomicBoolean deepgramSttFailed = new AtomicBoolean(false);
     private final AtomicLong ttsGeneration = new AtomicLong();
     private final Queue<byte[]> pendingAudio = new ConcurrentLinkedQueue<>();
-    private final Queue<String> pendingTranscriptFrames = new ConcurrentLinkedQueue<>();
     private final Object recentAudioLock = new Object();
     private final ArrayDeque<String> recentAudio = new ArrayDeque<>();
     private final Object utteranceLock = new Object();
@@ -95,13 +93,12 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
 
     private volatile WebSocket sttSocket;
     private volatile CompletableFuture<Void> sttSendChain = CompletableFuture.completedFuture(null);
-    private volatile int pendingSttMessages;
+    private final AtomicInteger pendingSttMessages = new AtomicInteger();
     private volatile ScheduledFuture<?> keepaliveTask;
     private volatile CompletableFuture<HttpResponse<byte[]>> currentTtsRequest;
     private volatile GeminiLiveVoiceSession geminiTextSession;
     private volatile GeminiLiveVoiceSession geminiAudioSession;
     private volatile List<String> lastUtteranceAudio = List.of();
-    private volatile boolean greetingCompleted;
     private final StringBuilder inboundJson = new StringBuilder();
 
     DeepgramHybridVoiceSession(RealtimeCallContext context,
@@ -264,8 +261,6 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
         }
         if (!"Results".equals(type)) return;
 
-        JSONObject channel = event.optJSONArray("channel") == null
-                ? null : event.optJSONArray("channel").optJSONObject(0);
         // Deepgram Results uses channel.alternatives, not a flat transcript.
         JSONObject results = event.optJSONObject("channel");
         JSONArray alternatives = results == null ? null : results.optJSONArray("alternatives");
@@ -327,8 +322,9 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
         if (closed.get() || geminiAudioSession != null) return;
         synchronized (this) {
             if (geminiTextSession == null) {
-                geminiTextSession = gemini.createTextContinuationSession(
-                        context, transport, this::speakGeminiText);
+                geminiTextSession = greetingStarted.get()
+                        ? gemini.createTextContinuationSession(context, transport, this::speakGeminiText)
+                        : gemini.createTextWelcomeSession(context, transport, this::speakGeminiText);
                 geminiTextSession.start();
                 log.info("VOICE_ECONOMY_ROUTE call={} path=GEMINI_TEXT mode=DEEPGRAM_STT_TTS",
                         context.callId());
@@ -359,7 +355,6 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
         String greeting = tools.agentGreeting(context, fallback);
         speak(greeting).whenComplete((spoken, failure) -> {
             if (Boolean.TRUE.equals(spoken) && failure == null) {
-                greetingCompleted = true;
                 persistTranscript("ASSISTANT", greeting);
             } else {
                 log.warn("DEEPGRAM_GREETING_TTS_FAILED call={} action=GEMINI_AUDIO_FALLBACK",
@@ -452,14 +447,11 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
         if (keepaliveTask != null) keepaliveTask.cancel(false);
         closeStt(sttSocket);
         List<String> replay = takeRecentAudio();
+        pendingAudio.clear(); // replay already contains the same bounded pre-connect frames
         ensureGeminiTextSession(null);
         GeminiLiveVoiceSession fallback = geminiTextSession;
         if (fallback != null) {
             for (String frame : replay) fallback.acceptInboundAudio(frame);
-            byte[] queued;
-            while ((queued = pendingAudio.poll()) != null) {
-                fallback.acceptInboundAudio(Base64.getEncoder().encodeToString(queued));
-            }
         }
     }
 
@@ -481,10 +473,7 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
             if (replayAudio != null) {
                 for (String frame : replayAudio) geminiAudioSession.acceptInboundAudio(frame);
             }
-            byte[] queued;
-            while ((queued = pendingAudio.poll()) != null) {
-                geminiAudioSession.acceptInboundAudio(Base64.getEncoder().encodeToString(queued));
-            }
+            pendingAudio.clear(); // replayAudio contains the same bounded pre-connect frames
         }
     }
 
@@ -502,8 +491,9 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
     private void enqueueSttSend(WebSocket socket,
                                 java.util.function.Supplier<CompletableFuture<WebSocket>> send) {
         synchronized (sttSendLock) {
-            if (++pendingSttMessages > MAX_PENDING_STT_MESSAGES) {
-                pendingSttMessages--;
+            int pending = pendingSttMessages.incrementAndGet();
+            if (pending > MAX_PENDING_STT_MESSAGES) {
+                pendingSttMessages.decrementAndGet();
                 failToGeminiTextAudio("deepgram_send_backlog");
                 return;
             }
@@ -515,7 +505,7 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
                         return send.get().thenApply(sent -> (Void) null);
                     })
                     .whenComplete((ignored, error) -> {
-                        pendingSttMessages = Math.max(0, pendingSttMessages - 1);
+                        pendingSttMessages.updateAndGet(value -> Math.max(0, value - 1));
                         if (error != null && !closed.get() && !deepgramSttFailed.get()) {
                             failToGeminiTextAudio("deepgram_send_failed");
                         }
