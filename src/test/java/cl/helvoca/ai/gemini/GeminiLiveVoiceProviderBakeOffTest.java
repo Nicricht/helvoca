@@ -108,6 +108,7 @@ class GeminiLiveVoiceProviderBakeOffTest {
         configured.setLeanSystemInstructionsEnabled(true);
         configured.setCompactToolDescriptionsEnabled(true);
         configured.setContextWindowCompressionEnabled(true);
+        configured.setEconomyShadowEnabled(true);
         configured.setContextWindowCompressionTriggerTokens(32000);
         configured.setContextWindowCompressionTargetTokens(10000);
         configured.setVoice("Sulafat");
@@ -129,6 +130,7 @@ class GeminiLiveVoiceProviderBakeOffTest {
         assertTrue(first.isLeanSystemInstructionsEnabled());
         assertTrue(first.isCompactToolDescriptionsEnabled());
         assertTrue(first.isContextWindowCompressionEnabled());
+        assertTrue(first.isEconomyShadowEnabled(), "shadow flag must reach actual provider session");
         assertEquals(32000, first.getContextWindowCompressionTriggerTokens());
         assertEquals(10000, first.getContextWindowCompressionTargetTokens());
 
@@ -155,10 +157,13 @@ class GeminiLiveVoiceProviderBakeOffTest {
         configured.setLeanSystemInstructionsEnabled(false);
         configured.setCompactToolDescriptionsEnabled(false);
         configured.setContextWindowCompressionEnabled(false);
+        configured.setEconomyShadowEnabled(false);
         GeminiLiveProperties second = provider.sessionProperties(context);
         assertFalse(second.isLeanSystemInstructionsEnabled());
         assertFalse(second.isCompactToolDescriptionsEnabled());
         assertFalse(second.isContextWindowCompressionEnabled());
+        assertFalse(second.isEconomyShadowEnabled());
+        assertTrue(first.isEconomyShadowEnabled(), "existing session retains shadow flag snapshot");
         assertTrue(first.isLeanSystemInstructionsEnabled(), "An existing session keeps its snapshot");
         assertTrue(first.isContextWindowCompressionEnabled(), "Global switch does not mutate an existing call");
     }
