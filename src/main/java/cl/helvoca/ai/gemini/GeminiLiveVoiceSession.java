@@ -412,7 +412,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             }
         }
         JSONObject output = content.optJSONObject("outputTranscription");
-        if (output != null) {
+        if (output != null && !properties.isTextOutputMode()) {
             append(assistantTranscript, output.optString("text", ""));
             if (asksIfAnythingElse(bufferText(assistantTranscript))
                     && !contextualClosingIntent.get()) {
