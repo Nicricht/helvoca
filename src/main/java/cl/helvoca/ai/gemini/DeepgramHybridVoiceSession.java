@@ -301,7 +301,9 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
             java.util.Optional<String> response = facts.answer(context, text);
             if (response.isPresent()) {
                 String answer = response.get();
+                long outputGeneration = ttsGeneration.get();
                 speak(answer).whenComplete((spoken, failure) -> {
+                    if (outputGeneration != ttsGeneration.get()) return; // caller interrupted this answer
                     if (Boolean.TRUE.equals(spoken) && failure == null) {
                         persistSimpleTurn(text, answer);
                         log.info("VOICE_ECONOMY_ROUTE call={} path=DEEPGRAM_RULES reason={} mode=PUBLIC_FACT_ONLY",
@@ -336,7 +338,9 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
     }
 
     private void speakGeminiText(String text) {
+        long outputGeneration = ttsGeneration.get();
         speak(text).whenComplete((spoken, failure) -> {
+            if (outputGeneration != ttsGeneration.get()) return; // caller interrupted this response
             if (!Boolean.TRUE.equals(spoken) || failure != null) {
                 // The model may already have executed a read or mutation tool.
                 // Never replay the same caller audio into a second model session.
@@ -352,8 +356,12 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
         String businessName = facts.businessName(context).orElse("nuestro negocio");
         String fallback = "Hola, gracias por llamar a " + businessName
                 + ". Ya, cuéntame, ¿en qué te puedo ayudar?";
-        String greeting = tools.agentGreeting(context, fallback);
+        String configuredGreeting = tools.agentGreeting(context, fallback);
+        String greeting = configuredGreeting == null || configuredGreeting.isBlank()
+                ? fallback : configuredGreeting;
+        long outputGeneration = ttsGeneration.get();
         speak(greeting).whenComplete((spoken, failure) -> {
+            if (outputGeneration != ttsGeneration.get()) return; // caller interrupted the welcome
             if (Boolean.TRUE.equals(spoken) && failure == null) {
                 persistTranscript("ASSISTANT", greeting);
             } else {
@@ -381,13 +389,32 @@ final class DeepgramHybridVoiceSession implements VoiceAiSession, WebSocket.List
                 http.sendAsync(request, HttpResponse.BodyHandlers.ofByteArray());
         currentTtsRequest = future;
         return future.handle((response, error) -> {
-            if (error != null || response == null) return false;
-            if (response.statusCode() < 200 || response.statusCode() >= 300) return false;
+            if (error != null || response == null) {
+                if (generation == ttsGeneration.get() && !closed.get()) {
+                    health.failure(DeepgramHybridVoiceProvider.ID,
+                            VoiceProviderHealthRegistry.FailureKind.UPSTREAM, "tts_request_failed");
+                }
+                return false;
+            }
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                if (generation == ttsGeneration.get() && !closed.get()) {
+                    VoiceProviderHealthRegistry.FailureKind kind =
+                            response.statusCode() == 401 || response.statusCode() == 403
+                                    ? VoiceProviderHealthRegistry.FailureKind.AUTH
+                                    : response.statusCode() == 429
+                                    ? VoiceProviderHealthRegistry.FailureKind.RATE_LIMIT
+                                    : VoiceProviderHealthRegistry.FailureKind.UPSTREAM;
+                    health.failure(DeepgramHybridVoiceProvider.ID, kind, "tts_http_" + response.statusCode());
+                }
+                return false;
+            }
             byte[] audio = response.body();
             if (audio == null || audio.length == 0 || generation != ttsGeneration.get()
                     || closed.get() || !transport.isOpen()) return false;
             sendMuLawFrames(audio, generation);
-            return generation == ttsGeneration.get() && !closed.get() && transport.isOpen();
+            boolean spoken = generation == ttsGeneration.get() && !closed.get() && transport.isOpen();
+            if (spoken) health.success(DeepgramHybridVoiceProvider.ID);
+            return spoken;
         }).exceptionally(error -> false).whenComplete((ignored, error) -> {
             if (currentTtsRequest == future) currentTtsRequest = null;
         });
