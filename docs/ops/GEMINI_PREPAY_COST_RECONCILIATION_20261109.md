@@ -182,3 +182,10 @@ y QA exact-HEAD.
 **QA contract:** no provider contact. Unit tests cover zero telephony, zero AI fallback, zero provider override, zero model override, positive configured rates and prior budget cases. Existing real PostgreSQL 16 Testcontainers tenant/idempotence and started-minute billing tests use an explicit fixture AI fallback. Require new HEAD Fast/Full Golden Journey, PostgreSQL 16/18, differential Java coverage 100% before treating this as certified. No deployment, provider LIVE action, merging to main, payments or variable changes without separate authorization.
 
 **Commercial status remains NO-GO:** the admission guard is a *best-effort estimated budget*, not a hard cap because Gemini resubmits context, actual rates are not yet reconciled per call and calls deliberately have no duration limit. The owner has not approved a budget or per-call reservation. Do not set arbitrary USD/CLP values or claim that this prevents all provider overage.
+
+### Exact-HEAD red-to-green correction: Spring placeholder alias in PostgreSQL fixture
+
+- GitHub Fast Gate run https://github.com/Nicricht/helvoca/actions/runs/42941418549 failed only the **three real PostgreSQL budget tests** with the intended fail-closed error, because the test set `app.commercial.calls.ai-cost-per-minute-usd=0.02` while `application.yml` derives provider and model-specific rates from `HELVOCA_AI_COST_PER_MINUTE_USD:0`. The named aliases remained zero in Spring's effective binding.
+- Minimal change confined to the **test fixture**: define `HELVOCA_AI_COST_PER_MINUTE_USD=0.02` via `@DynamicPropertySource` and assert the effective configuration prices both the AI fallback and all model/provider overrides. Real product runtime guard is **unchanged**; no production configuration, call, payment or database data modified.
+- Require Fast and Full Gate exact HEAD, PostgreSQL compatibility/security, Golden Journey, and 100% applicable differential coverage before signing off. The original red result is a realistic binder-regression check, not evidence that unpriced LIVE calls should be allowed.
+

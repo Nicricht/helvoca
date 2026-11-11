@@ -25,6 +25,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
 @SpringBootTest
@@ -44,12 +45,15 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         registry.add("app.commercial.calls.estimated-new-call-reservation-usd", () -> "0.20");
         registry.add("app.commercial.calls.telephony-cost-per-minute-usd", () -> "0.10");
         // Budget admission requires a positive AI fallback; no external AI call is made.
-        registry.add("app.commercial.calls.ai-cost-per-minute-usd", () -> "0.02");
+        // The provider/model alias defaults in application.yml resolve from
+        // the ENV key, not from app.commercial.calls.ai-cost-per-minute-usd.
+        registry.add("HELVOCA_AI_COST_PER_MINUTE_USD", () -> "0.02");
         // The provider-specific Twilio map overrides the generic rate.
         registry.add("app.commercial.calls.telephony-provider-cost-per-minute-usd.twilio", () -> "0.10");
     }
 
     @Autowired CallLifecycleService lifecycle;
+    @Autowired CallCommercialProperties commercial;
     @Autowired BusinessRepository businesses;
     @Autowired PhoneNumberRepository phoneNumbers;
     @Autowired BusinessSubscriptionRepository subscriptions;
@@ -57,6 +61,8 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
 
     @Test
     void postgresBudgetIsTenantIsolatedIncludesUnknownCostsAndKeepsRetriesIdempotent() {
+        assertTrue(commercial.hasCompleteAiPricingForEstimatedBudget(),
+                "fixture must price fallback and explicit provider/model overrides");
         Fixture first = tenant("Budget First", "+14355551911");
         Fixture second = tenant("Budget Second", "+14355551912");
         UUID firstCall = admit(first, "CA-budget-first-1");
