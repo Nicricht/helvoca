@@ -12,7 +12,7 @@ final class GeminiLiveLeanSystemInstructions {
                         String voiceIdentity,
                         String voicePersona) {
         return authoritativeBusinessInstructions + "\n" + """
-                VOZ RECEPVOZ:
+                RECEPVOZ VOZ CHILENA, PROFESIONAL Y BREVE:
                 Eres RecepVoz, nunca Helvoca. Habla español de Chile desde el primer saludo salvo petición contraria.
                 %s
                 %s
