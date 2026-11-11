@@ -223,6 +223,8 @@ app:
       compact-tool-descriptions-enabled: ${GEMINI_LIVE_COMPACT_TOOL_DESCRIPTIONS_ENABLED:false}
       # Shorten only the voice prose; keep business, privacy and date/booking rules.
       lean-system-instructions-enabled: ${GEMINI_LIVE_LEAN_SYSTEM_INSTRUCTIONS_ENABLED:false}
+      # Observation only, no paid second provider, routing change or call interruption.
+      economic-routing-shadow-enabled: ${GEMINI_LIVE_ECONOMIC_ROUTING_SHADOW_ENABLED:false}
       websocket-url: ${GEMINI_LIVE_WEBSOCKET_URL:wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent}
       start-of-speech-sensitivity: ${GEMINI_LIVE_START_SENSITIVITY:START_SENSITIVITY_HIGH}
       prefix-padding-ms: ${GEMINI_LIVE_PREFIX_PADDING_MS:60}
