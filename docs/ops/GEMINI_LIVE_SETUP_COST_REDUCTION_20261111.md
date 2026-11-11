@@ -23,3 +23,7 @@ Llamada real 11-nov, CallSid anonimizado: Gemini Live `gemini-3.8-live`, voz Sul
 ## Seguridad
 
 No fusionar este PR sobre main antes de #871. No originar llamadas, reservas, cobros ni recargas para medir. Producción comercial y otros tenants fuera de alcance. En caso de error de funcionamiento en demo, revertir únicamente los cambios de prompt o flags opt-in.
+
+## Trazabilidad del gate
+
+Se añadió un comprobante autenticado de contexto previo a este commit en el PR #872, con `AUDITED_HEAD` explícito, identificador de la rama, línea base y evidencia #823. El gate `scripts/ci/verify_prechange_receipt.py` debe validar el **padre exacto** del nuevo HEAD; no se ha debilitado ni desactivado ese control. Este commit solo añade la trazabilidad al documento operativo.
