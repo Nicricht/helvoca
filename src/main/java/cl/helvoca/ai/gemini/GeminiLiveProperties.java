@@ -50,6 +50,10 @@ public class GeminiLiveProperties {
     private boolean leanSystemInstructionsEnabled = false;
     // Advisory-only classifier. No provider switching or speech synthesis.
     private boolean economyShadowEnabled = false;
+    // Continuation sessions are already mid-call and must not replay the welcome.
+    private boolean suppressWelcome = false;
+    // Text-only Gemini reasoning; the outer voice provider owns STT and TTS.
+    private boolean textOutputMode = false;
 
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
@@ -142,6 +146,10 @@ public class GeminiLiveProperties {
 
     public boolean isEconomyShadowEnabled() { return economyShadowEnabled; }
     public void setEconomyShadowEnabled(boolean enabled) { this.economyShadowEnabled = enabled; }
+    public boolean isSuppressWelcome() { return suppressWelcome; }
+    public void setSuppressWelcome(boolean enabled) { this.suppressWelcome = enabled; }
+    public boolean isTextOutputMode() { return textOutputMode; }
+    public void setTextOutputMode(boolean enabled) { this.textOutputMode = enabled; }
 
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }
     public void setToolLatencyBudgetMs(int value) { this.toolLatencyBudgetMs = value; }
