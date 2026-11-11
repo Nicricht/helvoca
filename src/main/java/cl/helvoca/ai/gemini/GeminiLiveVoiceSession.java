@@ -7,6 +7,7 @@ import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.voice.EconomicVoiceRouteAdvisor;
 import cl.helvoca.voice.VoiceAiSession;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import cl.helvoca.voice.VoiceTransportSession;
@@ -1132,6 +1133,16 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         }
         if (!text.isBlank()) {
             if ("USER".equals(speaker)) {
+                // Shadow-only: classifies an existing transcription without an
+                // extra AI request or an actual provider/voice handoff.
+                // Never log the caller's words or any personal information.
+                if (properties.isEconomicRoutingShadowEnabled()) {
+                    EconomicVoiceRouteAdvisor.Intent intent =
+                            EconomicVoiceRouteAdvisor.classify(text);
+                    log.info("ECONOMIC_VOICE_ROUTING_SHADOW call_id={} intent={} selected=GEMINI_LIVE "
+                                    + "reason=NO_VERIFIED_ECONOMY_VOICE_EXECUTOR",
+                            context.callId(), intent);
+                }
                 lastUserUtterance = text;
                 boolean negative = isNegativeClosingReply(text);
                 if (awaitingAnythingElseAnswer.getAndSet(false) && negative) {
