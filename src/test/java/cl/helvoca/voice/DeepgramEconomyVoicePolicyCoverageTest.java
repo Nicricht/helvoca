@@ -233,6 +233,30 @@ class DeepgramEconomyVoicePolicyCoverageTest {
         }
     }
 
+
+    @Test
+    void inconsistentRulesClassificationCannotAccessTenantPriceCatalogue() {
+        var tool = mock(RealtimeToolService.class);
+        var context = context(TENANT);
+        var responder = new DeepgramEconomyPublicResponder(tool);
+        String utterance = "¿Cuánto cuesta psicología?";
+        // Adversarial provider-independent classifier contract: a candidate path
+        // without SERVICE_PRICE authorization must never expose tenant prices.
+        // This inconsistent classification could appear after a future router
+        // change; explicitly retain the extra fail-closed reason guard.
+        try (org.mockito.MockedStatic<VoiceEconomyIntentRouter> classifier =
+                     mockStatic(VoiceEconomyIntentRouter.class)) {
+            classifier.when(() -> VoiceEconomyIntentRouter.classify(utterance))
+                    .thenReturn(new VoiceEconomyIntentRouter.Decision(
+                            VoiceEconomyIntentRouter.Path.RULES_CANDIDATE,
+                            VoiceEconomyIntentRouter.Reason.BUSINESS_HOURS));
+            assertTrue(responder.answer(context, utterance).isEmpty(),
+                    "Non-price classification must not read or invent service prices");
+            classifier.verify(() -> VoiceEconomyIntentRouter.classify(utterance));
+        }
+        verifyNoInteractions(tool);
+    }
+
     @Test
     void nullNormalizerInputIsDefensivelyEmpty() throws Exception {
         Method m = DeepgramEconomyPublicResponder.class.getDeclaredMethod("normalize", String.class);
