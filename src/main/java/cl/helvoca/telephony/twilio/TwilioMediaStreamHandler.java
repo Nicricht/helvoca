@@ -188,7 +188,10 @@ public class TwilioMediaStreamHandler extends TextWebSocketHandler {
             return;
         }
         boolean configured = provider instanceof GeminiLiveVoiceProvider gemini
-                ? gemini.configuredFor(businessPhone) : provider.configured();
+                ? gemini.configuredFor(businessPhone)
+                : provider instanceof cl.helvoca.voice.DeepgramEconomyVoiceProvider deepgram
+                    ? deepgram.configuredFor(businessPhone)
+                    : provider.configured();
         if (!health.allow(provider.id(), configured)) {
             log.warn("Voice provider circuit is open provider={} call={}", provider.id(), callSid);
             socket.close(CloseStatus.SERVICE_RESTARTED);
