@@ -48,6 +48,8 @@ public class GeminiLiveProperties {
     private boolean compactToolDescriptionsEnabled = false;
     // Opt-in lean voice instructions; authoritative tenant rules stay verbatim.
     private boolean leanSystemInstructionsEnabled = false;
+    // Observation only: never changes the active Gemini provider or voice.
+    private boolean economicRoutingShadowEnabled = false;
 
     // Observability budgets. Exceeding them emits structured warnings; it never
     // changes business outcomes or skips backend validation.
@@ -137,6 +139,8 @@ public class GeminiLiveProperties {
 
     public boolean isLeanSystemInstructionsEnabled() { return leanSystemInstructionsEnabled; }
     public void setLeanSystemInstructionsEnabled(boolean enabled) { this.leanSystemInstructionsEnabled = enabled; }
+    public boolean isEconomicRoutingShadowEnabled() { return economicRoutingShadowEnabled; }
+    public void setEconomicRoutingShadowEnabled(boolean enabled) { this.economicRoutingShadowEnabled = enabled; }
 
     public int getToolLatencyBudgetMs() { return clamp(toolLatencyBudgetMs, 100, 30_000); }
     public void setToolLatencyBudgetMs(int value) { this.toolLatencyBudgetMs = value; }
