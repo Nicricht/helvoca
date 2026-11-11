@@ -149,6 +149,20 @@ app:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
     provider-order: ${HELVOCA_VOICE_PROVIDER_ORDER:gemini,openai-live}
+    deepgram:
+      enabled: ${DEEPGRAM_VOICE_ENABLED:false}
+      # Explicit approval is required before caller audio or transcripts leave RecepVoz.
+      data-processing-approved: ${DEEPGRAM_VOICE_DATA_PROCESSING_APPROVED:false}
+      api-key: ${DEEPGRAM_API_KEY:}
+      stt-endpoint: ${DEEPGRAM_VOICE_STT_ENDPOINT:wss://api.deepgram.com/v1/listen}
+      tts-endpoint: ${DEEPGRAM_VOICE_TTS_ENDPOINT:https://api.deepgram.com/v1/speak}
+      stt-model: ${DEEPGRAM_VOICE_STT_MODEL:nova-3}
+      stt-language: ${DEEPGRAM_VOICE_STT_LANGUAGE:multi}
+      stt-language-hint: ${DEEPGRAM_VOICE_STT_LANGUAGE_HINT:es}
+      tts-model: ${DEEPGRAM_VOICE_TTS_MODEL:aura-2-celeste-es}
+      connect-timeout-seconds: ${DEEPGRAM_VOICE_CONNECT_TIMEOUT_SECONDS:8}
+      request-timeout-seconds: ${DEEPGRAM_VOICE_REQUEST_TIMEOUT_SECONDS:15}
+      max-tts-characters: ${DEEPGRAM_VOICE_MAX_TTS_CHARACTERS:500}
   twilio:
     account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
