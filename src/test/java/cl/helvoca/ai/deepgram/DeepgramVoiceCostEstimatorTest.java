@@ -12,10 +12,10 @@ class DeepgramVoiceCostEstimatorTest {
         var estimate = DeepgramVoiceCostEstimator.compare(
                 new BigDecimal("1.0"), 150, 0, 0);
 
-        assertEquals(new BigDecimal("0.0092"), estimate.deepgramSttUsd());
+        assertEquals(0, new BigDecimal("0.0092").compareTo(estimate.deepgramSttUsd()));
         assertEquals(new BigDecimal("0.004500000000"), estimate.deepgramTtsUsd());
         assertEquals(new BigDecimal("0.013700000000"), estimate.hybridAiUsd());
-        assertEquals(new BigDecimal("0.0230"), estimate.geminiLiveAiUsd());
+        assertEquals(0, new BigDecimal("0.0230").compareTo(estimate.geminiLiveAiUsd()));
         assertTrue(estimate.hybridIsCheaper());
         assertEquals(new BigDecimal("40.4348"), estimate.estimatedSavingsPercent());
     }
