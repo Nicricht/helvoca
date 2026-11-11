@@ -48,3 +48,9 @@ Receipt autenticado anterior al HEAD final: PR #874, comentario 6803853419, vali
 - Integración de entrada Twilio: `TwilioMediaStreamHandler` valida `configuredFor(businessPhone)` para el proveedor económico igual que `VoiceCallRouter`, sin cambiar la firma del stream, el chequeo de binding ni el control RLS. Prueba firmada positiva/negativa `TwilioDeepgramEconomyMediaRoutingTest` con cero red externa.
 
 - Cobertura de contratos sin red en `DeepgramEconomyVoiceSessionTest`: transcripción interina ignorada; fragmentos finales unidos antes de fallback; precio oficial y bytes PCMU enviados a Twilio; fallo de STT sin Gemini cierra una sola vez; callbacks tardíos tras close no cambian estado. El test TTS inyecta una respuesta HTTP sintética en `HttpClient`, nunca contacta Deepgram.
+
+### Fallo de saludo del negocio (regresión, 11 nov 2026)
+
+Si una lectura autorizada de `agentGreeting` arroja una excepción (p. ej., error temporal de base de datos), el callback de Deepgram `onOpen` ahora entrega el control una sola vez a Gemini si está configurado para el número exacto; si Gemini también falla, finaliza el transporte de forma segura. No inventa información del negocio, no reproduce audio TTS tras ese fallo y no registra contenido del paciente. Test `DeepgramEconomyVoiceSessionTest.failingTenantGreetingHandsOffToGeminiOnceWithoutSendingTtsOrHangingUp` ejecuta el caso con mocks, sin credenciales ni uso real de Deepgram.
+
+**La verificación con proveedor real sigue sin acreditarse:** Railway Aurora no muestra `DEEPGRAM_API_KEY` ni habilitación `HELVOCA_DEEPGRAM_ECONOMY_ENABLED`; sin credenciales y una prueba costeada autorizada no existe evidencia de calidad en chileno, tarifas cobradas, ni ahorro real.

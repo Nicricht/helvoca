@@ -138,13 +138,19 @@ final class DeepgramEconomyVoiceSession implements VoiceAiSession, WebSocket.Lis
             socket = webSocket;
             while (!pendingAudio.isEmpty()) sendFrame(pendingAudio.removeFirst());
         }
-        String configuredGreeting = tools.agentGreeting(context,
-                "Hola, gracias por llamar. Cuéntame, ¿en qué te puedo ayudar?");
-        if (configuredGreeting == null || configuredGreeting.isBlank()
-                || configuredGreeting.length() > 160) {
-            configuredGreeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?";
+        try {
+            String configuredGreeting = tools.agentGreeting(context,
+                    "Hola, gracias por llamar. Cuéntame, ¿en qué te puedo ayudar?");
+            if (configuredGreeting == null || configuredGreeting.isBlank()
+                    || configuredGreeting.length() > 160) {
+                configuredGreeting = "Hola, gracias por llamar. ¿En qué te puedo ayudar?";
+            }
+            synthesize(configuredGreeting);
+        } catch (RuntimeException failure) {
+            // The tenant's official greeting can fail during a transient DB outage.
+            // Do not abandon the socket callback or invent a business greeting.
+            fallback("greeting_lookup_failure");
         }
-        synthesize(configuredGreeting);
     }
 
     @Override

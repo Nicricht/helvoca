@@ -65,6 +65,26 @@ class DeepgramEconomyVoiceSessionTest {
     }
 
     @Test
+    void failingTenantGreetingHandsOffToGeminiOnceWithoutSendingTtsOrHangingUp() {
+        Fixture f = new Fixture();
+        java.net.http.WebSocket socket = mock(java.net.http.WebSocket.class);
+        when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(true);
+        when(f.gemini.createSession(eq(f.context), eq(f.transport))).thenReturn(f.geminiSession);
+        when(f.tools.agentGreeting(eq(f.context), anyString()))
+                .thenThrow(new IllegalStateException("tenant settings unavailable"));
+
+        assertDoesNotThrow(() -> f.session.onOpen(socket));
+        verify(socket).request(1);
+        verify(socket).abort();
+        verify(f.gemini).createSession(eq(f.context), eq(f.transport));
+        verify(f.geminiSession).start();
+        verifyNoInteractions(f.http);
+        verify(f.transport, never()).closeOnUpstreamFailure();
+        f.session.onError(socket, new IllegalStateException("late provider callback"));
+        verify(f.geminiSession, times(1)).start();
+    }
+
+    @Test
     void upstreamFailureWithoutGeminiClosesCarrierExactlyOnce() {
         Fixture f = new Fixture();
         when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(false);
