@@ -219,9 +219,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
             pendingClientTurns.offer(text.trim());
             return;
         }
-        append(userTranscript, text);
-        flush(userTranscript, "USER");
-        sendClientTurn(text.trim());
+        runInTenantScope(() -> {
+            append(userTranscript, text);
+            flush(userTranscript, "USER");
+            sendClientTurn(text.trim());
+        });
     }
 
     @Override
