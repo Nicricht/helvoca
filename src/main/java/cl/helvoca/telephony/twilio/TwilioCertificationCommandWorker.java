@@ -13,6 +13,9 @@ public class TwilioCertificationCommandWorker {
     private static final Logger log = LoggerFactory.getLogger(TwilioCertificationCommandWorker.class);
 
     private final boolean enabled;
+    private final String onlyRunId;
+    private final boolean exactRunConfigured;
+    private final String environmentName;
     private final TwilioCertificationCommandStore commands;
     private final TwilioCertificationCommandCallLauncher launcher;
     private final TenantDatabaseContext databaseContext;
@@ -21,11 +24,16 @@ public class TwilioCertificationCommandWorker {
     @Autowired
     public TwilioCertificationCommandWorker(
             @Value("${TWILIO_CERTIFICATION_COMMAND_RUNNER_ENABLED:false}") boolean enabled,
+            @Value("${TWILIO_CERTIFICATION_COMMAND_ONLY_RUN_ID:}") String onlyRunId,
+            @Value("${RAILWAY_ENVIRONMENT_NAME:}") String environmentName,
             TwilioCertificationCommandStore commands,
             TwilioCertificationCommandCallLauncher launcher,
             TenantDatabaseContext databaseContext,
             TwilioCertificationDemoBindingGate demoBinding) {
         this.enabled = enabled;
+        this.exactRunConfigured = onlyRunId != null && !onlyRunId.isEmpty();
+        this.onlyRunId = onlyRunId == null ? "" : onlyRunId.trim();
+        this.environmentName = environmentName;
         this.commands = commands;
         this.launcher = launcher;
         this.databaseContext = databaseContext;
@@ -35,7 +43,13 @@ public class TwilioCertificationCommandWorker {
     // Isolated legacy unit tests; Spring always injects the DEMO gate.
     TwilioCertificationCommandWorker(boolean enabled, TwilioCertificationCommandStore commands,
             TwilioCertificationCommandCallLauncher launcher, TenantDatabaseContext databaseContext) {
-        this(enabled, commands, launcher, databaseContext, null);
+        this(enabled, "", "", commands, launcher, databaseContext, null);
+    }
+
+    TwilioCertificationCommandWorker(boolean enabled, TwilioCertificationCommandStore commands,
+            TwilioCertificationCommandCallLauncher launcher, TenantDatabaseContext databaseContext,
+            TwilioCertificationDemoBindingGate demoBinding) {
+        this(enabled, "", "", commands, launcher, databaseContext, demoBinding);
     }
 
     @Scheduled(
@@ -44,7 +58,17 @@ public class TwilioCertificationCommandWorker {
     public void poll() {
         if (!enabled) return;
 
-        databaseContext.callAsSystem(commands::claimNext).ifPresent(command -> {
+        boolean pinned = exactRunConfigured;
+        if (pinned && (!"demo-isolated".equals(environmentName)
+                || !TwilioCertificationCommandStore.validRunId(onlyRunId)
+                || demoBinding == null || demoBinding.pinnedBusinessId() == null
+                || !demoBinding.allows(demoBinding.pinnedBusinessId()))) {
+            log.error("TWILIO_CERTIFICATION_COMMAND exact-run preflight blocked");
+            return;
+        }
+        databaseContext.callAsSystem(() -> pinned
+                ? commands.claimExactRunId(onlyRunId, demoBinding.pinnedBusinessId(), "startup-bootstrap")
+                : commands.claimNext()).ifPresent(command -> {
             try {
                 if (demoBinding != null && !demoBinding.allows(command.businessId())) {
                     throw new IllegalStateException("certification DEMO tenant/phone binding unavailable");

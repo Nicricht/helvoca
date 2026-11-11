@@ -12,6 +12,89 @@ import static org.mockito.Mockito.*;
 class TwilioCertificationCommandWorkerTest {
 
     @Test
+    void pinnedModeClaimsOnlyExactBootstrapRunAndNeverFallsBackToGenericQueue() throws Exception {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        UUID business = UUID.randomUUID();
+        String run = "aurora-one-20261109-001";
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(run,
+                "11111111-1111-1111-1111-111111111111", business);
+        when(binding.pinnedBusinessId()).thenReturn(business);
+        when(binding.allows(business)).thenReturn(true);
+        when(store.claimExactRunId(run, business, "startup-bootstrap"))
+                .thenReturn(Optional.of(command), Optional.empty());
+        when(launcher.launch(command.callbackToken())).thenReturn("CA" + "a".repeat(32));
+        var worker = new TwilioCertificationCommandWorker(true, run, "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding);
+
+        worker.poll();
+        worker.poll();
+
+        verify(store, times(2)).claimExactRunId(run, business, "startup-bootstrap");
+        verify(store, never()).claimNext();
+        verify(launcher, times(1)).launch(command.callbackToken());
+    }
+
+    @Test
+    void invalidPinEnvironmentOrBusinessFailsClosed() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        for (String run : new String[]{"bad", "aurora-one-20261109-001"}) {
+            var worker = new TwilioCertificationCommandWorker(true, run, "production", store,
+                    launcher, new TenantDatabaseContext(), binding);
+            worker.poll();
+        }
+        new TwilioCertificationCommandWorker(true, "bad", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding).poll();
+        new TwilioCertificationCommandWorker(true, " ", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding).poll();
+        new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding).poll();
+        new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), null).poll();
+        UUID business = UUID.randomUUID();
+        when(binding.pinnedBusinessId()).thenReturn(business);
+        new TwilioCertificationCommandWorker(true, "aurora-one-20261109-001", "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding).poll();
+        verifyNoInteractions(store, launcher);
+    }
+
+    @Test
+    void ambiguousCarrierFailureNeverRetriesPinnedCommand() throws Exception {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var binding = mock(TwilioCertificationDemoBindingGate.class);
+        UUID business = UUID.randomUUID();
+        String run = "aurora-one-20261109-002";
+        var command = new TwilioCertificationCommandStore.ClaimedCommand(run,
+                "22222222-2222-2222-2222-222222222222", business);
+        when(binding.pinnedBusinessId()).thenReturn(business);
+        when(binding.allows(business)).thenReturn(true);
+        when(store.claimExactRunId(run, business, "startup-bootstrap")).thenReturn(Optional.of(command), Optional.empty());
+        when(launcher.launch(command.callbackToken())).thenThrow(new IllegalStateException("timeout"));
+        var worker = new TwilioCertificationCommandWorker(true, run, "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), binding);
+        worker.poll();
+        worker.poll();
+        verify(launcher, times(1)).launch(command.callbackToken());
+        verify(store).markFailed(run, "timeout");
+        verify(store, never()).claimNext();
+    }
+
+    @Test
+    void absentPinKeepsLegacyWorkerBehavior() {
+        var store = mock(TwilioCertificationCommandStore.class);
+        var launcher = mock(TwilioCertificationCommandCallLauncher.class);
+        var worker = new TwilioCertificationCommandWorker(true, null, "demo-isolated", store,
+                launcher, new TenantDatabaseContext(), null);
+        worker.poll();
+        verify(store).claimNext();
+        verifyNoInteractions(launcher);
+    }
+
+    @Test
     void mismatchedDemoBindingFailsBeforeCarrierCall() {
         var store = mock(TwilioCertificationCommandStore.class);
         var launcher = mock(TwilioCertificationCommandCallLauncher.class);

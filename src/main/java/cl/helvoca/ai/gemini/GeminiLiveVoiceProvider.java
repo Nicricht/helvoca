@@ -148,6 +148,13 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setLocalBargeInSpeechFrames(properties.getLocalBargeInSpeechFrames());
         session.setLocalBargeInReleaseFrames(properties.getLocalBargeInReleaseFrames());
         session.setLocalBargeInRecentAssistantAudioMs(properties.getLocalBargeInRecentAssistantAudioMs());
+        // A Gemini call uses a copied properties snapshot. Carry ALL cost
+        // optimization options into it or Railway env flags have no effect.
+        session.setContextWindowCompressionEnabled(properties.isContextWindowCompressionEnabled());
+        session.setContextWindowCompressionTriggerTokens(properties.getContextWindowCompressionTriggerTokens());
+        session.setContextWindowCompressionTargetTokens(properties.getContextWindowCompressionTargetTokens());
+        session.setCompactToolDescriptionsEnabled(properties.isCompactToolDescriptionsEnabled());
+        session.setLeanSystemInstructionsEnabled(properties.isLeanSystemInstructionsEnabled());
         session.setToolLatencyBudgetMs(properties.getToolLatencyBudgetMs());
         session.setToolBatchLatencyBudgetMs(properties.getToolBatchLatencyBudgetMs());
         session.setResponseLatencyBudgetMs(properties.getResponseLatencyBudgetMs());

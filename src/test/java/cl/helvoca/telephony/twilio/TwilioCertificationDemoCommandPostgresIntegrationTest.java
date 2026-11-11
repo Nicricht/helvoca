@@ -26,6 +26,48 @@ import static org.junit.jupiter.api.Assertions.*;
 @Testcontainers
 @SpringBootTest
 class TwilioCertificationDemoCommandPostgresIntegrationTest {
+
+    @Test
+    void exactRunClaimLeavesOtherPendingRowsAndCannotBeClaimedTwiceConcurrently() throws Exception {
+        UUID demo = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+        var owner = new JdbcTemplate(migrationDataSource);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Pinned demo','DEMO')", demo);
+        owner.update("INSERT INTO business(id,name,mode) VALUES (?,'Other pinned demo','DEMO')", other);
+        String target = "aurora-one-" + UUID.randomUUID();
+        String older = "aurora-other-" + UUID.randomUUID();
+        String foreign = "aurora-foreign-" + UUID.randomUUID();
+        scope.runAsSystem(() -> {
+            assertTrue(commands.enqueue(older, "startup-bootstrap", demo));
+            assertTrue(commands.enqueue(target, "startup-bootstrap", demo));
+            assertTrue(commands.enqueue(foreign, "startup-bootstrap", other));
+        });
+        assertTrue(scope.callAsSystem(() -> commands.claimExactRunId(target, other, "startup-bootstrap")).isEmpty());
+        assertTrue(scope.callAsSystem(() -> commands.claimExactRunId(target, demo, "platform-admin")).isEmpty());
+        var pool = Executors.newFixedThreadPool(2);
+        var start = new CountDownLatch(1);
+        try {
+            var first = pool.submit(() -> { start.await(); return scope.callAsSystem(() ->
+                    commands.claimExactRunId(target, demo, "startup-bootstrap")); });
+            var second = pool.submit(() -> { start.await(); return scope.callAsSystem(() ->
+                    commands.claimExactRunId(target, demo, "startup-bootstrap")); });
+            start.countDown();
+            assertEquals(1, (first.get(15, TimeUnit.SECONDS).isPresent() ? 1 : 0)
+                    + (second.get(15, TimeUnit.SECONDS).isPresent() ? 1 : 0));
+            assertTrue(scope.callAsSystem(() -> commands.claimExactRunId(target, demo, "startup-bootstrap")).isEmpty());
+            assertEquals("PENDING", scope.callAsSystem(() -> commands.find(older).orElseThrow().status()));
+            assertEquals("PENDING", scope.callAsSystem(() -> commands.find(foreign).orElseThrow().status()));
+            assertEquals("CLAIMED", scope.callAsSystem(() -> commands.find(target).orElseThrow().status()));
+        } finally {
+            pool.shutdownNow();
+            owner.update("""
+                    UPDATE twilio_certification_command
+                       SET status = 'FAILED', failure_reason = 'synthetic test cleanup',
+                           completed_at = CURRENT_TIMESTAMP
+                     WHERE run_id IN (?, ?, ?) AND status = 'PENDING'
+                    """, target, older, foreign);
+        }
+    }
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>(
             System.getProperty("helvoca.test.postgres.image", "postgres:18-alpine"));

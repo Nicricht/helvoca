@@ -43,6 +43,29 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
     long countByBusinessIdAndCertificationFalseAndTelephonyProviderNotAndResolutionAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             UUID businessId, String excludedProvider, String resolution, Instant start, Instant end);
 
+    /**
+     * Each already admitted call consumes at least the configured reservation.
+     * Unknown/zero cost must NEVER silently count as free; completed calls
+     * with a larger estimate consume the larger value. All statuses count,
+     * including failed, certification and not-yet-finished calls.
+     */
+    @Query("""
+        select coalesce(sum(
+            case when c.estimatedTotalCostUsd is null
+                        or c.estimatedTotalCostUsd < :reservation
+                 then :reservation else c.estimatedTotalCostUsd end
+        ), 0)
+        from CallSession c
+        where c.businessId = :businessId
+          and c.startedAt >= :start
+          and c.startedAt < :end
+        """)
+    BigDecimal sumReservedEstimatedCostByBusinessAndUtcDay(
+            @Param("businessId") UUID businessId,
+            @Param("start") Instant start,
+            @Param("end") Instant end,
+            @Param("reservation") BigDecimal reservation);
+
     @Query("""
         select coalesce(sum(c.estimatedTotalCostUsd), 0) from CallSession c
         where c.businessId = :businessId

@@ -34,6 +34,7 @@ import org.springframework.transaction.TransactionDefinition;
 import java.time.*;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -229,6 +230,9 @@ public class RealtimeToolService {
                 Interpreta expresiones como hoy, mañana y pasado mañana usando la fecha local del negocio, nunca UTC.
                 Nunca calcules ni infieras el día de la semana de memoria.
                 Si el cliente menciona explícitamente un día de semana, incluye requestedWeekday en la herramienta de agenda con uno de MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY o SUNDAY.
+                 SEMANA EXPLÍCITA: "próximo jueves", "próximo miércoles" o "[día] de la próxima semana" significan ese día de la SEMANA CALENDARIO SIGUIENTE (lunes a domingo), no el de esta semana. Envía requestedWeekScope=NEXT_WEEK en la consulta, propuesta inicial o reprogramación. "Este jueves" o "[día] de esta semana" significa requestedWeekScope=THIS_WEEK. Si solo dice "jueves", omite requestedWeekScope y pregunta si resulta ambiguo. El backend comprueba fecha y semana usando la zona horaria local; NO confundas dos jueves distintos.
+                 Si recibes REQUESTED_WEEK_SCOPE_MISMATCH, corrige la fecha a la indicada por el backend, consulta la disponibilidad real de esa fecha y aclara verbalmente día y número antes de hacer reservas.
+                 HORARIOS FUTUROS: jamás ofrezcas una hora ya pasada en la zona horaria del negocio. Ofrece exclusivamente los horarios FUTUROS devueltos en la última consulta de disponibilidad del día; nunca inventes ni reutilices una alternativa antigua si pasó el tiempo. Si no hay horarios futuros confirmados, indica que no los hay.
                 El backend compara requestedWeekday con la fecha local del negocio. Si devuelve WEEKDAY_DATE_MISMATCH o INVALID_REQUESTED_WEEKDAY, no confirmes ni ejecutes la operación: corrige la fecha con el día solicitado o pregunta al cliente.
                 Cuando list_available_slots o check_booking_availability devuelvan dayOfWeek, usa ese valor literalmente en create_booking o reschedule_booking; nunca lo recalcules.
                 Nunca inventes disponibilidad, precios, reservas, clientes, horarios ni resultados de operaciones.
@@ -413,7 +417,7 @@ public class RealtimeToolService {
     private JSONObject listAvailableSlots(RealtimeCallContext context, JSONObject args) {
         UUID serviceId = uuid(required(args, "serviceId"));
         LocalDate date = localDate(required(args, "date"));
-        JSONObject weekdayError = requestedWeekdayError(date, args);
+        JSONObject weekdayError = requestedWeekdayError(context.businessId(), date, args);
         if (weekdayError != null) return weekdayError;
         ServiceItem service = requireActiveService(context.businessId(), serviceId);
         BusinessScheduleService.AvailabilityLookahead lookup = schedule.listAvailableSlotsWithLookahead(
@@ -765,16 +769,25 @@ public class RealtimeToolService {
     }
 
     private JSONObject requestedWeekdayError(LocalDate localDate, JSONObject args) {
-        String requestedWeekday = requestedWeekdayArgument(args);
-        if (requestedWeekday == null) return null;
-        return compareRequestedWeekday(localDate, requestedWeekday);
+        String weekday = requestedWeekdayArgument(args);
+        if (weekday == null) return args.has("requestedWeekScope") ? invalidRequestedWeekday() : null;
+        return compareRequestedWeekday(localDate, weekday);
+    }
+
+    private JSONObject requestedWeekdayError(UUID businessId, LocalDate localDate, JSONObject args) {
+        JSONObject weekdayError = requestedWeekdayError(localDate, args);
+        if (weekdayError != null || !args.has("requestedWeekScope")) return weekdayError;
+        ZoneId zone = ZoneId.of(requireBusiness(businessId).getTimezone());
+        return requestedWeekScopeError(localDate, args, LocalDate.now(zone));
     }
 
     protected JSONObject requestedWeekdayError(UUID businessId, Instant value, JSONObject args) {
-        String requestedWeekday = requestedWeekdayArgument(args);
-        if (requestedWeekday == null) return null;
+        if (!args.has("requestedWeekday") && !args.has("requestedWeekScope")) return null;
         ZoneId zone = ZoneId.of(requireBusiness(businessId).getTimezone());
-        return compareRequestedWeekday(value.atZone(zone).toLocalDate(), requestedWeekday);
+        LocalDate localDate = value.atZone(zone).toLocalDate();
+        JSONObject weekdayError = requestedWeekdayError(localDate, args);
+        if (weekdayError != null || !args.has("requestedWeekScope")) return weekdayError;
+        return requestedWeekScopeError(localDate, args, LocalDate.now(zone));
     }
 
     protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args) {
@@ -782,13 +795,12 @@ public class RealtimeToolService {
     }
 
     protected JSONObject requestedWeekdayError(UUID businessId, JSONObject args, String instantArgument) {
-        String requestedWeekday = requestedWeekdayArgument(args);
-        if (requestedWeekday == null) return null;
-        if (requestedWeekday.isBlank()) return invalidRequestedWeekday();
+        String weekday = requestedWeekdayArgument(args);
+        if (weekday == null && !args.has("requestedWeekScope")) return null;
+        if (weekday == null || weekday.isBlank()) return invalidRequestedWeekday();
 
         String rawInstant = args.optString(instantArgument, null);
         if (rawInstant == null || rawInstant.isBlank()) return null;
-
         Instant value;
         try {
             value = instant(rawInstant);
@@ -818,6 +830,31 @@ public class RealtimeToolService {
         return error("WEEKDAY_DATE_MISMATCH",
                 "La fecha local " + localDate + " corresponde a " + actualName + ", no a " + requestedName
                         + ". Revisa la fecha con el cliente antes de continuar.");
+    }
+
+    private static JSONObject requestedWeekScopeError(LocalDate localDate, JSONObject args, LocalDate today) {
+        String scope = args.optString("requestedWeekScope", "").trim().toUpperCase(Locale.ROOT);
+        if (!"THIS_WEEK".equals(scope) && !"NEXT_WEEK".equals(scope)) {
+            return error("INVALID_REQUESTED_WEEK_SCOPE",
+                    "requestedWeekScope debe ser THIS_WEEK o NEXT_WEEK, u omitirse si el cliente no indicó semana.");
+        }
+        DayOfWeek requested = DayOfWeek.valueOf(requestedWeekdayArgument(args).trim().toUpperCase(Locale.ROOT));
+        LocalDate expected = dateForWeekScope(today, requested, scope);
+        if (localDate.equals(expected)) return null;
+        return error("REQUESTED_WEEK_SCOPE_MISMATCH",
+                "Para " + ("NEXT_WEEK".equals(scope) ? "la próxima semana" : "esta semana") + " y "
+                        + requested.getDisplayName(TextStyle.FULL, Locale.forLanguageTag("es-CL"))
+                        + ", la fecha correcta en el calendario local es " + expected + ", no " + localDate
+                        + ". Consulta la fecha correcta y confírmala con el cliente.");
+    }
+
+    static LocalDate dateForWeekScope(LocalDate today, DayOfWeek requested, String scope) {
+        LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        return switch (scope) {
+            case "THIS_WEEK" -> monday.plusDays(requested.getValue() - 1L);
+            case "NEXT_WEEK" -> monday.plusWeeks(1).plusDays(requested.getValue() - 1L);
+            default -> throw new IllegalArgumentException("Invalid requestedWeekScope");
+        };
     }
 
     private static JSONObject invalidRequestedWeekday() {

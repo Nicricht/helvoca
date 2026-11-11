@@ -18,6 +18,34 @@ import static org.mockito.Mockito.*;
 class TwilioCertificationCommandStoreTest {
 
     @Test
+    void exactClaimRequiresValidRunBusinessAndBootstrapActor() {
+        var jdbc = mock(JdbcTemplate.class);
+        var store = new TwilioCertificationCommandStore(jdbc);
+        UUID business = UUID.randomUUID();
+        assertTrue(store.claimExactRunId("bad", business, "startup-bootstrap").isEmpty());
+        assertTrue(store.claimExactRunId("aurora-one-20261109-001", null, "startup-bootstrap").isEmpty());
+        assertTrue(store.claimExactRunId("aurora-one-20261109-001", business, "platform-admin").isEmpty());
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void exactClaimSqlPinsRunTenantAndActorUnderAtomicLock() {
+        var jdbc = mock(JdbcTemplate.class);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(),
+                any(), any(), any(), any(), any())).thenReturn(List.of());
+        var store = new TwilioCertificationCommandStore(jdbc);
+        UUID business = UUID.randomUUID();
+        assertTrue(store.claimExactRunId("aurora-one-20261109-001", business, "startup-bootstrap").isEmpty());
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), org.mockito.ArgumentMatchers.<RowMapper<TwilioCertificationCommandStore.ClaimedCommand>>any(),
+                eq("aurora-one-20261109-001"), eq(business), eq("startup-bootstrap"), any(), any());
+        assertTrue(sql.getValue().contains("FOR UPDATE OF c SKIP LOCKED"));
+        assertTrue(sql.getValue().contains("c.run_id = ?"));
+        assertTrue(sql.getValue().contains("c.business_id = ?"));
+        assertTrue(sql.getValue().contains("c.requested_by = ?"));
+    }
+
+    @Test
     void validatesRunIdsTokensAndProviderCallSids() {
         assertTrue(TwilioCertificationCommandStore.validRunId("latency-20260927-001"));
         assertFalse(TwilioCertificationCommandStore.validRunId("short"));
