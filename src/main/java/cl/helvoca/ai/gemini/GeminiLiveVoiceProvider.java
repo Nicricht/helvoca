@@ -155,6 +155,7 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         session.setContextWindowCompressionTargetTokens(properties.getContextWindowCompressionTargetTokens());
         session.setCompactToolDescriptionsEnabled(properties.isCompactToolDescriptionsEnabled());
         session.setLeanSystemInstructionsEnabled(properties.isLeanSystemInstructionsEnabled());
+        session.setEconomyShadowEnabled(properties.isEconomyShadowEnabled());
         session.setToolLatencyBudgetMs(properties.getToolLatencyBudgetMs());
         session.setToolBatchLatencyBudgetMs(properties.getToolBatchLatencyBudgetMs());
         session.setResponseLatencyBudgetMs(properties.getResponseLatencyBudgetMs());
