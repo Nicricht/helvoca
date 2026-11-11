@@ -196,6 +196,43 @@ class DeepgramEconomyVoicePolicyCoverageTest {
         }
     }
 
+
+    @Test
+    void unsupportedServiceAndNonPriceRequestFailClosedBeforeAnyCatalogQuery() throws Exception {
+        var tool = mock(RealtimeToolService.class);
+        var responder = new DeepgramEconomyPublicResponder(tool);
+        var context = context(TENANT);
+        assertTrue(responder.answer(context, "¿Cuánto cuesta cardiología?").isEmpty());
+        assertTrue(responder.answer(context, "Hola, ¿en qué horario atienden?").isEmpty());
+        assertTrue(responder.answer(context, "¿Cuánto cuesta una consulta de psiquiatría?").isEmpty());
+        verifyNoInteractions(tool);
+
+        Method parser = DeepgramEconomyPublicResponder.class
+                .getDeclaredMethod("requestedService", String.class);
+        parser.setAccessible(true);
+        assertNull(parser.invoke(null, "¿Cuánto cuesta cardiología?"),
+                "Unsupported services must never receive invented prices");
+    }
+
+    @Test
+    void allFourAllowedServicesRequireExactAuthorizedCatalogueRows() {
+        var context = context(TENANT);
+        for (String service : new String[]{"Medicina General", "Psicología",
+                "Dermatología", "Nutrición"}) {
+            var tool = mock(RealtimeToolService.class);
+            when(tool.execute(eq(context), eq("list_services"), eq("{}"))).thenReturn(
+                    new JSONObject().put("success", true)
+                            .put("data", new JSONObject().put("services", new JSONArray()
+                                    .put(new JSONObject().put("name", service)
+                                            .put("price", 25000)))).toString());
+            var result = new DeepgramEconomyPublicResponder(tool).answer(
+                    context, "¿Cuánto cuesta " + service + " por favor?");
+            assertTrue(result.isPresent(), "Exact supported service must be readable: " + service);
+            assertTrue(result.orElseThrow().contains("25"));
+            verify(tool).execute(eq(context), eq("list_services"), eq("{}"));
+        }
+    }
+
     @Test
     void nullNormalizerInputIsDefensivelyEmpty() throws Exception {
         Method m = DeepgramEconomyPublicResponder.class.getDeclaredMethod("normalize", String.class);

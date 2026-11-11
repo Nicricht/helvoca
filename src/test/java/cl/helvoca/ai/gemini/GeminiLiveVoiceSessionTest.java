@@ -1664,6 +1664,52 @@ class GeminiLiveVoiceSessionTest {
         }
     }
 
+
+    @Test
+    void economyShadowNeverObservesCertificationOrVoiceBakeOffTranscripts()
+            throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            for (int mode = 0; mode < 2; mode++) {
+                GeminiLiveProperties props = properties();
+                props.setEconomyShadowEnabled(true);
+                RealtimeCallContext call;
+                if (mode == 0) {
+                    props.setCertificationSimulation(true);
+                    call = context();
+                } else {
+                    call = new RealtimeCallContext(UUID.randomUUID(), UUID.randomUUID(), null,
+                            "+56933334444", "+14355652512", "MZ-shadow-bakeoff", "Aoede");
+                    assertTrue(call.voiceBakeOff());
+                }
+                CallTranscriptService transcripts = mock(CallTranscriptService.class);
+                VoiceTransportSession transport = mock(VoiceTransportSession.class);
+                GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(call,
+                        transport, props, mock(RealtimeToolService.class), transcripts,
+                        mock(CallSummaryService.class), mock(CallLifecycleService.class),
+                        mock(CallCertificationService.class), new VoiceProviderHealthRegistry(),
+                        HttpClient.newHttpClient());
+                String utterance = "¿Cuánto cuesta nutrición?";
+                // Exercise the completed transcript callback without any provider requests.
+                var flush = GeminiLiveVoiceSession.class.getDeclaredMethod(
+                        "flush", StringBuilder.class, String.class);
+                flush.setAccessible(true);
+                flush.invoke(session, new StringBuilder(utterance), "USER");
+                verify(transcripts).append(call.callId(), "USER", utterance);
+                verifyNoInteractions(transport);
+            }
+            assertEquals(0, appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("VOICE_ECONOMY_SHADOW"))
+                    .count(), "Certification and bake-off audio must never enter cost-routing telemetry");
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
     @Test
     void permissionDeniedAndAccessDeniedAreAuthFailures() {
         assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,

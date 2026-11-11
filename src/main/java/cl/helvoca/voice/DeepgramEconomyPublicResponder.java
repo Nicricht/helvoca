@@ -26,13 +26,15 @@ public final class DeepgramEconomyPublicResponder {
 
     public Optional<String> answer(RealtimeCallContext context, String utterance) {
         if (context == null || context.businessId() == null) return Optional.empty();
+        // Parse the supported service first. Unknown names and unrelated intents
+        // must fail closed without looking up tenant catalogue data.
+        String name = requestedService(utterance);
+        if (name == null) return Optional.empty();
         VoiceEconomyIntentRouter.Decision decision = VoiceEconomyIntentRouter.classify(utterance);
         if (decision.path() != VoiceEconomyIntentRouter.Path.RULES_CANDIDATE
                 || decision.reason() != VoiceEconomyIntentRouter.Reason.SERVICE_PRICE) {
             return Optional.empty();
         }
-        String name = requestedService(utterance);
-        if (name == null) return Optional.empty();
         try {
             JSONObject result = new JSONObject(tools.execute(context, "list_services", "{}"));
             if (!result.optBoolean("success")) return Optional.empty();

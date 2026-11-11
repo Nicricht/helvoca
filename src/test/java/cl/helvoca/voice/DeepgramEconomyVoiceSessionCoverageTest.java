@@ -271,6 +271,103 @@ class DeepgramEconomyVoiceSessionCoverageTest {
         verify(f.geminiSession).close();
     }
 
+
+    @Test
+    void handoffForwardsSubsequentAudioOnlyToGeminiAndIgnoresUnpublishedHandoff() throws Exception {
+        var pending = new Fixture();
+        flag(pending.session, "handedToGemini");
+        pending.session.acceptInboundAudio(PCMU);
+        verifyNoInteractions(pending.http, pending.gemini, pending.tools);
+
+        var active = new Fixture().fallbackReady();
+        active.session.onError(active.socket(), new IllegalStateException("network lost"));
+        active.session.acceptInboundAudio(PCMU);
+        verify(active.geminiSession).start();
+        verify(active.geminiSession).acceptInboundAudio(PCMU);
+        verifyNoInteractions(active.http);
+    }
+
+    @Test
+    void unsentFramesAfterSocketResetHandoffOrClosureNeverLeaveTheProcess() throws Exception {
+        var missing = new Fixture();
+        invoke(missing.session, "sendFrame", byte[].class, new byte[]{1, 2});
+        verifyNoInteractions(missing.http);
+
+        var handed = new Fixture();
+        WebSocket handoffSocket = handed.socket();
+        field(handed.session, "socket", handoffSocket);
+        flag(handed.session, "handedToGemini");
+        invoke(handed.session, "sendFrame", byte[].class, new byte[]{1, 2});
+        verify(handoffSocket, never()).sendBinary(any(ByteBuffer.class), anyBoolean());
+
+        var closed = new Fixture();
+        closed.session.close();
+        WebSocket closedSocket = closed.socket();
+        field(closed.session, "socket", closedSocket);
+        invoke(closed.session, "sendFrame", byte[].class, new byte[]{1, 2});
+        verify(closedSocket, never()).sendBinary(any(ByteBuffer.class), anyBoolean());
+    }
+
+    @Test
+    void websocketOpenArrivingAfterHandoffOrCloseIsAbortedWithoutGreetingOrAudio() {
+        var handed = new Fixture().fallbackReady();
+        handed.session.onError(handed.socket(), new IllegalStateException("disconnected"));
+        WebSocket late = handed.socket();
+        handed.session.onOpen(late);
+        verify(late).abort();
+        verifyNoInteractions(handed.tools, handed.http);
+
+        var closed = new Fixture();
+        closed.session.close();
+        WebSocket afterClose = closed.socket();
+        closed.session.onOpen(afterClose);
+        verify(afterClose).abort();
+        verifyNoInteractions(closed.tools, closed.http);
+    }
+
+    @Test
+    void lateSpeechAndSynthesisCallbacksAfterCloseOrHandoffCannotCallPaidProviders() throws Exception {
+        var closed = new Fixture();
+        closed.session.close();
+        invoke(closed.session, "onUtterance", String.class, "¿Cuánto cuesta psicología?");
+        invoke(closed.session, "synthesize", String.class, "No responder después del cierre");
+        verifyNoInteractions(closed.http, closed.tools, closed.gemini);
+
+        var handed = new Fixture().fallbackReady();
+        handed.session.onError(handed.socket(), new IllegalStateException("handoff"));
+        invoke(handed.session, "onUtterance", String.class, "¿Cuánto cuesta psicología?");
+        invoke(handed.session, "synthesize", String.class, "No hablar en paralelo");
+        verify(handed.geminiSession).start();
+        verifyNoInteractions(handed.http, handed.tools);
+    }
+
+    @Test
+    void ttsHttp200WithNoAudioBodyFallsBackInsteadOfSilentlyClaimingSpeech() {
+        var f = new Fixture().fallbackReady().tts(null, 200);
+        f.session.onOpen(f.socket());
+        verify(f.geminiSession).start();
+        verify(f.transport, never()).sendAudio(anyString(), anyString());
+    }
+
+    @Test
+    void audioChunkingStopsImmediatelyWhenCallClosesOrTransfersBetweenChunks() throws Exception {
+        var closed = new Fixture().tts(new byte[3201], 200);
+        doAnswer(invocation -> {
+            closed.session.close();
+            return null;
+        }).when(closed.transport).sendAudio(eq(closed.context.streamSid()), anyString());
+        closed.session.onOpen(closed.socket());
+        verify(closed.transport, times(1)).sendAudio(eq(closed.context.streamSid()), anyString());
+
+        var handed = new Fixture().tts(new byte[3201], 200);
+        doAnswer(invocation -> {
+            flag(handed.session, "handedToGemini");
+            return null;
+        }).when(handed.transport).sendAudio(eq(handed.context.streamSid()), anyString());
+        handed.session.onOpen(handed.socket());
+        verify(handed.transport, times(1)).sendAudio(eq(handed.context.streamSid()), anyString());
+    }
+
     private static JSONObject transcript(String text, boolean isFinal, boolean speechFinal) {
         return new JSONObject().put("type", "Results").put("is_final", isFinal)
                 .put("speech_final", speechFinal).put("channel",
@@ -282,6 +379,20 @@ class DeepgramEconomyVoiceSessionCoverageTest {
         Field f = subject.getClass().getDeclaredField(name);
         f.setAccessible(true);
         f.set(subject, value);
+    }
+
+
+    private static void flag(Object subject, String name) throws Exception {
+        Field f = subject.getClass().getDeclaredField(name);
+        f.setAccessible(true);
+        ((java.util.concurrent.atomic.AtomicBoolean) f.get(subject)).set(true);
+    }
+
+    private static void invoke(Object subject, String method, Class<?> argType, Object arg)
+            throws Exception {
+        var target = subject.getClass().getDeclaredMethod(method, argType);
+        target.setAccessible(true);
+        target.invoke(subject, arg);
     }
 
     private static final class Fixture {

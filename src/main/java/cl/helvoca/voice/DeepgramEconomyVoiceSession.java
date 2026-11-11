@@ -108,7 +108,9 @@ final class DeepgramEconomyVoiceSession implements VoiceAiSession, WebSocket.Lis
             if (base64Audio.length() > 8192) { fallback("oversized_frame"); return; }
             bytes = Base64.getDecoder().decode(base64Audio);
         } catch (IllegalArgumentException error) { fallback("invalid_frame"); return; }
-        if (bytes.length == 0 || bytes.length > MAX_FRAME_BYTES) {
+        // Nonblank valid Base64 always decodes to at least one byte; the
+        // empty-input case was already rejected before decode.
+        if (bytes.length > MAX_FRAME_BYTES) {
             fallback("invalid_frame_size"); return;
         }
         synchronized (audioLock) {

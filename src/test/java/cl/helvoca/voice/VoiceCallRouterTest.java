@@ -135,6 +135,36 @@ class VoiceCallRouterTest {
     }
 
 
+
+    @Test
+    void deepgramOnlyRoutesOnScopedBusinessPhoneAndNeverReportsUnscopedReadiness() {
+        var settings = new VoiceProviderProperties();
+        settings.setProviderOrder(List.of("deepgram-economy"));
+        var providers = mock(VoiceAiProviderRegistry.class);
+        var deepgram = mock(DeepgramEconomyVoiceProvider.class);
+        var media = mock(TwilioMediaStreamTwimlFactory.class);
+        var health = new VoiceProviderHealthRegistry();
+        String pin = "+56911112222";
+        when(providers.require("deepgram-economy")).thenReturn(deepgram);
+        when(deepgram.id()).thenReturn("deepgram-economy");
+        when(deepgram.configuredFor(pin)).thenReturn(true);
+        when(media.twiml(pin, "+56933334444", CALL_SID, "deepgram-economy"))
+                .thenReturn("<Response><Connect><Stream/></Connect></Response>");
+
+        var router = new VoiceCallRouter(settings, providers, health, media,
+                mock(OpenAiLiveSipService.class));
+        assertEquals("deepgram-economy", router.route(pin, "+56933334444", CALL_SID)
+                .orElseThrow().providerId());
+        verify(deepgram).configuredFor(pin);
+        assertTrue(router.route("+56900000000", "+56933334444", CALL_SID).isEmpty(),
+                "The economic provider must not serve a different destination");
+        assertFalse(router.readiness().ready(),
+                "Unscoped health must not disclose readiness of a tenant-pinned paid provider");
+        assertEquals("deepgram-economy", router.readiness().providers().get(0).providerId());
+        verify(deepgram, atLeastOnce()).configured();
+        verify(deepgram, never()).configuredFor("+56933334444");
+    }
+
     @Test
     void unavailableProviderReadinessNeverEchoesExceptionMessages() {
         VoiceProviderProperties settings = new VoiceProviderProperties();
