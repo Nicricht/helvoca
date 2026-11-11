@@ -103,6 +103,90 @@ class DeepgramEconomyVoiceSessionTest {
     }
 
     @Test
+    void inactiveEconomySessionCannotStartDeepgramConnection() {
+        Fixture f = new Fixture();
+        assertThrows(IllegalStateException.class, f.session::start);
+        verifyNoInteractions(f.http, f.gemini, f.tools);
+    }
+
+    @Test
+    void activeSessionBuildsExactNovaMultilingualTlsHandshakeWithoutPaidRequest() {
+        Fixture f = new Fixture();
+        f.settings.setEnabled(true);
+        f.settings.setApiKey("synthetic-key-for-unit-test");
+        f.settings.setPinnedBusinessId(f.context.businessId().toString());
+        f.settings.setPinnedDestinationNumber(f.context.destinationNumber());
+        java.net.http.WebSocket.Builder builder = mock(java.net.http.WebSocket.Builder.class);
+        when(f.http.newWebSocketBuilder()).thenReturn(builder);
+        when(builder.connectTimeout(any(java.time.Duration.class))).thenReturn(builder);
+        when(builder.header(eq("Authorization"), eq("Token synthetic-key-for-unit-test")))
+                .thenReturn(builder);
+        java.util.concurrent.CompletableFuture<java.net.http.WebSocket> pending =
+                new java.util.concurrent.CompletableFuture<>();
+        when(builder.buildAsync(any(java.net.URI.class), eq(f.session))).thenReturn(pending);
+
+        f.session.start();
+
+        org.mockito.ArgumentCaptor<java.net.URI> uri =
+                org.mockito.ArgumentCaptor.forClass(java.net.URI.class);
+        verify(builder).buildAsync(uri.capture(), eq(f.session));
+        assertEquals("wss", uri.getValue().getScheme());
+        assertEquals("api.deepgram.com", uri.getValue().getHost());
+        assertTrue(uri.getValue().getRawQuery().contains("model=nova-3"));
+        assertTrue(uri.getValue().getRawQuery().contains("language_hint=es"));
+        assertTrue(uri.getValue().getRawQuery().contains("encoding=mulaw"));
+        assertTrue(uri.getValue().getRawQuery().contains("sample_rate=8000"));
+        verifyNoInteractions(f.gemini, f.tools);
+        f.session.close();
+    }
+
+    @Test
+    void invalidFramesFallBackRatherThanSendingUnknownAudio() {
+        Fixture f = new Fixture();
+        when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(true);
+        when(f.gemini.createSession(eq(f.context), eq(f.transport))).thenReturn(f.geminiSession);
+        f.session.acceptInboundAudio("%%%%invalid");
+        verify(f.geminiSession).start();
+        verifyNoInteractions(f.http, f.tools);
+        f.session.acceptInboundAudio("AAECAw==");
+        verify(f.geminiSession).acceptInboundAudio("AAECAw==");
+        verify(f.geminiSession, times(1)).start();
+    }
+
+    @Test
+    void thirtySecondsOfPcmuAudioBoundEconomyInputAndPreserveCallThroughGemini() {
+        Fixture f = new Fixture();
+        when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(true);
+        when(f.gemini.createSession(eq(f.context), eq(f.transport))).thenReturn(f.geminiSession);
+        String frame = java.util.Base64.getEncoder().encodeToString(new byte[1600]);
+        for (int i = 0; i < 150; i++) {
+            f.session.acceptInboundAudio(frame);
+        }
+        verifyNoInteractions(f.gemini);
+        f.session.acceptInboundAudio(frame);
+
+        verify(f.geminiSession).start();
+        // Best-effort replay is deliberately bounded to the most recent 120 frames.
+        verify(f.geminiSession, times(120)).acceptInboundAudio(frame);
+        verify(f.transport, never()).closeOnUpstreamFailure();
+        verifyNoInteractions(f.http);
+        f.session.acceptInboundAudio(frame);
+        verify(f.geminiSession, times(121)).acceptInboundAudio(frame);
+        verify(f.geminiSession, times(1)).start();
+    }
+
+    @Test
+    void closedSocketCannotStartLateOrProduceNewPaidSpeech() {
+        Fixture f = new Fixture();
+        java.net.http.WebSocket socket = mock(java.net.http.WebSocket.class);
+        f.session.close();
+        f.session.onOpen(socket);
+        verify(socket).request(1);
+        verify(socket).abort();
+        verifyNoInteractions(f.tools, f.http, f.gemini);
+    }
+
+    @Test
     void upstreamFailureWithoutGeminiClosesCarrierExactlyOnce() {
         Fixture f = new Fixture();
         when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(false);

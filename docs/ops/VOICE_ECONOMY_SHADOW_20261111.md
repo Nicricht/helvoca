@@ -58,3 +58,11 @@ Si una lectura autorizada de `agentGreeting` arroja una excepción (p. ej., erro
 ### Certificación GitHub sobre rama apilada
 
 El workflow `.github/workflows/ci.yml` tiene activador de PR restringido a `main`. Para certificar el HEAD de la nueva corrección, el PR DRAFT #875 se basó temporalmente en `main` sin fusionar y se creó un recibo nuevo para su base real. Tras observar el Fast/Full Gate exacto debe regresar a la base `perf/aurora-economy-intent-shadow-20261111` (#874). La prueba nueva comprueba también que, cuando fallan **el saludo y Gemini**, la telefonía se cierra una sola vez sin invocar Deepgram TTS. Ninguno de estos cambios acredita autenticidad o ahorro del proveedor real.
+
+### 11 nov 2026 · Reconciliación de cobertura y control de audio STT
+
+El workflow `43089205213` terminó con conclusión global **FAILURE** en el job `test`, paso `Enforce differential Java coverage`. No es fallo de la batería JUnit: el reporte `backend-test-diagnostics` de 8 MB muestra **2.702 Java tests PASS**. La cobertura en JaCoCo del código completo del prototipo, no sólo del último commit, es insuficiente: `DeepgramEconomyVoiceSession` 111/180 líneas y 54/130 ramas, `DeepgramEconomyVoiceProvider` 7/15 líneas y 0/10 ramas. Prohibido declarar DONE o modificar el umbral de 100 %.
+
+Se añadió un límite conservador de **240.000 bytes de audio PCMU 8 kHz** (equivalente a 30 segundos de audio) por sesión STT económica. Al excederlo la sesión deja de remitir nuevos bytes a Deepgram y deriva la llamada a Gemini configurado para el negocio, sin colgar. **No es un límite estricto de facturación**: duración de WebSocket inactivo, tarifas de proveedor, TTS y continuidad todavía deben certificarse. También se añadieron pruebas offline del handshake, pinning, agente inactivo, audio inválido, cierre temprano y sobreconsumo de audio. El provider sigue **OFF**.
+
+Referencias de formato verificadas: https://developers.deepgram.com/docs/nova-3-language-prompting , https://developers.deepgram.com/docs/encoding/ y https://developers.deepgram.com/developer-tools/cli/text-to-speech .

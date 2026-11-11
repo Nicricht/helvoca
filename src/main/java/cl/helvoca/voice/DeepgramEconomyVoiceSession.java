@@ -41,6 +41,10 @@ final class DeepgramEconomyVoiceSession implements VoiceAiSession, WebSocket.Lis
     private static final int MAX_PENDING_FRAMES = 200;
     private static final int MAX_TTS_BYTES = 512000;
     private static final int MAX_TTS_CHARACTERS = 220;
+    // Raw Twilio mu-law audio carries 8000 bytes per second. Limit the
+    // experimental STT path; keep the caller connected through Gemini.
+    // This is an audio-volume guard, NOT a provider billing hard limit.
+    private static final long MAX_STT_AUDIO_BYTES = 30L * 8_000;
 
     private final RealtimeCallContext context;
     private final VoiceTransportSession transport;
@@ -62,6 +66,8 @@ final class DeepgramEconomyVoiceSession implements VoiceAiSession, WebSocket.Lis
     private volatile VoiceAiSession geminiSession;
     private CompletableFuture<Void> sendChain = CompletableFuture.completedFuture(null);
     private int pendingSendCount;
+    // Guarded by audioLock, including buffering before the STT socket opens.
+    private long acceptedSttAudioBytes;
 
     DeepgramEconomyVoiceSession(RealtimeCallContext context,
                                 VoiceTransportSession transport,
@@ -106,6 +112,13 @@ final class DeepgramEconomyVoiceSession implements VoiceAiSession, WebSocket.Lis
             fallback("invalid_frame_size"); return;
         }
         synchronized (audioLock) {
+            if (acceptedSttAudioBytes > MAX_STT_AUDIO_BYTES - bytes.length) {
+                // Never silently continue to accumulate paid STT audio.
+                // Switching to Gemini is preferable to ending the phone call.
+                fallback("stt_audio_budget");
+                return;
+            }
+            acceptedSttAudioBytes += bytes.length;
             if (replayAudio.size() >= 120) replayAudio.removeFirst();
             replayAudio.addLast(base64Audio);
             if (socket == null) {
