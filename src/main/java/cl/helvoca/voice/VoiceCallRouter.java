@@ -100,7 +100,9 @@ public class VoiceCallRouter {
                 VoiceAiProvider provider = mediaProviders.require(mediaId);
                 boolean configured = provider instanceof GeminiLiveVoiceProvider gemini
                         ? gemini.configuredFor(businessPhone)
-                        : provider.configured();
+                        : provider instanceof DeepgramEconomyVoiceProvider deepgram
+                            ? deepgram.configuredFor(businessPhone)
+                            : provider.configured();
                 if (!health.allow(provider.id(), configured)) continue;
                 String twiml = bakeOff
                         ? mediaTwiml.twiml(
@@ -140,7 +142,9 @@ public class VoiceCallRouter {
             }
             try {
                 VoiceAiProvider provider = mediaProviders.require(mediaProviderId(id));
-                var snapshot = health.snapshot(provider.id(), provider.configured());
+                boolean configured = provider instanceof DeepgramEconomyVoiceProvider deepgram
+                        ? deepgram.configured() : provider.configured();
+                var snapshot = health.snapshot(provider.id(), configured);
                 providers.add(new ProviderStatus(provider.id(), "MEDIA_STREAM", snapshot.configured(), snapshot.available(),
                         snapshot.state(), snapshot.detail()));
             } catch (RuntimeException e) {

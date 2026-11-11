@@ -34,3 +34,13 @@ Prototipar STT alternativo y TTS de calidad comparable a Sulafat, con acceso aut
 ## Comprobante de contexto previo
 
 Receipt autenticado anterior al HEAD final: PR #874, comentario 6803853419, validando el padre exacto, rama, base main temporal y evidencia del piloto. Este commit únicamente añade la referencia de trazabilidad; no desactiva controles ni habilita rutas telefónicas.
+
+## Fase 2: PR #875 (Nova-3 + Aura-2), estado NO-GO hasta certificación
+
+- Rama `feat/deepgram-economy-voice-isolated-20261111`, apilada sobre #874; PR DRAFT https://github.com/Nicricht/helvoca/pull/875.
+- Se añadió proveedor `deepgram-economy` con reconocimiento Deepgram Nova-3 multilingüe en tiempo real (PCMU 8 kHz), síntesis Aura-2 en español (PCMU 8 kHz sin contenedor) y adaptador a Twilio media stream, sin alterar el proveedor `gemini` ni Sulafat.
+- La selección económica es **opt-in y OFF**: nunca figura en `HELVOCA_VOICE_PROVIDER_ORDER` predeterminado, requiere `HELVOCA_DEEPGRAM_ECONOMY_ENABLED=true`, credencial segura no registrada en Git, negocio UUID y teléfono exactos. Incluso habilitado exige fallback Gemini configurado. `configured()` sin contexto devuelve false.
+- Sólo se responde un precio cuyo nombre coincide exactamente con un servicio activo del catálogo del tenant mediante la capa existente de permisos. Horarios y dirección, reservas, datos personales, consultas ambiguas y falla del backend escalan a Gemini; nunca se inventan datos ni se habilitan mutaciones en la ruta económica.
+- Si falla STT, TTS, el costo estimado, la conexión o la respuesta autorizada, la ruta intenta transferir el control a la sesión Gemini de la misma llamada; un fallo adicional termina la conexión de forma segura. Una transición puede requerir repetir la solicitud, por eso **no se acepta la ruta para pacientes reales sin un ensayo de continuidad y latencia**.
+- Modelo de costos: referencia provisional Nova-3 streaming USD 0,0092/min + Aura-2 USD 0,03/1.000 caracteres frente a Gemini Live USD 0,023/min. Son unidades de referencia, no un ahorro facturado; Twilio, latencia, contenido y consumo adicional quedan fuera. Aceptación obligatoria: ahorro extremo a extremo **medido**, no por porcentajes inventados.
+- Pruebas unitarias sintéticas en `DeepgramEconomyVoiceTest` y CI del SHA final; NO se realizaron llamadas, HTTP al proveedor, pagos, recargas, despliegues ni cambios de variables de Railway. La calidad de voz chilena, VAD, interrupciones y continuidad del fallback siguen **NO VERIFICADAS EN PROVEEDOR REAL**. El PR debe seguir DRAFT hasta cerrar el Full Gate y la verificación de un piloto autorizado.

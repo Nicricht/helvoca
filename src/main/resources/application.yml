@@ -149,6 +149,16 @@ app:
     telephony-provider: ${HELVOCA_TELEPHONY_PROVIDER:twilio}
     ai-provider: ${HELVOCA_VOICE_AI_PROVIDER:openai}
     provider-order: ${HELVOCA_VOICE_PROVIDER_ORDER:gemini,openai-live}
+    # Experimental phone route. Both explicit enable + exact tenant/phone pin needed.
+    # Not in default provider-order. No paid Deepgram requests when OFF.
+    deepgram-economy:
+      enabled: ${HELVOCA_DEEPGRAM_ECONOMY_ENABLED:false}
+      api-key: ${DEEPGRAM_API_KEY:}
+      pinned-business-id: ${HELVOCA_DEEPGRAM_ECONOMY_ALLOWED_BUSINESS_ID:}
+      pinned-destination-number: ${HELVOCA_DEEPGRAM_ECONOMY_ALLOWED_PHONE:}
+      nova-usd-per-minute: ${HELVOCA_DEEPGRAM_ECONOMY_NOVA_USD_PER_MINUTE:0.0092}
+      aura-usd-per-thousand-chars: ${HELVOCA_DEEPGRAM_ECONOMY_AURA_USD_PER_1000_CHARS:0.03}
+      gemini-reference-usd-per-minute: ${HELVOCA_DEEPGRAM_ECONOMY_GEMINI_REF_USD_PER_MINUTE:0.023}
   twilio:
     account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
