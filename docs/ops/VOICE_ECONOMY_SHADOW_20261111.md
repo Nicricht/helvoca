@@ -31,3 +31,6 @@ JUnit usa **18 mensajes ficticios**. **6/18 (33,3 %)** son candidatos a ruta bar
 ## Para ahorrar dinero de verdad en fase 2
 
 Prototipar STT alternativo y TTS de calidad comparable a Sulafat, con acceso autenticado de solo lectura al catálogo y horarios vigentes. Probar con audio sintético de Chile, interrupciones, fechas y nombres. Ante duda, preferir Gemini. Activar el nuevo motor solo cuando sea mediblemente más barato y no baje tasa de reservas correctas. Requiere trabajo y autorización separados para una ruta telefónica real.
+## Comprobante de contexto previo
+
+Receipt autenticado anterior al HEAD final: PR #874, comentario 6803853419, validando el padre exacto, rama, base main temporal y evidencia del piloto. Este commit únicamente añade la referencia de trazabilidad; no desactiva controles ni habilita rutas telefónicas.
