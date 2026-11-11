@@ -7,6 +7,7 @@ import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.call.CallTranscriptService;
 import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallLifecycleService;
+import cl.helvoca.voice.VoiceEconomyIntentRouter;
 import cl.helvoca.voice.VoiceAiSession;
 import cl.helvoca.voice.VoiceProviderHealthRegistry;
 import cl.helvoca.voice.VoiceTransportSession;
@@ -1133,6 +1134,14 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (!text.isBlank()) {
             if ("USER".equals(speaker)) {
                 lastUserUtterance = text;
+                // Passive, non-billable routing observation. Speech is already
+                // transcribed by Gemini; no change to audio or provider here.
+                if (properties.isEconomyShadowEnabled()
+                        && !properties.isCertificationSimulation() && !context.voiceBakeOff()) {
+                    VoiceEconomyIntentRouter.Decision economy = VoiceEconomyIntentRouter.classify(text);
+                    log.info("VOICE_ECONOMY_SHADOW call_id={} path={} reason={} mode=ADVISORY_ONLY",
+                            context.callId(), economy.path(), economy.reason());
+                }
                 boolean negative = isNegativeClosingReply(text);
                 if (awaitingAnythingElseAnswer.getAndSet(false) && negative) {
                     contextualClosingIntent.set(true);
