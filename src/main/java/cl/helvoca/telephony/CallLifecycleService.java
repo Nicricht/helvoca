@@ -134,7 +134,7 @@ public class CallLifecycleService {
 
         // Same transaction + business advisory lock as the concurrency guard:
         // another replica cannot race this budget admission decision.
-        enforceEstimatedDailyBudget(businessId);
+        enforceEstimatedDailyBudget(businessId, telephonyProvider);
 
         String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
@@ -160,7 +160,7 @@ public class CallLifecycleService {
         return saved.getId();
     }
 
-    private void enforceEstimatedDailyBudget(UUID businessId) {
+    private void enforceEstimatedDailyBudget(UUID businessId, String telephonyProvider) {
         BigDecimal ceiling = commercial.getMaxEstimatedCostPerBusinessPerUtcDayUsd();
         if (ceiling.signum() <= 0) return;
         BigDecimal reservation = commercial.getEstimatedNewCallReservationUsd();
@@ -168,6 +168,16 @@ public class CallLifecycleService {
         if (reservation.signum() <= 0 || reservation.compareTo(ceiling) > 0) {
             metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_config").increment();
             throw new CallCapacityExceededException("Estimated daily budget is not configured safely");
+        }
+
+        // A positive reservation is not enough if a configured zero tariff
+        // makes completed calls appear free. Require an effective carrier
+        // rate and a positive AI fallback with no zero-priced overrides.
+        // This is still an admission estimate, never a hard provider cap.
+        if (commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider).signum() <= 0
+                || !commercial.hasCompleteAiPricingForEstimatedBudget()) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_pricing").increment();
+            throw new CallCapacityExceededException("Estimated daily budget pricing is not configured safely");
         }
 
         Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS);

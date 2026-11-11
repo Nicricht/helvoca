@@ -171,3 +171,14 @@ límite experimental susceptible de excedentes: **NO-GO** para activar
 y cobros desactivados. Sin activar ni alterar variables, `main`,
 producción comercial, pagos o llamadas. Ver Issue #823 para evidencia
 y QA exact-HEAD.
+
+
+## 11-nov-2026 · Fail-closed on zero-price voice rates when an estimated daily budget is enabled
+
+**Observed gap in PR #871 HEAD `12d1485e`:** the per-business daily USD admission ceiling verified only the ceiling and positive reservation, but an effective carrier tariff or the AI fallback/model/provider rate could still be zero. For an already completed call, the estimated cost then risks falling back to the reservation rather than reflecting actual positive usage. The existing reservation and tenant lock remain mandatory and unchanged; this update is specifically a priced-admission *safety* improvement, not a new V1 milestone.
+
+**New behavior:** with `HELVOCA_MAX_ESTIMATED_COST_PER_BUSINESS_PER_UTC_DAY_USD > 0`, a new call is denied **before the DB cost query or persistence** if its effective telephony provider rate is not positive, or if `HELVOCA_AI_COST_PER_MINUTE_USD` is not positive, or any configured AI provider/model rate override is nonpositive. This is conservative because the model is not always known at call admission. Operators must configure a positive generic AI fallback and positive explicit overrides for all configured routes; **a positive placeholder is not proof of a calibrated billing rate**. For the budget OFF (default = 0), prior behavior is preserved.
+
+**QA contract:** no provider contact. Unit tests cover zero telephony, zero AI fallback, zero provider override, zero model override, positive configured rates and prior budget cases. Existing real PostgreSQL 16 Testcontainers tenant/idempotence and started-minute billing tests use an explicit fixture AI fallback. Require new HEAD Fast/Full Golden Journey, PostgreSQL 16/18, differential Java coverage 100% before treating this as certified. No deployment, provider LIVE action, merging to main, payments or variable changes without separate authorization.
+
+**Commercial status remains NO-GO:** the admission guard is a *best-effort estimated budget*, not a hard cap because Gemini resubmits context, actual rates are not yet reconciled per call and calls deliberately have no duration limit. The owner has not approved a budget or per-call reservation. Do not set arbitrary USD/CLP values or claim that this prevents all provider overage.

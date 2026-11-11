@@ -154,6 +154,8 @@ class CallSubscriptionAdmissionTest {
         CallCommercialProperties props = new CallCommercialProperties();
         props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new java.math.BigDecimal("0.90"));
         props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.20"));
+        props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.02"));
         CallLifecycleService lifecycle = lifecycle(phones, calls, props);
         lifecycle.setSubscriptions(subscriptions);
         when(calls.sumReservedEstimatedCostByBusinessAndUtcDay(eq(businessId),
@@ -169,6 +171,61 @@ class CallSubscriptionAdmissionTest {
         verify(calls, times(1)).saveAndFlush(any(CallSession.class));
         assertThrows(CallCapacityExceededException.class, () -> lifecycle.startInboundCall(
                 "twilio", "CA-budget-unknown", "+56910001902", "+14355551902"));
+        verify(calls, times(1)).saveAndFlush(any(CallSession.class));
+    }
+
+    @Test
+    void budgetEnabledRejectsUnknownCarrierAndAiRatesBeforeAnyWrite() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551918"))
+                .thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+
+        CallCommercialProperties props = new CallCommercialProperties();
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new java.math.BigDecimal("0.90"));
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.20"));
+        CallLifecycleService lifecycle = lifecycle(phones, calls, props);
+        lifecycle.setSubscriptions(subscriptions);
+
+        // All budget-enabled pricing failures occur before spend lookup/save.
+        var missingCarrier = assertThrows(CallCapacityExceededException.class,
+                () -> lifecycle.startInboundCall("twilio", "CA-price-carrier-zero",
+                        "+56910001918", "+14355551918"));
+        assertEquals("Estimated daily budget pricing is not configured safely", missingCarrier.getMessage());
+
+        props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        var missingAi = assertThrows(CallCapacityExceededException.class,
+                () -> lifecycle.startInboundCall("twilio", "CA-price-ai-zero",
+                        "+56910001918", "+14355551918"));
+        assertEquals("Estimated daily budget pricing is not configured safely", missingAi.getMessage());
+
+        props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.02"));
+        props.setAiProviderCostPerMinuteUsd(java.util.Map.of("gemini", java.math.BigDecimal.ZERO));
+        assertThrows(CallCapacityExceededException.class,
+                () -> lifecycle.startInboundCall("twilio", "CA-price-provider-zero",
+                        "+56910001918", "+14355551918"));
+
+        props.setAiProviderCostPerMinuteUsd(java.util.Map.of("gemini", new java.math.BigDecimal("0.02")));
+        props.setAiModelCostPerMinuteUsd(java.util.Map.of("gemini-3.8-live", java.math.BigDecimal.ZERO));
+        assertThrows(CallCapacityExceededException.class,
+                () -> lifecycle.startInboundCall("twilio", "CA-price-model-zero",
+                        "+56910001918", "+14355551918"));
+        verify(calls, never()).sumReservedEstimatedCostByBusinessAndUtcDay(
+                any(UUID.class), any(Instant.class), any(Instant.class), any(java.math.BigDecimal.class));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
+
+        props.setAiModelCostPerMinuteUsd(java.util.Map.of("gemini-3.8-live", new java.math.BigDecimal("0.02")));
+        when(calls.sumReservedEstimatedCostByBusinessAndUtcDay(eq(businessId),
+                any(Instant.class), any(Instant.class), eq(new java.math.BigDecimal("0.20"))))
+                .thenReturn(java.math.BigDecimal.ZERO);
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(i -> i.getArgument(0));
+        lifecycle.startInboundCall("twilio", "CA-price-all-positive",
+                "+56910001918", "+14355551918");
         verify(calls, times(1)).saveAndFlush(any(CallSession.class));
     }
 

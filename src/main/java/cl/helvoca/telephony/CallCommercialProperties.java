@@ -112,6 +112,17 @@ public class CallCommercialProperties {
         this.aiModelCostPerMinuteUsd = normalizeRates(values);
     }
 
+    /**
+     * A budget admission cannot rely on a zero-priced voice fallback, and a
+     * configured provider/model override must not silently bypass that floor.
+     * Positive rates are operator estimates, not proof of provider billing.
+     */
+    public boolean hasCompleteAiPricingForEstimatedBudget() {
+        return aiCostPerMinuteUsd.signum() > 0
+                && aiProviderCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0)
+                && aiModelCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0);
+    }
+
     public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider) {
         return resolve(telephonyProviderCostPerMinuteUsd, provider, telephonyCostPerMinuteUsd);
     }

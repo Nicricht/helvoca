@@ -43,6 +43,8 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         registry.add("app.commercial.calls.max-estimated-cost-per-business-per-utc-day-usd", () -> "0.50");
         registry.add("app.commercial.calls.estimated-new-call-reservation-usd", () -> "0.20");
         registry.add("app.commercial.calls.telephony-cost-per-minute-usd", () -> "0.10");
+        // Budget admission requires a positive AI fallback; no external AI call is made.
+        registry.add("app.commercial.calls.ai-cost-per-minute-usd", () -> "0.02");
         // The provider-specific Twilio map overrides the generic rate.
         registry.add("app.commercial.calls.telephony-provider-cost-per-minute-usd.twilio", () -> "0.10");
     }
