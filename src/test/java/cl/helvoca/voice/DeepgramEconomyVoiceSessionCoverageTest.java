@@ -336,9 +336,10 @@ class DeepgramEconomyVoiceSessionCoverageTest {
         }
 
         Fixture tts(byte[] audio, int status) {
+            HttpResponse<byte[]> preparedResponse = response(status, audio);
             when(http.sendAsync(any(HttpRequest.class),
                     org.mockito.ArgumentMatchers.<HttpResponse.BodyHandler<byte[]>>any()))
-                    .thenReturn(CompletableFuture.completedFuture(response(status, audio)));
+                    .thenReturn(CompletableFuture.completedFuture(preparedResponse));
             when(transport.isOpen()).thenReturn(true);
             return this;
         }
