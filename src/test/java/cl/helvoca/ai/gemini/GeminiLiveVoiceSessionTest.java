@@ -1615,6 +1615,56 @@ class GeminiLiveVoiceSessionTest {
     }
 
     @Test
+    void economyShadowClassifiesCompletedTranscriptWithoutSendingAudioOrExposingTextInLogs() {
+        GeminiLiveProperties props = properties();
+        assertFalse(props.isEconomyShadowEnabled(), "off by default");
+        props.setEconomyShadowEnabled(true);
+        RealtimeCallContext context = context();
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        CallTranscriptService transcripts = mock(CallTranscriptService.class);
+        VoiceTransportSession transport = mock(VoiceTransportSession.class);
+        GeminiLiveVoiceSession session = new GeminiLiveVoiceSession(
+                context, transport, props, tools, transcripts,
+                mock(CallSummaryService.class), mock(CallLifecycleService.class),
+                mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        WebSocket socket = mock(WebSocket.class);
+        Logger logger = (Logger) LoggerFactory.getLogger(GeminiLiveVoiceSession.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            String utterance = "¿Cuál es la dirección?";
+            session.onText(socket, new JSONObject().put("serverContent", new JSONObject()
+                    .put("inputTranscription", new JSONObject().put("text", utterance))
+                    .put("turnComplete", true)).toString(), true);
+            verify(transcripts).append(context.callId(), "USER", utterance);
+            verifyNoInteractions(tools, transport);
+            List<String> logs = appender.list.stream()
+                    .map(ILoggingEvent::getFormattedMessage)
+                    .filter(s -> s.contains("VOICE_ECONOMY_SHADOW"))
+                    .toList();
+            assertEquals(1, logs.size());
+            assertTrue(logs.get(0).contains("RULES_CANDIDATE"));
+            assertTrue(logs.get(0).contains("BUSINESS_ADDRESS"));
+            assertTrue(logs.get(0).contains("mode=ADVISORY_ONLY"));
+            assertFalse(logs.get(0).contains(utterance), "No caller speech in cost logs");
+
+            props.setEconomyShadowEnabled(false);
+            session.onText(socket, new JSONObject().put("serverContent", new JSONObject()
+                    .put("inputTranscription", new JSONObject().put("text", "¿Cuánto cuesta nutrición?"))
+                    .put("turnComplete", true)).toString(), true);
+            assertEquals(1, appender.list.stream()
+                    .filter(e -> e.getFormattedMessage().contains("VOICE_ECONOMY_SHADOW"))
+                    .count(), "turning off shadow must not route or log further speech");
+            verifyNoInteractions(tools, transport);
+        } finally {
+            logger.detachAppender(appender);
+            appender.stop();
+        }
+    }
+
+    @Test
     void permissionDeniedAndAccessDeniedAreAuthFailures() {
         assertEquals(VoiceProviderHealthRegistry.FailureKind.AUTH,
                 GeminiLiveVoiceSession.classifyFailure(403, "PERMISSION_DENIED"));
