@@ -123,6 +123,12 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
         return createSession(context, transport, true, true, assistantTextSink);
     }
 
+    GeminiLiveVoiceSession createAudioContinuationSession(
+            RealtimeCallContext context,
+            VoiceTransportSession transport) {
+        return createSession(context, transport, true, false, null);
+    }
+
     private GeminiLiveVoiceSession createSession(
             RealtimeCallContext context,
             VoiceTransportSession transport,
