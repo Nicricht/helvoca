@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * Server-to-server Gemini Live session. The telephony adapter supplies Twilio
@@ -109,6 +110,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final StringBuilder userTranscript = new StringBuilder();
     private final StringBuilder assistantTranscript = new StringBuilder();
     private final Object sendLock = new Object();
+    private final Queue<String> pendingClientTurns = new ConcurrentLinkedQueue<>();
+    private final Consumer<String> assistantTextSink;
 
     private volatile WebSocket socket;
     private volatile String lastUserUtterance = "";
@@ -129,7 +132,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                            VoiceProviderHealthRegistry health,
                            HttpClient http) {
         this(context, transport, properties, tools, transcripts, summaries, lifecycle,
-                certifications, health, http, new TenantDatabaseContext());
+                certifications, health, http, new TenantDatabaseContext(), null);
     }
 
     GeminiLiveVoiceSession(RealtimeCallContext context,
@@ -143,6 +146,22 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                            VoiceProviderHealthRegistry health,
                            HttpClient http,
                            TenantDatabaseContext databaseContext) {
+        this(context, transport, properties, tools, transcripts, summaries, lifecycle,
+                certifications, health, http, databaseContext, null);
+    }
+
+    GeminiLiveVoiceSession(RealtimeCallContext context,
+                           VoiceTransportSession transport,
+                           GeminiLiveProperties properties,
+                           RealtimeToolService tools,
+                           CallTranscriptService transcripts,
+                           CallSummaryService summaries,
+                           CallLifecycleService lifecycle,
+                           CallCertificationService certifications,
+                           VoiceProviderHealthRegistry health,
+                           HttpClient http,
+                           TenantDatabaseContext databaseContext,
+                           Consumer<String> assistantTextSink) {
         if (context == null || context.businessId() == null) {
             throw new IllegalArgumentException("Realtime call context requires businessId");
         }
@@ -157,6 +176,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         this.certifications = certifications;
         this.health = health;
         this.http = http;
+        this.assistantTextSink = assistantTextSink;
         this.usageMeter = new GeminiLiveUsageMeter(context.callId(), context.businessId(), properties.getModel());
         this.localBargeInDetector = new LocalBargeInDetector(
                 properties.getLocalBargeInMeanAmplitudeThreshold(),
@@ -181,6 +201,27 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                             classifyFailure(null, message));
                     return null;
                 });
+    }
+
+    /**
+     * Supplies a caller turn already transcribed by the outer speech provider.
+     * This keeps Gemini text-only and lets the outer provider retain one stable
+     * TTS voice across simple and complex turns.
+     */
+    void acceptInboundText(String text) {
+        if (closed.get() || text == null || text.isBlank()) return;
+        if (!setupComplete.get()) {
+            if (pendingClientTurns.size() >= 32) {
+                fail("Gemini pending text-turn backlog exceeded safe limit",
+                        VoiceProviderHealthRegistry.FailureKind.UPSTREAM);
+                return;
+            }
+            pendingClientTurns.offer(text.trim());
+            return;
+        }
+        append(userTranscript, text);
+        flush(userTranscript, "USER");
+        sendClientTurn(text.trim());
     }
 
     @Override
@@ -329,8 +370,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
         if (context.voiceBakeOff()) {
             advanceVoiceBakeOff();
-        } else {
+        } else if (!properties.isSuppressWelcome()) {
             sendRealtimeText("[RECEPVOZ_CALL_CONNECTED]");
+        }
+
+        String pendingText;
+        while ((pendingText = pendingClientTurns.poll()) != null) {
+            append(userTranscript, pendingText);
+            flush(userTranscript, "USER");
+            sendClientTurn(pendingText);
         }
 
         if (properties.isCertificationSimulation()) {
@@ -375,7 +423,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         if (parts != null && !interrupted) {
             for (int i = 0; i < parts.length(); i++) {
                 JSONObject part = parts.optJSONObject(i);
-                JSONObject inline = part == null ? null : part.optJSONObject("inlineData");
+                if (part == null) continue;
+                if (properties.isTextOutputMode()) {
+                    append(assistantTranscript, part.optString("text", ""));
+                    continue;
+                }
+                JSONObject inline = part.optJSONObject("inlineData");
                 if (inline == null) continue;
                 String data = inline.optString("data", null);
                 if (data == null || data.isBlank()) continue;
@@ -387,7 +440,12 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         boolean generationComplete = content.optBoolean("generationComplete", false);
         boolean waitingForInput = content.optBoolean("waitingForInput", false);
         if (turnComplete || generationComplete) {
-            sendFramedAssistantAudio(assistantAudioFramer.finishTurn());
+            if (!properties.isTextOutputMode()) {
+                sendFramedAssistantAudio(assistantAudioFramer.finishTurn());
+            } else if (!interrupted && assistantTextSink != null) {
+                String assistantText = bufferText(assistantTranscript);
+                if (!assistantText.isBlank()) assistantTextSink.accept(assistantText);
+            }
         }
 
         if (context.voiceBakeOff() && turnComplete) {
@@ -869,11 +927,13 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     JSONObject buildSetup() {
         JSONObject generation = new JSONObject()
-                .put("responseModalities", new JSONArray().put("AUDIO"))
-                .put("speechConfig", new JSONObject()
-                        .put("voiceConfig", new JSONObject()
-                                .put("prebuiltVoiceConfig", new JSONObject()
-                                        .put("voiceName", properties.getVoice()))));
+                .put("responseModalities", new JSONArray().put(properties.isTextOutputMode() ? "TEXT" : "AUDIO"));
+        if (!properties.isTextOutputMode()) {
+            generation.put("speechConfig", new JSONObject()
+                    .put("voiceConfig", new JSONObject()
+                            .put("prebuiltVoiceConfig", new JSONObject()
+                                    .put("voiceName", properties.getVoice()))));
+        }
 
         JSONObject activityDetection = new JSONObject()
                 .put("disabled", false)
@@ -986,6 +1046,11 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     }
 
     private String systemInstructions() {
+        String continuationPrelude = properties.isSuppressWelcome()
+                ? """
+                CONTINUIDAD DE LLAMADA: el paciente ya recibió el saludo inicial. No vuelvas a saludar, no te presentes y no reinicies la conversación. Responde directamente a la solicitud que acaba de llegar. La voz la sintetiza el proveedor telefónico, así que redacta una respuesta breve y natural en español de Chile.
+                """
+                : "";
         String bakeOffPrelude = context.voiceBakeOff()
                 ? """
                 MODO VOICE FINALIST DE RECEPVOZ:
@@ -1011,9 +1076,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 ? "PERSONA VOCAL: habla como un recepcionista chileno de Santiago, adulto, cordial, despierto y profesional. La impresión debe ser de confianza, cercanía y agilidad, sin sonar infantil, exageradamente sensual ni como locutor de call center."
                 : "PERSONA VOCAL: habla como una recepcionista chilena joven-adulta de Santiago, alegre, despierta, cercana y con presencia premium. La impresión debe ser \"qué agradable hablar con ella\", no \"estoy hablando con una operadora\". Usa calidez natural, energía moderada y curiosidad genuina por ayudar, sin exagerar la sonrisa ni teatralizar la entonación. La voz debe sonar femenina y joven-adulta, con resonancia clara, nunca infantil, susurrada, empalagosa ni forzadamente sensual.";
         if (!context.voiceBakeOff() && properties.isLeanSystemInstructionsEnabled()) {
-            return GeminiLiveLeanSystemInstructions.build(bakeOffPrelude, voiceIdentity, voicePersona);
+            return continuationPrelude + GeminiLiveLeanSystemInstructions.build(bakeOffPrelude, voiceIdentity, voicePersona);
         }
-        return bakeOffPrelude + "\n" + """
+        return bakeOffPrelude + "\n" + continuationPrelude + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
                 RESPONDE SIEMPRE EN ESPAÑOL DE CHILE, salvo que el cliente pida explícitamente otro idioma.
