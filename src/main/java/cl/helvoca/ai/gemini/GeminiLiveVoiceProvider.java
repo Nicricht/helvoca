@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Value;
 
 import java.net.http.HttpClient;
 import java.time.Duration;
+import java.util.function.Consumer;
 
 @Component
 public class GeminiLiveVoiceProvider implements VoiceAiProvider {
@@ -107,13 +108,37 @@ public class GeminiLiveVoiceProvider implements VoiceAiProvider {
 
     @Override
     public VoiceAiSession createSession(RealtimeCallContext context, VoiceTransportSession transport) {
+        return createSession(context, transport, false, false, null);
+    }
+
+    /**
+     * Mid-call continuation for a composed speech provider. Gemini receives
+     * text only and returns text to the supplied TTS sink; the caller's voice
+     * remains owned by the outer provider for the entire call.
+     */
+    GeminiLiveVoiceSession createTextContinuationSession(
+            RealtimeCallContext context,
+            VoiceTransportSession transport,
+            Consumer<String> assistantTextSink) {
+        return createSession(context, transport, true, true, assistantTextSink);
+    }
+
+    private GeminiLiveVoiceSession createSession(
+            RealtimeCallContext context,
+            VoiceTransportSession transport,
+            boolean suppressWelcome,
+            boolean textOutputMode,
+            Consumer<String> assistantTextSink) {
         String configuredAgent = tools.agentName(context, null);
         if (configuredAgent != null && !tools.agentActive(context)) {
             throw new IllegalStateException("AI agent is disabled for this business");
         }
+        GeminiLiveProperties snapshot = sessionProperties(context);
+        snapshot.setSuppressWelcome(suppressWelcome);
+        snapshot.setTextOutputMode(textOutputMode);
         return new GeminiLiveVoiceSession(
-                context, transport, sessionProperties(context), tools, transcripts, summaries,
-                lifecycle, certifications, health, http, databaseContext);
+                context, transport, snapshot, tools, transcripts, summaries,
+                lifecycle, certifications, health, http, databaseContext, assistantTextSink);
     }
 
     GeminiLiveProperties sessionProperties(RealtimeCallContext context) {
