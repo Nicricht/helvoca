@@ -35,3 +35,7 @@ Antes de conectar un segundo proveedor habría que:
 - No generar llamadas reales para medir una reducción provisional. No modificar main o producción comercial.
 - No usar un precio de Twilio saliente como tarifa entrante. Las tarifas de voz dependen del sentido de la llamada y su país/origen.
 - No anunciar ahorros financieros hasta contar con dos comparables facturados, no con proyecciones del modo shadow.
+
+## CI: pre-change receipt
+
+El PR #873 dispone de comprobante de evidencia previa autenticado que incluye el SHA exacto dc9c6eece260fd0b383247a2d09a34f03fb30aa0, rama y base main en el momento del test. Este último commit documental desencadena la verificación de ese padre; no se debilita el gate. Una vez verificados los checks, el PR vuelve a apilarse sobre #872.
