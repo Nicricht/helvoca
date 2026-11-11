@@ -85,6 +85,24 @@ class DeepgramEconomyVoiceSessionTest {
     }
 
     @Test
+    void failingTenantGreetingWithNoGeminiSafelyEndsCarrierWithoutPaidTts() {
+        Fixture f = new Fixture();
+        java.net.http.WebSocket socket = mock(java.net.http.WebSocket.class);
+        when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(false);
+        when(f.tools.agentGreeting(eq(f.context), anyString()))
+                .thenThrow(new IllegalStateException("tenant database unavailable"));
+
+        assertDoesNotThrow(() -> f.session.onOpen(socket));
+        verify(socket).request(1);
+        verify(socket).abort();
+        verify(f.transport, times(1)).closeOnUpstreamFailure();
+        verify(f.gemini, never()).createSession(any(), any());
+        verifyNoInteractions(f.http);
+        f.session.onError(socket, new IllegalStateException("duplicate close"));
+        verify(f.transport, times(1)).closeOnUpstreamFailure();
+    }
+
+    @Test
     void upstreamFailureWithoutGeminiClosesCarrierExactlyOnce() {
         Fixture f = new Fixture();
         when(f.gemini.configuredFor(f.context.destinationNumber())).thenReturn(false);

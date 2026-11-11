@@ -54,3 +54,7 @@ Receipt autenticado anterior al HEAD final: PR #874, comentario 6803853419, vali
 Si una lectura autorizada de `agentGreeting` arroja una excepción (p. ej., error temporal de base de datos), el callback de Deepgram `onOpen` ahora entrega el control una sola vez a Gemini si está configurado para el número exacto; si Gemini también falla, finaliza el transporte de forma segura. No inventa información del negocio, no reproduce audio TTS tras ese fallo y no registra contenido del paciente. Test `DeepgramEconomyVoiceSessionTest.failingTenantGreetingHandsOffToGeminiOnceWithoutSendingTtsOrHangingUp` ejecuta el caso con mocks, sin credenciales ni uso real de Deepgram.
 
 **La verificación con proveedor real sigue sin acreditarse:** Railway Aurora no muestra `DEEPGRAM_API_KEY` ni habilitación `HELVOCA_DEEPGRAM_ECONOMY_ENABLED`; sin credenciales y una prueba costeada autorizada no existe evidencia de calidad en chileno, tarifas cobradas, ni ahorro real.
+
+### Certificación GitHub sobre rama apilada
+
+El workflow `.github/workflows/ci.yml` tiene activador de PR restringido a `main`. Para certificar el HEAD de la nueva corrección, el PR DRAFT #875 se basó temporalmente en `main` sin fusionar y se creó un recibo nuevo para su base real. Tras observar el Fast/Full Gate exacto debe regresar a la base `perf/aurora-economy-intent-shadow-20261111` (#874). La prueba nueva comprueba también que, cuando fallan **el saludo y Gemini**, la telefonía se cierra una sola vez sin invocar Deepgram TTS. Ninguno de estos cambios acredita autenticidad o ahorro del proveedor real.
