@@ -120,3 +120,54 @@ La primera versión de la optimización había superado los tests que construía
 Se incorporó regresión por el camino verdadero del proveedor `GeminiLiveVoiceProviderBakeOffTest.realProviderSessionPropagatesLeanCompactAndCompressionWithIndependentSnapshots`. **RED verificado** en SHA `5918e052e1f6b085c209eda8e3fe07626c05fbbb`, Fast Gate https://github.com/Nicricht/helvoca/actions/runs/42912492436: 684 tests, 1 failure exactamente en la aserción de que el nuevo snapshot conservara `leanSystemInstructionsEnabled=true`; los otros 683 pasaron. Corrección mínima en `GeminiLiveVoiceProvider.java`: copiar los tres flags más `contextWindowCompressionTriggerTokens` y `contextWindowCompressionTargetTokens` al construir la sesión individual, sin tocar las rutas de pacientes, herramientas, agendas, voz, VAD o permisos.
 
 El primer Fast Gate sobre el código corregido (SHA `2bb71d1c3714928548905a8d293c419a10e7df4f`) fue **bloqueado antes de ejecutar Java** por falta de un recibo de evidencia firmado para su parent exacto. No se eliminó ni debilitó el gate. Se añadió una nueva auditoría previa al siguiente commit (PR #871 comentario #6780799598). **Pendiente:** CI final GREEN exact HEAD, verificación de despliegue aislado y metadatos reales del próximo setup; no disparar llamadas ni recargas automáticas.
+
+
+## 10-nov-2026 · Corrección mínima de redondeo Twilio y propuesta preventiva de presupuesto (NO ACTIVADA)
+
+**Nueva evidencia auténtica, sin llamadas adicionales:** la llamada existente de 165 segundos
+`CAd2a116d3701b4507143a48782ec12211` se liquidó en **USD 0,22380**.
+La tarifa publicada de Twilio para un móvil chileno es **USD 0,0746 por minuto**;
+Twilio factura cada minuto parcial como un minuto completo. Por tanto
+`ceil(165/60) * 0.0746 = 3 * 0.0746 = USD 0.22380`.
+En contraste, el estimador previo usaba `165/60 * 0.0746 = USD 0.205150`,
+una **subestimación demostrada de USD 0.018650** para esa llamada.
+Fuentes: https://www.twilio.com/en-us/voice/pricing/cl y
+https://help.twilio.com/articles/223132307-How-do-you-round-minutes-for-billing- .
+Para cargos de una cuenta concreta, manda siempre la factura o Pricing API autenticada.
+
+**Delta del PR #871:** el estimador redondea hacia arriba los minutos de
+conectividad cuando `telephonyProvider=twilio`, conservando los segundos
+fraccionarios para otros proveedores y los estimados IA; no cambia el tiempo
+de conversación, la voz, el calendario, el registro ni las reservas.
+Prueba PostgreSQL con tarifa controlada USD 0,10/min: 165 s -> USD 0,30,
+61 s -> USD 0,20, 0 s -> USD 0; proveedor distinto 30 s -> USD 0,05.
+El presupuesto diario por tenant y la reserva transaccional ya existían:
+no duplicarlos ni presentarlos como un cap de gasto auténtico.
+
+**Gemini:** la tarifa pública `gemini-3.8-live` Standard incluye audio
+entrante USD 0,005/min y saliente USD 0,018/min *equivalentes*, más texto
+entrada USD 0,75/M tokens y salida USD 4,50/M tokens, incluido pensamiento.
+La sesión real reutiliza contexto, por lo que un costo nominal por minuto
+no representa el cargo de esa llamada. Los CLP 762 del 10 nov son consumo
+**diario del proyecto**, no consumo atribuible al CallSid.
+Fuente: https://ai.google.dev/gemini-api/docs/pricing .
+
+**Política simulada para discusión, NO parámetro aprobado ni activo:**
+un techo estimado ilustrativo de USD 5 por tenant/día y reserva de USD 1
+por nueva llamada permitirían a lo sumo cinco admisiones por día con
+estimados que no superen la reserva; si uno supera USD 1, permite menos.
+La llamada observada costó USD 0,22380 **solo en Twilio**, y una estimación
+nominal de audio Google de 3 minutos sería hasta USD 0,069 **sin texto ni
+reprocesamiento**. No usar USD 0,29280 como costo final ni asumir que
+USD 1 cubre conversaciones indefinidas. El límite controla SOLO
+admisión de llamadas nuevas, no corta llamadas ni fija duración, no
+proporciona garantía de factura; es un presupuesto común configurable
+que se evalúa independientemente por tenant, no precios personalizados
+por negocio. Sin tarifa efectiva de IA derivada de uso/SKU, sin umbral
+aceptado por el dueño y con AI Studio mostrando CLP 8.991/10.000 del
+límite experimental susceptible de excedentes: **NO-GO** para activar
+`HELVOCA_MAX_ESTIMATED_COST_PER_BUSINESS_PER_UTC_DAY_USD` /
+`HELVOCA_ESTIMATED_NEW_CALL_RESERVATION_USD`. Mantener Gemini, llamador
+y cobros desactivados. Sin activar ni alterar variables, `main`,
+producción comercial, pagos o llamadas. Ver Issue #823 para evidencia
+y QA exact-HEAD.

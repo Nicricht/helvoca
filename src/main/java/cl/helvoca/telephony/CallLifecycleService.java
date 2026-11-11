@@ -314,8 +314,13 @@ public class CallLifecycleService {
         if (seconds == null || seconds < 0) return;
         BigDecimal minutes = BigDecimal.valueOf(seconds)
                 .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
+        // Twilio bills a started minute as a full minute. Preserve fractional
+        // minutes for other carriers and for Gemini's separate usage estimate.
+        BigDecimal telephonyMinutes = "twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                ? BigDecimal.valueOf((seconds + 59L) / 60L)
+                : minutes;
         BigDecimal telephony = commercial.resolveTelephonyCostPerMinuteUsd(call.getTelephonyProvider())
-                .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
+                .multiply(telephonyMinutes).setScale(6, RoundingMode.HALF_UP);
         BigDecimal ai = call.getAiProvider() == null || call.getAiProvider().isBlank()
                 ? BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP)
                 : commercial.resolveAiCostPerMinuteUsd(call.getAiProvider(), call.getAiModel())

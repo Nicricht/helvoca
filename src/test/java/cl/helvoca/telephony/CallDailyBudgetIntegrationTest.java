@@ -93,6 +93,38 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         assertEquals("Estimated daily call budget reached for business", denied.getMessage());
     }
 
+    @Test
+    void twilioEstimateUsesStartedMinutesButOtherCarriersStayFractional() {
+        Fixture twilio165 = tenant("Budget Rounded 165 Seconds", "+14355551914");
+        admit(twilio165, "CA-budget-rounded-165");
+        lifecycle.updateStatus("CA-budget-rounded-165", "completed", 165);
+        var billed165 = calls.findByProviderCallId("CA-budget-rounded-165").orElseThrow();
+        assertEquals(0, billed165.getEstimatedTelephonyCostUsd()
+                .compareTo(new java.math.BigDecimal("0.30")));
+        assertEquals(0, billed165.getEstimatedTotalCostUsd()
+                .compareTo(new java.math.BigDecimal("0.30")));
+
+        Fixture twilio61 = tenant("Budget Rounded 61 Seconds", "+14355551915");
+        admit(twilio61, "CA-budget-rounded-61");
+        lifecycle.updateStatus("CA-budget-rounded-61", "completed", 61);
+        assertEquals(0, calls.findByProviderCallId("CA-budget-rounded-61").orElseThrow()
+                .getEstimatedTelephonyCostUsd().compareTo(new java.math.BigDecimal("0.20")));
+
+        Fixture twilioZero = tenant("Budget Rounded Zero Seconds", "+14355551916");
+        admit(twilioZero, "CA-budget-rounded-zero");
+        lifecycle.updateStatus("CA-budget-rounded-zero", "completed", 0);
+        assertEquals(0, calls.findByProviderCallId("CA-budget-rounded-zero").orElseThrow()
+                .getEstimatedTelephonyCostUsd().compareTo(java.math.BigDecimal.ZERO));
+
+        Fixture other = tenant("Budget Fractional Carrier", "+14355551917");
+        databaseContext.callAsTenant(other.businessId(), () ->
+                lifecycle.startInboundCall("custom", "CA-budget-custom-30",
+                        "+56910001911", other.phone()));
+        lifecycle.updateStatus("CA-budget-custom-30", "completed", 30);
+        assertEquals(0, calls.findByProviderCallId("CA-budget-custom-30").orElseThrow()
+                .getEstimatedTelephonyCostUsd().compareTo(new java.math.BigDecimal("0.05")));
+    }
+
     private UUID admit(Fixture tenant, String providerCallSid) {
         return databaseContext.callAsTenant(tenant.businessId(), () ->
                 lifecycle.startInboundCall("twilio", providerCallSid,
