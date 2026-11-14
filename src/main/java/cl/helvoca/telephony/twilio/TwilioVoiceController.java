@@ -35,10 +35,10 @@ public class TwilioVoiceController {
     @Autowired
     private TwilioCallBindingGuard bindingGuard;
 
-    @Autowired(required = false)
+    @Autowired
     private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
-    @Autowired(required = false)
+    @Autowired
     private PhoneNumberRepository pilotPhoneNumbers;
 
     @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}")
@@ -179,14 +179,23 @@ public class TwilioVoiceController {
             UUID businessId = pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
                     .map(phone -> phone.getBusinessId())
                     .orElse(null);
+            // A public inbound call must belong to an explicitly launched
+            // tenant. The generic pilot guard intentionally allows
+            // NOT_PILOT_MANAGED for other external effects; that is not
+            // sufficient authorization to incur commercial voice costs.
+            if ("inbound".equals(direction) && businessId == null) {
+                log.warn("Blocking Twilio public inbound call={} because tenant cannot be resolved", callSid);
+                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+            }
             if (businessId != null) {
                 ControlledPilotExternalEffectGuard.Decision pilotDecision =
                         pilotExternalEffects.evaluate(
                                 businessId,
                                 ControlledPilotExternalEffectGuard.Effect.VOICE);
-                if (!pilotDecision.allowed()) {
+                if (!pilotDecision.allowed()
+                        || ("inbound".equals(direction) && !pilotDecision.pilotManaged())) {
                     log.warn(
-                            "Blocking Twilio {} call={} by controlled pilot guard code={} status={}",
+                            "Blocking Twilio {} call={} by tenant voice launch guard code={} status={}",
                             direction,
                             callSid,
                             pilotDecision.code(),
