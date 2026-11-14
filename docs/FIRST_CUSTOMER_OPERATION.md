@@ -101,6 +101,17 @@ Para **cada plan y tenant**, preparar un registro privado sin credenciales ni da
 | Comisiones de cobro, conversión USD/CLP, impuestos y reembolsos | Contrato y liquidaciones verificables de medios de pago, tipo de cambio con fecha y criterio tributario revisado |
 | Riesgo de excedentes, abuso, reintentos y fallos de proveedor | Escenarios de uso máximo, límites técnicos medidos, alertas y responsable de STOP |
 
+**Tarifas de telefonía por sentido (estimación, no facturación):** el backend permite
+configurar opcionalmente `app.commercial.calls.inbound-telephony-provider-cost-per-minute-usd.twilio`
+para llamadas entrantes y `app.commercial.calls.outbound-telephony-provider-cost-per-minute-usd.twilio`
+para salientes. Si se omiten, permanece la tarifa previa por proveedor
+`telephony-provider-cost-per-minute-usd.twilio`. El cálculo conserva el redondeo
+por minuto iniciado de Twilio; para la admisión de llamadas entrantes, un
+presupuesto estimado activo exige un costo entrante positivo y rechaza un
+override cero. Los valores se deben obtener de la ruta real contratada y no
+introducen tarifas públicas, límites de duración ni cobros reales. Gemini,
+Media Streams, número mensual y otros componentes deben conciliarse por separado.
+
 **Cálculo sin números ficticios:** `ingreso_neto_CLP = cobro_real_CLP - tributos_no_reconocidos_como_ingreso - descuentos/reembolsos aplicables`; `coste_total_CLP = telefonía + IA + infraestructura_asignada + comisiones + soporte + reserva_operativa`; `margen_estimado_CLP = ingreso_neto_CLP - coste_total_CLP`. Evaluar **uso promedio y peor caso permitido** por plan, incluidos excedentes y concurrencia. Guardar fecha, origen y criterio de cada tarifa; no mezclar USD y CLP sin tipo de cambio fechado.
 
 **Puerta NO-GO:** si faltan tarifas aplicables, límites verificables de consumo/coste, canal de soporte, mecanismo de suspensión o aceptación comercial/tributaria, no declarar margen positivo, SLA ni capacidad comercial lista. Con un piloto web aislado sin voz, marcar telefonía/IA real **fuera de alcance**, no cero coste supuesto de una prestación ofrecida. El titular valida costes/condiciones y un responsable operativo documenta alertas, presupuesto y acciones de PAUSE; ningún cálculo autoriza gastos, llamadas o cobros reales.

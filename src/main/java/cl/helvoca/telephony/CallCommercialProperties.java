@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.call.CallDirection;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,9 @@ public class CallCommercialProperties {
     private BigDecimal usdToClpRate = BigDecimal.ZERO;
     private BigDecimal twilioNumberMonthlyCostUsd = BigDecimal.ZERO;
     private Map<String, BigDecimal> telephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
+    // Optional operator estimates by call direction. An empty map preserves legacy pricing.
+    private Map<String, BigDecimal> inboundTelephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
+    private Map<String, BigDecimal> outboundTelephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiModelCostPerMinuteUsd = new LinkedHashMap<>();
 
@@ -96,6 +101,22 @@ public class CallCommercialProperties {
         this.telephonyProviderCostPerMinuteUsd = normalizeRates(values);
     }
 
+    public Map<String, BigDecimal> getInboundTelephonyProviderCostPerMinuteUsd() {
+        return Map.copyOf(inboundTelephonyProviderCostPerMinuteUsd);
+    }
+
+    public void setInboundTelephonyProviderCostPerMinuteUsd(Map<String, BigDecimal> values) {
+        this.inboundTelephonyProviderCostPerMinuteUsd = normalizeRates(values);
+    }
+
+    public Map<String, BigDecimal> getOutboundTelephonyProviderCostPerMinuteUsd() {
+        return Map.copyOf(outboundTelephonyProviderCostPerMinuteUsd);
+    }
+
+    public void setOutboundTelephonyProviderCostPerMinuteUsd(Map<String, BigDecimal> values) {
+        this.outboundTelephonyProviderCostPerMinuteUsd = normalizeRates(values);
+    }
+
     public Map<String, BigDecimal> getAiProviderCostPerMinuteUsd() {
         return Map.copyOf(aiProviderCostPerMinuteUsd);
     }
@@ -125,6 +146,21 @@ public class CallCommercialProperties {
 
     public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider) {
         return resolve(telephonyProviderCostPerMinuteUsd, provider, telephonyCostPerMinuteUsd);
+    }
+
+    /**
+     * Use a verified direction-specific operator rate when configured, or
+     * preserve the legacy provider rate. These figures remain estimates, not bills.
+     */
+    public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider, CallDirection direction) {
+        if (direction == CallDirection.INBOUND) {
+            BigDecimal configured = lookup(inboundTelephonyProviderCostPerMinuteUsd, provider);
+            if (configured != null) return configured;
+        } else if (direction == CallDirection.OUTBOUND) {
+            BigDecimal configured = lookup(outboundTelephonyProviderCostPerMinuteUsd, provider);
+            if (configured != null) return configured;
+        }
+        return resolveTelephonyCostPerMinuteUsd(provider);
     }
 
     public BigDecimal resolveAiCostPerMinuteUsd(String provider, String model) {

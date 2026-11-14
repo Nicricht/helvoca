@@ -18,7 +18,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -131,6 +133,36 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         lifecycle.updateStatus("CA-budget-custom-30", "completed", 30);
         assertEquals(0, calls.findByProviderCallId("CA-budget-custom-30").orElseThrow()
                 .getEstimatedTelephonyCostUsd().compareTo(new java.math.BigDecimal("0.05")));
+    }
+
+    @Test
+    void postgresPersistsInboundTariffAndRejectsZeroCostBudgetConfiguration() {
+        Map<String, BigDecimal> previous =
+                commercial.getInboundTelephonyProviderCostPerMinuteUsd();
+        try {
+            commercial.setInboundTelephonyProviderCostPerMinuteUsd(
+                    Map.of("twilio", new BigDecimal("0.040")));
+            Fixture first = tenant("Budget Incoming Tariff", "+14355551918");
+            admit(first, "CA-inbound-specific-61");
+            lifecycle.updateStatus("CA-inbound-specific-61", "completed", 61);
+            var stored = calls.findByProviderCallId("CA-inbound-specific-61").orElseThrow();
+            assertEquals(0, stored.getEstimatedTelephonyCostUsd()
+                    .compareTo(new BigDecimal("0.08")));
+            assertEquals(0, stored.getEstimatedTotalCostUsd()
+                    .compareTo(new BigDecimal("0.08")));
+
+            // A configured zero is not a free call: budget admission fails closed.
+            commercial.setInboundTelephonyProviderCostPerMinuteUsd(
+                    Map.of("twilio", BigDecimal.ZERO));
+            Fixture denied = tenant("Budget Invalid Incoming Tariff", "+14355551919");
+            CallCapacityExceededException error =
+                    assertThrows(CallCapacityExceededException.class,
+                            () -> admit(denied, "CA-inbound-zero-rate"));
+            assertEquals("Estimated daily budget pricing is not configured safely",
+                    error.getMessage());
+        } finally {
+            commercial.setInboundTelephonyProviderCostPerMinuteUsd(previous);
+        }
     }
 
     private UUID admit(Fixture tenant, String providerCallSid) {

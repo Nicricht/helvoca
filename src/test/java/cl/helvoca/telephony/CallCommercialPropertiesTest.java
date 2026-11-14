@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.call.CallDirection;
+
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -103,6 +105,47 @@ class CallCommercialPropertiesTest {
 
         properties.setAiModelCostPerMinuteUsd(Map.of("gemini-3.8-live", new BigDecimal("0.02")));
         assertTrue(properties.hasCompleteAiPricingForEstimatedBudget());
+    }
+
+    @Test
+    void directionSpecificTelephonyRatesOverrideOnlyTheirOwnDirection() {
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setTelephonyCostPerMinuteUsd(new BigDecimal("0.010"));
+        properties.setTelephonyProviderCostPerMinuteUsd(Map.of("TWILIO", new BigDecimal("0.080")));
+        properties.setInboundTelephonyProviderCostPerMinuteUsd(
+                Map.of(" TWILIO ", new BigDecimal("0.0151")));
+        properties.setOutboundTelephonyProviderCostPerMinuteUsd(
+                Map.of("Twilio", new BigDecimal("0.0746")));
+
+        assertEquals(new BigDecimal("0.0151"),
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", CallDirection.INBOUND));
+        assertEquals(new BigDecimal("0.0746"),
+                properties.resolveTelephonyCostPerMinuteUsd(" TWILIO ", CallDirection.OUTBOUND));
+        assertEquals(new BigDecimal("0.080"),
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", null));
+        assertEquals(new BigDecimal("0.010"),
+                properties.resolveTelephonyCostPerMinuteUsd("other", CallDirection.INBOUND));
+        assertEquals(new BigDecimal("0.010"),
+                properties.resolveTelephonyCostPerMinuteUsd("other", CallDirection.OUTBOUND));
+        assertEquals(new BigDecimal("0.0151"),
+                properties.getInboundTelephonyProviderCostPerMinuteUsd().get("twilio"));
+        assertEquals(new BigDecimal("0.0746"),
+                properties.getOutboundTelephonyProviderCostPerMinuteUsd().get("twilio"));
+    }
+
+    @Test
+    void invalidOrAbsentDirectionalRatesDoNotInventPositiveCharges() {
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setInboundTelephonyProviderCostPerMinuteUsd(
+                Map.of("twilio", new BigDecimal("-0.5")));
+        properties.setOutboundTelephonyProviderCostPerMinuteUsd(null);
+        assertEquals(BigDecimal.ZERO,
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", CallDirection.INBOUND));
+        assertEquals(BigDecimal.ZERO,
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", CallDirection.OUTBOUND));
+        assertEquals(Map.of(), properties.getOutboundTelephonyProviderCostPerMinuteUsd());
+        properties.setInboundTelephonyProviderCostPerMinuteUsd(null);
+        assertEquals(Map.of(), properties.getInboundTelephonyProviderCostPerMinuteUsd());
     }
 
     @Test
