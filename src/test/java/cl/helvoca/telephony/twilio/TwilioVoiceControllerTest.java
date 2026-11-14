@@ -4,6 +4,7 @@ import cl.helvoca.call.CallSummaryService;
 import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,7 @@ class TwilioVoiceControllerTest {
         when(guard.allowsCallback(anyString(), anyString())).thenReturn(true);
         when(guard.allowsStreamCallback(anyString(), anyString(), anyString())).thenReturn(true);
         org.springframework.test.util.ReflectionTestUtils.setField(controller, "bindingGuard", guard);
+        ReflectionTestUtils.setField(controller, "pilotDatabaseContext", new TenantDatabaseContext());
         return controller;
     }
 
@@ -45,6 +47,9 @@ class TwilioVoiceControllerTest {
         CallSummaryService summaries = mock(CallSummaryService.class);
         String twiml = "<Response><Connect><Stream/></Connect></Response>";
         TwilioVoiceController controller = controller(calls, router, summaries, false);
+        UUID certificationCallId = UUID.randomUUID();
+        when(calls.startInboundCall(CALL_SID, "+56966939611", "+14355652512"))
+                .thenReturn(certificationCallId);
         ReflectionTestUtils.setField(controller, "certificationVoiceOverride", " sadachbia ");
 
         when(router.route("+14355652512", "+56966939611", CALL_SID, "Sadachbia"))
@@ -57,6 +62,7 @@ class TwilioVoiceControllerTest {
         assertEquals(twiml, response.getBody());
         verify(router).route("+14355652512", "+56966939611", CALL_SID, "Sadachbia");
         verify(calls).startInboundCall(CALL_SID, "+56966939611", "+14355652512");
+        verify(calls).markCertification(certificationCallId);
         verifyNoInteractions(summaries);
     }
 
@@ -216,6 +222,133 @@ class TwilioVoiceControllerTest {
         assertEquals(SILENT_HANGUP, response.getBody());
         verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
         verifyNoInteractions(summaries);
+    }
+
+    @Test
+    void publicInboundReadsPilotUnderSystemScopeAndRestoresDeniedContext() {
+        UUID businessId = UUID.randomUUID();
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        TenantDatabaseContext scope = new TenantDatabaseContext();
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        String twiml = "<Response><Connect><Stream/></Connect></Response>";
+
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512")).thenAnswer(invocation -> {
+            assertEquals(TenantDatabaseContext.Mode.SYSTEM, scope.currentOrDenied().mode());
+            return Optional.of(phone);
+        });
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenAnswer(invocation -> {
+                    assertEquals(TenantDatabaseContext.Mode.SYSTEM, scope.currentOrDenied().mode());
+                    return new ControlledPilotExternalEffectGuard.Decision(
+                            true, true, "ALLOWED", "RUNNING",
+                            ControlledPilotExternalEffectGuard.Effect.VOICE);
+                });
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+        ReflectionTestUtils.setField(controller, "pilotDatabaseContext", scope);
+
+        assertEquals(twiml, controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID).getBody());
+        assertEquals(TenantDatabaseContext.Mode.DENIED, scope.currentOrDenied().mode());
+        verify(calls).startInboundCall(CALL_SID, "+56911111111", "+14355652512");
+    }
+
+    @Test
+    void publicInboundRejectsVerifiedButUnenrolledBusinessBeforeCreatingBillableCall() {
+        UUID businessId = UUID.randomUUID();
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512"))
+                .thenReturn(Optional.of(phone));
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true, false, "NOT_PILOT_MANAGED", null,
+                        ControlledPilotExternalEffectGuard.Effect.VOICE));
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+
+        var response = controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(calls, router, summaries);
+    }
+
+    @Test
+    void publicInboundRejectsUnresolvedBusinessEvenAfterCarrierBindingPasses() {
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512"))
+                .thenReturn(Optional.empty());
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+
+        var response = controller.incoming(
+                CALL_SID, "+56911111111", "+14355652512", ACCOUNT_SID);
+
+        assertEquals(SILENT_HANGUP, response.getBody());
+        verifyNoInteractions(guard, calls, router, summaries);
+    }
+
+    @Test
+    void oneShotCertificationRemainsAvailableToTokenAuthorizedUnenrolledDemo() {
+        UUID businessId = UUID.randomUUID();
+        TwilioCallService calls = mock(TwilioCallService.class);
+        VoiceCallRouter router = mock(VoiceCallRouter.class);
+        CallSummaryService summaries = mock(CallSummaryService.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        ControlledPilotExternalEffectGuard guard = mock(ControlledPilotExternalEffectGuard.class);
+        TwilioCertificationIngressTokenGate tokenGate = mock(TwilioCertificationIngressTokenGate.class);
+        PhoneNumber phone = new PhoneNumber();
+        phone.setBusinessId(businessId);
+        String tokenValue = "11111111-1111-1111-1111-111111111111";
+        String twiml = "<Response><Connect><Stream/></Connect></Response>";
+        when(phones.findByPhoneNumberAndActiveTrue("+14355652512"))
+                .thenReturn(Optional.of(phone));
+        when(guard.evaluate(businessId, ControlledPilotExternalEffectGuard.Effect.VOICE))
+                .thenReturn(new ControlledPilotExternalEffectGuard.Decision(
+                        true, false, "NOT_PILOT_MANAGED", null,
+                        ControlledPilotExternalEffectGuard.Effect.VOICE));
+        when(tokenGate.authorize(tokenValue, CALL_SID, "+14355652512", "+56911111111"))
+                .thenReturn(true);
+        UUID callId = UUID.randomUUID();
+        when(calls.startInboundCall(CALL_SID, "+56911111111", "+14355652512"))
+                .thenReturn(callId);
+        when(router.route("+14355652512", "+56911111111", CALL_SID))
+                .thenReturn(Optional.of(new VoiceCallRouter.RouteDecision(
+                        "gemini", VoiceCallRouter.RouteMode.MEDIA_STREAM, twiml)));
+        TwilioVoiceController controller = controller(calls, router, summaries, false);
+        ReflectionTestUtils.setField(controller, "pilotExternalEffects", guard);
+        ReflectionTestUtils.setField(controller, "pilotPhoneNumbers", phones);
+        controller.setCertificationIngressTokenGate(tokenGate);
+
+        var response = controller.oneShotInboundCertification(
+                tokenValue, CALL_SID, "+14355652512", "+56911111111", ACCOUNT_SID);
+
+        assertEquals(twiml, response.getBody());
+        verify(calls).markCertification(callId);
+        verify(router).route("+14355652512", "+56911111111", CALL_SID);
     }
 
     @Test

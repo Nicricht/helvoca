@@ -1,6 +1,7 @@
 package cl.helvoca.telephony;
 
 import cl.helvoca.billing.BusinessSubscriptionService;
+import cl.helvoca.call.CallDirection;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallStatus;
@@ -128,6 +129,42 @@ class CallLifecycleServiceTest {
         assertEquals(new BigDecimal("0.020000"), call.getEstimatedTelephonyCostUsd());
         assertEquals(new BigDecimal("0.040000"), call.getEstimatedAiCostUsd());
         assertEquals(new BigDecimal("0.060000"), call.getEstimatedTotalCostUsd());
+    }
+
+    @Test
+    void incomingAndOutgoingTwilioCallsUseDifferentConfiguredEstimates() {
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setTelephonyProviderCostPerMinuteUsd(
+                java.util.Map.of("twilio", new BigDecimal("0.0500")));
+        properties.setInboundTelephonyProviderCostPerMinuteUsd(
+                java.util.Map.of("twilio", new BigDecimal("0.0151")));
+        properties.setOutboundTelephonyProviderCostPerMinuteUsd(
+                java.util.Map.of("twilio", new BigDecimal("0.0746")));
+        CallLifecycleService lifecycle = lifecycle(
+                mock(PhoneNumberRepository.class), mock(CustomerRepository.class), calls, properties);
+
+        UUID incomingId = UUID.randomUUID();
+        CallSession incoming = new CallSession();
+        incoming.setTelephonyProvider("twilio");
+        incoming.setDirection(CallDirection.INBOUND);
+        incoming.setStatus(CallStatus.IN_PROGRESS);
+        incoming.setStartedAt(Instant.now().minusSeconds(61));
+        when(calls.findById(incomingId)).thenReturn(Optional.of(incoming));
+        lifecycle.updateStatus(incomingId, "completed", 61);
+        assertEquals(new BigDecimal("0.030200"), incoming.getEstimatedTelephonyCostUsd());
+        assertEquals(new BigDecimal("0.030200"), incoming.getEstimatedTotalCostUsd());
+
+        UUID outgoingId = UUID.randomUUID();
+        CallSession outgoing = new CallSession();
+        outgoing.setTelephonyProvider("twilio");
+        outgoing.setDirection(CallDirection.OUTBOUND);
+        outgoing.setStatus(CallStatus.IN_PROGRESS);
+        outgoing.setStartedAt(Instant.now().minusSeconds(61));
+        when(calls.findById(outgoingId)).thenReturn(Optional.of(outgoing));
+        lifecycle.updateStatus(outgoingId, "completed", 61);
+        assertEquals(new BigDecimal("0.149200"), outgoing.getEstimatedTelephonyCostUsd());
+        assertEquals(new BigDecimal("0.149200"), outgoing.getEstimatedTotalCostUsd());
     }
 
     @Test

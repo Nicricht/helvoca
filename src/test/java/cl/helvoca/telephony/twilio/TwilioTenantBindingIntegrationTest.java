@@ -66,8 +66,10 @@ class TwilioTenantBindingIntegrationTest extends ExplicitSystemDatabaseScopeSupp
 
         assertTrue(binding.allowsIncoming(callA, numberA, callerA, accountA));
         assertTrue(binding.allowsIncoming(callB, numberB, callerB, accountB));
-        assertTrue(binding.allowsMedia(callA, numberA, callerA, accountA));
-        assertTrue(binding.allowsMedia(callB, numberB, callerB, accountB));
+        // Neither synthetic business opted into commercial voice. Carrier
+        // attestation remains valid, but public commercial media stays closed.
+        assertFalse(binding.allowsMedia(callA, numberA, callerA, accountA));
+        assertFalse(binding.allowsMedia(callB, numberB, callerB, accountB));
         assertTrue(binding.allowsCallback(callA, accountA));
         assertTrue(binding.allowsCallback(callB, accountB));
 
@@ -107,6 +109,13 @@ class TwilioTenantBindingIntegrationTest extends ExplicitSystemDatabaseScopeSupp
         CallSession b = calls.findByProviderCallId(callSidB).orElseThrow();
         b.setCertification(true);
         calls.saveAndFlush(b);
+
+        // Explicitly marked certification sessions retain the isolated demo
+        // exception; an unmanaged *commercial* session does not.
+        assertTrue(binding.allowsMedia(callSidA, "+14355551231", "+56911111111",
+                "ACcccccccccccccccccccccccccccccccc"));
+        assertTrue(binding.allowsMedia(callSidB, "+14355551232", "+56922222222",
+                "ACdddddddddddddddddddddddddddddddd"));
 
         assertEquals(a.getId(), databaseContext.callAsTenant(tenantA, () ->
                 calls.findFirstByBusinessIdAndCertificationTrueOrderByStartedAtDesc(tenantA)
@@ -171,7 +180,8 @@ class TwilioTenantBindingIntegrationTest extends ExplicitSystemDatabaseScopeSupp
         assertFalse(binding.allowsMedia(importedCall, managedPhone, importedCaller, managedAccount));
 
         assertTrue(binding.allowsIncoming(managedCall, managedPhone, managedCaller, managedAccount));
-        assertTrue(binding.allowsMedia(managedCall, managedPhone, managedCaller, managedAccount));
+        // A verified MANAGED_PURCHASE number alone is not commercial launch consent.
+        assertFalse(binding.allowsMedia(managedCall, managedPhone, managedCaller, managedAccount));
         assertTrue(binding.allowsCallback(managedCall, managedAccount));
         assertTrue(binding.allowsStreamCallback(managedCall,
                 "MZffffffffffffffffffffffffffffffff", managedAccount));

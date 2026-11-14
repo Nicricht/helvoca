@@ -5,6 +5,7 @@ import cl.helvoca.ai.gemini.VoiceBakeOffCatalog;
 import cl.helvoca.common.NotFoundException;
 import cl.helvoca.operations.ControlledPilotExternalEffectGuard;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import cl.helvoca.telephony.CallCapacityExceededException;
 import cl.helvoca.voice.VoiceCallRouter;
 import org.slf4j.Logger;
@@ -35,11 +36,14 @@ public class TwilioVoiceController {
     @Autowired
     private TwilioCallBindingGuard bindingGuard;
 
-    @Autowired(required = false)
+    @Autowired
     private ControlledPilotExternalEffectGuard pilotExternalEffects;
 
-    @Autowired(required = false)
+    @Autowired
     private PhoneNumberRepository pilotPhoneNumbers;
+
+    @Autowired
+    private TenantDatabaseContext pilotDatabaseContext;
 
     @Value("${TWILIO_CERTIFICATION_PROVIDER_OVERRIDE:}")
     private String certificationProviderOverride;
@@ -176,17 +180,32 @@ public class TwilioVoiceController {
             return ResponseEntity.ok(SILENT_HANGUP_TWIML);
         }
         if (pilotExternalEffects != null && pilotPhoneNumbers != null) {
-            UUID businessId = pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
-                    .map(phone -> phone.getBusinessId())
-                    .orElse(null);
+            // Public Twilio callbacks do not carry a trusted user tenant.
+            // Carrier identity was already verified by the binding guard;
+            // resolve the associated tenant under an explicitly scoped read
+            // so PostgreSQL RLS does not reject a legitimate caller.
+            UUID businessId = pilotDatabaseContext.callAsSystem(() ->
+                    pilotPhoneNumbers.findByPhoneNumberAndActiveTrue(businessPhone)
+                            .map(phone -> phone.getBusinessId())
+                            .orElse(null));
+            // A public inbound call must belong to an explicitly launched
+            // tenant. The generic pilot guard intentionally allows
+            // NOT_PILOT_MANAGED for other external effects; that is not
+            // sufficient authorization to incur commercial voice costs.
+            if ("inbound".equals(direction) && businessId == null) {
+                log.warn("Blocking Twilio public inbound call={} because tenant cannot be resolved", callSid);
+                return ResponseEntity.ok(SILENT_HANGUP_TWIML);
+            }
             if (businessId != null) {
                 ControlledPilotExternalEffectGuard.Decision pilotDecision =
-                        pilotExternalEffects.evaluate(
-                                businessId,
-                                ControlledPilotExternalEffectGuard.Effect.VOICE);
-                if (!pilotDecision.allowed()) {
+                        pilotDatabaseContext.callAsSystem(() ->
+                                pilotExternalEffects.evaluate(
+                                        businessId,
+                                        ControlledPilotExternalEffectGuard.Effect.VOICE));
+                if (!pilotDecision.allowed()
+                        || ("inbound".equals(direction) && !pilotDecision.pilotManaged())) {
                     log.warn(
-                            "Blocking Twilio {} call={} by controlled pilot guard code={} status={}",
+                            "Blocking Twilio {} call={} by tenant voice launch guard code={} status={}",
                             direction,
                             callSid,
                             pilotDecision.code(),
@@ -201,7 +220,10 @@ public class TwilioVoiceController {
         // to bind to, and unauthenticated callers could create one from WS input.
         try {
             UUID callId = calls.startInboundCall(callSid, callerPhone, businessPhone);
-            if ("inbound-certification".equals(direction)) {
+            if ("inbound-certification".equals(direction)
+                    || "outbound-test".equals(direction)) {
+                // Public commercial inbound remains unmarked. Both explicit
+                // certification routes preserve their existing media allowance.
                 calls.markCertification(callId);
             }
         } catch (CallCapacityExceededException e) {

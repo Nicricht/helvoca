@@ -235,6 +235,26 @@ class GeminiLiveLowLatencySetupTest {
         assertEquals(toolByName(ordinaryTools, "send_whatsapp_operation").toString().length(),
                 toolByName(compactTools, "send_whatsapp_operation").toString().length());
 
+        // New optimizations must shrink the remaining short operational tools
+        // without dropping them, their parameter schemas or security checks.
+        for (String toolName : new String[]{
+                "get_business_information", "verify_caller_whatsapp",
+                "list_customer_bookings", "create_request",
+                "record_unanswered_question", "transfer_to_human"}) {
+            assertTrue(toolByName(compactTools, toolName).getString("description").length()
+                            < toolByName(ordinaryTools, toolName).getString("description").length(),
+                    toolName + " should use compact voice instructions");
+        }
+        assertTrue(toolByName(compactTools, "verify_caller_whatsapp")
+                .getString("description").contains("confirmación explícita"));
+        assertTrue(toolByName(compactTools, "create_booking")
+                .getString("description").contains("requiresConfirmation=true"));
+        assertTrue(toolByName(compactTools, "list_available_slots")
+                .getString("description").contains("unavailabilityReasonKnown=false"));
+        assertEquals("string", toolByName(compactTools, "create_booking")
+                .getJSONObject("parameters").getJSONObject("properties")
+                .getJSONObject("confirmationToken").getString("type"));
+
         properties.setCompactToolDescriptionsEnabled(false);
         assertEquals(ordinaryTools.toString().length(), session.buildSetup().getJSONObject("setup")
                 .getJSONArray("tools").getJSONObject(0).getJSONArray("functionDeclarations")
@@ -289,6 +309,8 @@ class GeminiLiveLowLatencySetupTest {
         assertTrue(compact.contains("te tinca"));
         assertTrue(compact.contains("femenina"));
         assertTrue(originalInstructions.length() - compact.length() > 3000);
+        assertTrue(compact.length() - rules.length() < 3000,
+                "Lean voice supplement must stay below 3000 characters without touching tenant rules");
         assertEquals(original.getJSONObject("setup").getJSONArray("tools").toString(),
                 lean.getJSONObject("setup").getJSONArray("tools").toString());
         assertEquals(original.getJSONObject("setup").getJSONObject("generationConfig").toString(),

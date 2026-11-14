@@ -169,7 +169,7 @@ jobs:
     # when any applicable independent Full Gate job fails or is skipped.
     needs: [fast-gate, golden-journey-release-contract, system-integration-e2e, home-frontend-coverage, inventory-frontend-coverage, import-frontend-coverage, legacy-v99-runtime-on-v103]
     if: always() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
 
     steps:
@@ -323,7 +323,7 @@ jobs:
   inventory-frontend-coverage:
     needs: [fast-gate]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
 
     steps:
@@ -368,7 +368,7 @@ jobs:
   home-frontend-coverage:
     needs: [fast-gate]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - name: Checkout
@@ -410,7 +410,7 @@ jobs:
   import-frontend-coverage:
     needs: [fast-gate]
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - name: Checkout exact candidate
@@ -452,7 +452,7 @@ jobs:
   system-integration-e2e:
     needs: [fast-gate, golden-journey-release-contract]
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     services:
@@ -656,7 +656,7 @@ jobs:
 
   frontend-qa:
     if: github.event_name == 'push' && (contains(github.event.head_commit.message, '[frontend-verify]') || contains(github.event.head_commit.message, '[verify]'))
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -727,7 +727,7 @@ jobs:
 
   auth-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[auth-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -780,7 +780,7 @@ jobs:
 
   reservations-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[reservations-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -845,7 +845,7 @@ jobs:
 
   workspace-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[workspace-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -895,7 +895,7 @@ jobs:
 
   orders-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[orders-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -944,7 +944,7 @@ jobs:
 
   conversations-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[conversations-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -996,7 +996,7 @@ jobs:
 
   settings-qa:
     if: (github.event_name == 'push' && contains(github.event.head_commit.message, '[settings-verify]')) || (github.event_name == 'pull_request' && github.head_ref == 'feat/react-settings-migration')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -1422,7 +1422,7 @@ jobs:
 
   operational-redesign-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[operational-redesign-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -1476,7 +1476,7 @@ jobs:
 
   simulator-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[simulator-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 6
 
     steps:
@@ -1528,7 +1528,7 @@ jobs:
 
   navigation-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[navigation-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
@@ -1577,7 +1577,7 @@ jobs:
 
   interaction-qa:
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '[interaction-verify]')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
