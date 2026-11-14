@@ -1,6 +1,7 @@
 package cl.helvoca.ai.gemini;
 
 import cl.helvoca.ai.realtime.RealtimeCallContext;
+import cl.helvoca.ai.realtime.RealtimeToolDefinitions;
 import cl.helvoca.voice.VoiceTransportSession;
 import org.json.JSONObject;
 import java.net.http.HttpClient;
@@ -99,6 +100,67 @@ class GeminiLiveVoiceProviderBakeOffTest {
         when(tools.agentVoice(context, null)).thenReturn("seductive_female");
 
         assertEquals("Sulafat", provider.sessionProperties(context).getVoice());
+    }
+
+    @Test
+    void realProviderSessionPropagatesLeanCompactAndCompressionWithIndependentSnapshots() {
+        GeminiLiveProperties configured = new GeminiLiveProperties();
+        configured.setLeanSystemInstructionsEnabled(true);
+        configured.setCompactToolDescriptionsEnabled(true);
+        configured.setContextWindowCompressionEnabled(true);
+        configured.setContextWindowCompressionTriggerTokens(32000);
+        configured.setContextWindowCompressionTargetTokens(10000);
+        configured.setVoice("Sulafat");
+        RealtimeToolService tools = mock(RealtimeToolService.class);
+        GeminiLiveVoiceProvider provider = new GeminiLiveVoiceProvider(configured, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry());
+        RealtimeCallContext context = new RealtimeCallContext(
+                UUID.randomUUID(), UUID.randomUUID(), null,
+                "+56911111111", "+14355551101", "MZ-prompt-passthrough");
+        when(tools.buildInstructions(context)).thenReturn("REGLAS OFICIALES DEL NEGOCIO.");
+        when(tools.toolDefinitions(context)).thenReturn(RealtimeToolDefinitions.all());
+
+        // This MUST be the live provider's copied configuration, not an
+        // artificially injected GeminiLiveVoiceSession test-only properties object.
+        GeminiLiveProperties first = provider.sessionProperties(context);
+        assertNotSame(configured, first);
+        assertTrue(first.isLeanSystemInstructionsEnabled());
+        assertTrue(first.isCompactToolDescriptionsEnabled());
+        assertTrue(first.isContextWindowCompressionEnabled());
+        assertEquals(32000, first.getContextWindowCompressionTriggerTokens());
+        assertEquals(10000, first.getContextWindowCompressionTargetTokens());
+
+        GeminiLiveVoiceSession actualSession = new GeminiLiveVoiceSession(
+                context, mock(VoiceTransportSession.class), first, tools,
+                mock(CallTranscriptService.class), mock(CallSummaryService.class),
+                mock(CallLifecycleService.class), mock(CallCertificationService.class),
+                new VoiceProviderHealthRegistry(), HttpClient.newHttpClient());
+        JSONObject setup = actualSession.buildSetup().getJSONObject("setup");
+        String prompt = setup.getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        assertTrue(prompt.startsWith("REGLAS OFICIALES DEL NEGOCIO."));
+        assertTrue(prompt.contains("RECEPVOZ VOZ CHILENA, PROFESIONAL Y BREVE:"));
+        assertEquals("32000", setup.getJSONObject("contextWindowCompression")
+                .getString("triggerTokens"));
+        assertEquals("10000", setup.getJSONObject("contextWindowCompression")
+                .getJSONObject("slidingWindow").getString("targetTokens"));
+        assertEquals("Sulafat", setup.getJSONObject("generationConfig")
+                .getJSONObject("speechConfig").getJSONObject("voiceConfig")
+                .getJSONObject("prebuiltVoiceConfig").getString("voiceName"));
+        assertEquals("START_OF_ACTIVITY_INTERRUPTS", setup.getJSONObject("realtimeInputConfig")
+                .getString("activityHandling"));
+
+        configured.setLeanSystemInstructionsEnabled(false);
+        configured.setCompactToolDescriptionsEnabled(false);
+        configured.setContextWindowCompressionEnabled(false);
+        GeminiLiveProperties second = provider.sessionProperties(context);
+        assertFalse(second.isLeanSystemInstructionsEnabled());
+        assertFalse(second.isCompactToolDescriptionsEnabled());
+        assertFalse(second.isContextWindowCompressionEnabled());
+        assertTrue(first.isLeanSystemInstructionsEnabled(), "An existing session keeps its snapshot");
+        assertTrue(first.isContextWindowCompressionEnabled(), "Global switch does not mutate an existing call");
     }
 
     @Test

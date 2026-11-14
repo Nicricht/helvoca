@@ -56,7 +56,11 @@ public class VoiceProviderHealthRegistry {
 
     public void failure(String providerId, FailureKind kind, String reason) {
         Duration duration = switch (kind) {
-            case NO_CREDITS, AUTH -> Duration.ofMinutes(15);
+            // A 15-minute retry after confirmed exhausted credits can start
+            // another carrier-billable call before an operator has recharged.
+            // This is only an in-memory cooldown, NOT a Google billing cap.
+            case NO_CREDITS -> Duration.ofHours(24);
+            case AUTH -> Duration.ofMinutes(15);
             case RATE_LIMIT -> Duration.ofMinutes(1);
             case SESSION, UPSTREAM -> Duration.ofSeconds(30);
             case UNKNOWN -> Duration.ofSeconds(15);

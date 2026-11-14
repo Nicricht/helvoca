@@ -6,6 +6,8 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CallCommercialPropertiesTest {
 
@@ -65,6 +67,42 @@ class CallCommercialPropertiesTest {
         assertEquals(new BigDecimal("0.020"), properties.resolveAiCostPerMinuteUsd("gemini", " "));
         assertEquals(BigDecimal.ZERO, properties.resolveAiCostPerMinuteUsd(null, null));
         assertEquals(BigDecimal.ZERO, properties.resolveTelephonyCostPerMinuteUsd(""));
+    }
+
+    @Test
+    void estimatedBudgetDefaultsOffAndRejectsInvalidNegativeAmounts() {
+        CallCommercialProperties props = new CallCommercialProperties();
+        assertEquals(BigDecimal.ZERO, props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(BigDecimal.ZERO, props.getEstimatedNewCallReservationUsd());
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new BigDecimal("-1"));
+        props.setEstimatedNewCallReservationUsd(null);
+        assertEquals(BigDecimal.ZERO, props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(BigDecimal.ZERO, props.getEstimatedNewCallReservationUsd());
+        props.setMaxEstimatedCostPerBusinessPerUtcDayUsd(new BigDecimal("0.900000"));
+        props.setEstimatedNewCallReservationUsd(new BigDecimal("0.200000"));
+        assertEquals(new BigDecimal("0.900000"), props.getMaxEstimatedCostPerBusinessPerUtcDayUsd());
+        assertEquals(new BigDecimal("0.200000"), props.getEstimatedNewCallReservationUsd());
+    }
+
+    @Test
+    void budgetPricingRequiresPositiveAiFallbackAndEveryExplicitOverride() {
+        CallCommercialProperties properties = new CallCommercialProperties();
+        assertFalse(properties.hasCompleteAiPricingForEstimatedBudget());
+
+        properties.setAiCostPerMinuteUsd(new BigDecimal("0.02"));
+        assertTrue(properties.hasCompleteAiPricingForEstimatedBudget());
+
+        properties.setAiProviderCostPerMinuteUsd(Map.of("gemini", BigDecimal.ZERO));
+        assertFalse(properties.hasCompleteAiPricingForEstimatedBudget());
+
+        properties.setAiProviderCostPerMinuteUsd(Map.of("gemini", new BigDecimal("0.02")));
+        assertTrue(properties.hasCompleteAiPricingForEstimatedBudget());
+
+        properties.setAiModelCostPerMinuteUsd(Map.of("gemini-3.8-live", BigDecimal.ZERO));
+        assertFalse(properties.hasCompleteAiPricingForEstimatedBudget());
+
+        properties.setAiModelCostPerMinuteUsd(Map.of("gemini-3.8-live", new BigDecimal("0.02")));
+        assertTrue(properties.hasCompleteAiPricingForEstimatedBudget());
     }
 
     @Test

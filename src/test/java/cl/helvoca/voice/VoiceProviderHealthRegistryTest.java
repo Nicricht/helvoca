@@ -1,6 +1,8 @@
 package cl.helvoca.voice;
 
 import org.junit.jupiter.api.Test;
+import java.time.Duration;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,6 +22,9 @@ class VoiceProviderHealthRegistryTest {
         assertFalse(health.available());
         assertTrue(health.detail().contains("NO_CREDITS"));
         assertNotNull(health.blockedUntil());
+        assertTrue(health.blockedUntil().isAfter(Instant.now().plus(Duration.ofHours(23))),
+                "No credits must not allow a new paid carrier call after 15 minutes");
+        assertTrue(health.blockedUntil().isBefore(Instant.now().plus(Duration.ofHours(25))));
     }
 
     @Test

@@ -12,6 +12,13 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.commercial.calls")
 public class CallCommercialProperties {
     private int maxConcurrentPerBusiness = 10;
+    // Optional spending-abuse safety gate for new call starts. Zero preserves
+    // unlimited admission; no time limit is imposed on a connected call.
+    private int maxCallsPerBusinessPerUtcDay = 0;
+    // Estimated admission ceiling, independent for every tenant/day. Zero disables it.
+    // This cannot be a hard provider-spend cap while calls have unlimited duration.
+    private BigDecimal maxEstimatedCostPerBusinessPerUtcDayUsd = BigDecimal.ZERO;
+    private BigDecimal estimatedNewCallReservationUsd = BigDecimal.ZERO;
     private BigDecimal telephonyCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal aiCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal usdToClpRate = BigDecimal.ZERO;
@@ -26,6 +33,27 @@ public class CallCommercialProperties {
 
     public void setMaxConcurrentPerBusiness(int maxConcurrentPerBusiness) {
         this.maxConcurrentPerBusiness = Math.max(0, maxConcurrentPerBusiness);
+    }
+
+    public int getMaxCallsPerBusinessPerUtcDay() {
+        return maxCallsPerBusinessPerUtcDay;
+    }
+
+    public void setMaxCallsPerBusinessPerUtcDay(int maxCallsPerBusinessPerUtcDay) {
+        this.maxCallsPerBusinessPerUtcDay = Math.max(0, maxCallsPerBusinessPerUtcDay);
+    }
+
+    public BigDecimal getMaxEstimatedCostPerBusinessPerUtcDayUsd() {
+        return maxEstimatedCostPerBusinessPerUtcDayUsd;
+    }
+    public void setMaxEstimatedCostPerBusinessPerUtcDayUsd(BigDecimal value) {
+        this.maxEstimatedCostPerBusinessPerUtcDayUsd = nonNegative(value);
+    }
+    public BigDecimal getEstimatedNewCallReservationUsd() {
+        return estimatedNewCallReservationUsd;
+    }
+    public void setEstimatedNewCallReservationUsd(BigDecimal value) {
+        this.estimatedNewCallReservationUsd = nonNegative(value);
     }
 
     public BigDecimal getTelephonyCostPerMinuteUsd() {
@@ -82,6 +110,17 @@ public class CallCommercialProperties {
 
     public void setAiModelCostPerMinuteUsd(Map<String, BigDecimal> values) {
         this.aiModelCostPerMinuteUsd = normalizeRates(values);
+    }
+
+    /**
+     * A budget admission cannot rely on a zero-priced voice fallback, and a
+     * configured provider/model override must not silently bypass that floor.
+     * Positive rates are operator estimates, not proof of provider billing.
+     */
+    public boolean hasCompleteAiPricingForEstimatedBudget() {
+        return aiCostPerMinuteUsd.signum() > 0
+                && aiProviderCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0)
+                && aiModelCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0);
     }
 
     public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider) {

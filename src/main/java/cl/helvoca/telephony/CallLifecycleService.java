@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -116,6 +117,25 @@ public class CallLifecycleService {
             throw new CallCapacityExceededException("Concurrent call capacity reached for business");
         }
 
+        // The existing business advisory transaction lock serializes concurrent
+        // admissions across app replicas. Count ALL starts (including failures
+        // and test calls), not only billable/completed calls, to stop call storms.
+        // The guard never disconnects an established call or creates a timer.
+        int maxCallsPerUtcDay = commercial.getMaxCallsPerBusinessPerUtcDay();
+        if (maxCallsPerUtcDay > 0) {
+            Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS);
+            long callsToday = calls.countByBusinessIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                    businessId, dayStart, dayStart.plus(1, ChronoUnit.DAYS));
+            if (callsToday >= maxCallsPerUtcDay) {
+                metrics.counter("helvoca.calls.rejected", "reason", "daily_call_safety_limit").increment();
+                throw new CallCapacityExceededException("Daily call safety limit reached for business");
+            }
+        }
+
+        // Same transaction + business advisory lock as the concurrency guard:
+        // another replica cannot race this budget admission decision.
+        enforceEstimatedDailyBudget(businessId, telephonyProvider);
+
         String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
         call.setBusinessId(businessId);
@@ -138,6 +158,35 @@ public class CallLifecycleService {
         CallSession saved = calls.saveAndFlush(call);
         metrics.counter("helvoca.calls.started", "provider", normalizedProvider).increment();
         return saved.getId();
+    }
+
+    private void enforceEstimatedDailyBudget(UUID businessId, String telephonyProvider) {
+        BigDecimal ceiling = commercial.getMaxEstimatedCostPerBusinessPerUtcDayUsd();
+        if (ceiling.signum() <= 0) return;
+        BigDecimal reservation = commercial.getEstimatedNewCallReservationUsd();
+        // A zero reserve is a bypass: reject a misconfigured enabled budget.
+        if (reservation.signum() <= 0 || reservation.compareTo(ceiling) > 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_config").increment();
+            throw new CallCapacityExceededException("Estimated daily budget is not configured safely");
+        }
+
+        // A positive reservation is not enough if a configured zero tariff
+        // makes completed calls appear free. Require an effective carrier
+        // rate and a positive AI fallback with no zero-priced overrides.
+        // This is still an admission estimate, never a hard provider cap.
+        if (commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider).signum() <= 0
+                || !commercial.hasCompleteAiPricingForEstimatedBudget()) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_pricing").increment();
+            throw new CallCapacityExceededException("Estimated daily budget pricing is not configured safely");
+        }
+
+        Instant dayStart = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        BigDecimal accrued = calls.sumReservedEstimatedCostByBusinessAndUtcDay(
+                businessId, dayStart, dayStart.plus(1, ChronoUnit.DAYS), reservation);
+        if (accrued == null || accrued.add(reservation).compareTo(ceiling) > 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_limit").increment();
+            throw new CallCapacityExceededException("Estimated daily call budget reached for business");
+        }
     }
 
     @Transactional
@@ -275,8 +324,13 @@ public class CallLifecycleService {
         if (seconds == null || seconds < 0) return;
         BigDecimal minutes = BigDecimal.valueOf(seconds)
                 .divide(BigDecimal.valueOf(60), 6, RoundingMode.HALF_UP);
+        // Twilio bills a started minute as a full minute. Preserve fractional
+        // minutes for other carriers and for Gemini's separate usage estimate.
+        BigDecimal telephonyMinutes = "twilio".equalsIgnoreCase(call.getTelephonyProvider())
+                ? BigDecimal.valueOf((seconds + 59L) / 60L)
+                : minutes;
         BigDecimal telephony = commercial.resolveTelephonyCostPerMinuteUsd(call.getTelephonyProvider())
-                .multiply(minutes).setScale(6, RoundingMode.HALF_UP);
+                .multiply(telephonyMinutes).setScale(6, RoundingMode.HALF_UP);
         BigDecimal ai = call.getAiProvider() == null || call.getAiProvider().isBlank()
                 ? BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP)
                 : commercial.resolveAiCostPerMinuteUsd(call.getAiProvider(), call.getAiModel())
