@@ -90,19 +90,25 @@ public class TwilioCallBindingGuard {
         return databaseContext.callAsSystem(() -> {
             PhoneNumber phone = phones.findByPhoneNumberAndActiveTrue(destination).orElse(null);
             if (!certified(phone, accountSid)) return false;
-            boolean bound = calls.findByProviderCallId(callSid)
+            CallSession boundCall = calls.findByProviderCallId(callSid)
                     .filter(call -> boundTo(call, phone, caller, destination))
                     .filter(call -> call.getStatus() != null && !call.getStatus().terminal())
-                    .isPresent();
-            if (!bound) return false;
+                    .orElse(null);
+            if (boundCall == null) return false;
 
             // Route admission can predate pilot PAUSE. Recheck the verified
             // phone's tenant at WebSocket start before any AI session is created.
             // Never read a tenant ID from the untrusted WebSocket parameters.
             if (pilotExternalEffects == null) return true; // Isolated legacy unit tests only.
             try {
-                return pilotExternalEffects.evaluate(
-                        phone.getBusinessId(), ControlledPilotExternalEffectGuard.Effect.VOICE).allowed();
+                ControlledPilotExternalEffectGuard.Decision decision = pilotExternalEffects.evaluate(
+                        phone.getBusinessId(), ControlledPilotExternalEffectGuard.Effect.VOICE);
+                // A public inbound call was enrolled at the signed Twilio webhook,
+                // but its pilot record can be removed before media connects.
+                // Non-managed calls may start media only when their persisted call
+                // was explicitly marked as a certification route.
+                return decision.allowed()
+                        && (decision.pilotManaged() || boundCall.isCertification());
             } catch (RuntimeException ignored) {
                 // Losing pilot-control read access must not open a new AI session.
                 return false;

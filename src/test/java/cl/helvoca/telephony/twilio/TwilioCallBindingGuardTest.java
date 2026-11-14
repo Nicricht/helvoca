@@ -248,6 +248,18 @@ class TwilioCallBindingGuardTest {
     }
 
     @Test
+    void mediaWebSocketRejectsPausedPilotEvenForPreviouslyCertifiedCall() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(
+                Optional.of(pilot(PilotLaunchControl.Status.PAUSED)));
+        when(call.isCertification()).thenReturn(true);
+
+        // Certification is not a bypass of STOP for an enrolled tenant.
+        assertFalse(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+    }
+
+    @Test
     void mediaWebSocketRejectsRunningPilotWhenPilotSwitchIsOff() {
         PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
         when(controls.findById(businessId)).thenReturn(
@@ -269,9 +281,21 @@ class TwilioCallBindingGuardTest {
     }
 
     @Test
-    void mediaWebSocketPreservesUnmanagedTenantWhenPilotSwitchOff() {
+    void mediaWebSocketRejectsUnmanagedCommercialCallAfterEnrollmentRemoval() {
         PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
         when(controls.findById(businessId)).thenReturn(Optional.empty());
+
+        // The public /voice webhook checked enrollment before this record was removed.
+        // Its persisted call is not marked for certification.
+        assertFalse(withPilot(controls, true).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
+        verify(controls).findById(businessId);
+    }
+
+    @Test
+    void mediaWebSocketPreservesExplicitCertificationOfUnmanagedTenant() {
+        PilotLaunchControlRepository controls = mock(PilotLaunchControlRepository.class);
+        when(controls.findById(businessId)).thenReturn(Optional.empty());
+        when(call.isCertification()).thenReturn(true);
 
         assertTrue(withPilot(controls, false).allowsMedia(CALL_SID, NUMBER, CALLER, ACCOUNT));
         verify(controls).findById(businessId);

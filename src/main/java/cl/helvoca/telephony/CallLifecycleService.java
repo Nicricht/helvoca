@@ -174,7 +174,7 @@ public class CallLifecycleService {
         // makes completed calls appear free. Require an effective carrier
         // rate and a positive AI fallback with no zero-priced overrides.
         // This is still an admission estimate, never a hard provider cap.
-        if (commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider).signum() <= 0
+        if (commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider, CallDirection.INBOUND).signum() <= 0
                 || !commercial.hasCompleteAiPricingForEstimatedBudget()) {
             metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_pricing").increment();
             throw new CallCapacityExceededException("Estimated daily budget pricing is not configured safely");
@@ -329,7 +329,7 @@ public class CallLifecycleService {
         BigDecimal telephonyMinutes = "twilio".equalsIgnoreCase(call.getTelephonyProvider())
                 ? BigDecimal.valueOf((seconds + 59L) / 60L)
                 : minutes;
-        BigDecimal telephony = commercial.resolveTelephonyCostPerMinuteUsd(call.getTelephonyProvider())
+        BigDecimal telephony = commercial.resolveTelephonyCostPerMinuteUsd(call.getTelephonyProvider(), call.getDirection())
                 .multiply(telephonyMinutes).setScale(6, RoundingMode.HALF_UP);
         BigDecimal ai = call.getAiProvider() == null || call.getAiProvider().isBlank()
                 ? BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP)
