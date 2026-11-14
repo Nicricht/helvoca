@@ -34,6 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -463,7 +464,8 @@ class RealtimeToolServiceTest {
         UUID serviceId = UUID.randomUUID();
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+                LocalDate.now(zone).plusWeeks(3)
+                        .with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY)), LocalTime.of(10, 30), zone).toInstant();
 
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -508,7 +510,8 @@ class RealtimeToolServiceTest {
         String streamSid = "MZ-create-weekday";
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+                LocalDate.now(zone).plusWeeks(3)
+                        .with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY)), LocalTime.of(10, 30), zone).toInstant();
 
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -568,9 +571,10 @@ class RealtimeToolServiceTest {
         String streamSid = "MZ-reschedule-weekday";
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant newStartAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), zone).toInstant();
+                LocalDate.now(zone).plusWeeks(3)
+                        .with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY)), LocalTime.of(10, 30), zone).toInstant();
         Instant oldStartAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 10), LocalTime.of(10, 30), zone).toInstant();
+                newStartAt.atZone(zone).toLocalDate().minusDays(3), LocalTime.of(10, 30), zone).toInstant();
 
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -622,7 +626,8 @@ class RealtimeToolServiceTest {
         UUID serviceId = UUID.randomUUID();
         ZoneId zone = ZoneId.of("America/Santiago");
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 12), LocalTime.of(23, 0), zone).toInstant();
+                LocalDate.now(zone).plusWeeks(3)
+                        .with(TemporalAdjusters.nextOrSame(DayOfWeek.THURSDAY)), LocalTime.of(23, 0), zone).toInstant();
 
         BusinessRepository businesses = mock(BusinessRepository.class);
         CustomerRepository customers = mock(CustomerRepository.class);
@@ -655,9 +660,12 @@ class RealtimeToolServiceTest {
 
         assertTrue(result.getBoolean("success"));
         assertTrue(result.getJSONObject("data").getBoolean("available"));
-        assertEquals("2026-11-12", result.getJSONObject("data").getString("localDate"));
+        assertEquals(startAt.atZone(zone).toLocalDate().toString(),
+                result.getJSONObject("data").getString("localDate"));
         assertEquals("THURSDAY", result.getJSONObject("data").getString("dayOfWeek"));
-        assertTrue(result.getJSONObject("data").getString("localStart").contains("2026-11-12T23:00"));
+        assertTrue(result.getJSONObject("data").getString("localStart")
+                .contains(startAt.atZone(zone).toLocalDate() + "T23:00"));
+        assertEquals(DayOfWeek.FRIDAY, startAt.atZone(ZoneId.of("UTC")).getDayOfWeek());
     }
 
     @Test
