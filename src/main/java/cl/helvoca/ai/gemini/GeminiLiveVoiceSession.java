@@ -83,6 +83,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private final GeminiTwilioAudioFramer assistantAudioFramer = new GeminiTwilioAudioFramer();
     private final Queue<String> pendingAudio = new ConcurrentLinkedQueue<>();
     private final GeminiToolCallLedger toolCallLedger = new GeminiToolCallLedger();
+    // Google reports usage per provider event; never assume snapshots are
+    // cumulative or additive when producing billing estimates.
+    private final GeminiLiveUsageMeter usageMeter;
     private final ConcurrentHashMap<String, CachedToolResult> recentReadToolResults = new ConcurrentHashMap<>();
     private final AtomicBoolean setupComplete = new AtomicBoolean(false);
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -153,6 +156,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         this.certifications = certifications;
         this.health = health;
         this.http = http;
+        this.usageMeter = new GeminiLiveUsageMeter(context.callId(), context.businessId(), properties.getModel());
         this.localBargeInDetector = new LocalBargeInDetector(
                 properties.getLocalBargeInMeanAmplitudeThreshold(),
                 properties.getLocalBargeInSpeechFrames(),
@@ -278,6 +282,10 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
     private void handleInTenant(String payload) {
         try {
             JSONObject event = new JSONObject(payload);
+            // Record only numeric, provider-reported usage. Do not persist the
+            // provider payload or treat token snapshots as an invoice.
+            JSONObject usageMetadata = event.optJSONObject("usageMetadata");
+            if (usageMetadata != null) usageMeter.record(usageMetadata);
             if (event.has("setupComplete")) {
                 onSetupComplete();
                 return;
@@ -779,9 +787,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 || now - lastAudio > properties.getLocalBargeInRecentAssistantAudioMs()) {
             return;
         }
-        deferredEndCallPending.set(false);
-        contextualClosingIntent.set(false);
-        awaitingAnythingElseAnswer.set(false);
+        // A local amplitude crossing is only a tentative acoustic signal.
+        // Do not erase a pending farewell or conversation intent until Gemini
+        // confirms an interruption. This protects against speaker echo/noise.
         assistantAudioFramer.clear();
         transport.clearPlayback(context.streamSid());
         log.info("VOICE_LOCAL_BARGE_IN call={} playback_age_ms={} threshold={} speech_frames={}",
@@ -894,7 +902,44 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 .put("outputAudioTranscription", new JSONObject())
                 .put("tools", new JSONArray().put(new JSONObject()
                         .put("functionDeclarations", geminiFunctionDeclarations())));
-        return new JSONObject().put("setup", setup);
+        if (properties.isContextWindowCompressionEnabled()) {
+            // Live API uses int64-encoded strings for both token counts.
+            // This opt-in retains the system instructions, tool definitions and
+            // most recent turns; it never imposes a call-duration cutoff.
+            setup.put("contextWindowCompression", new JSONObject()
+                    .put("triggerTokens",
+                            Integer.toString(properties.getContextWindowCompressionTriggerTokens()))
+                    .put("slidingWindow", new JSONObject()
+                            .put("targetTokens",
+                                    Integer.toString(properties.getContextWindowCompressionTargetTokens()))));
+        }
+        JSONObject message = new JSONObject().put("setup", setup);
+        JSONObject sizes = setupSizes(message);
+        // Numbers only: no tenant instructions, tool schemas or customer data in logs.
+        log.info("GEMINI_LIVE_SETUP_SIZE call_id={} model={} compact_tools={} compression={} "
+                        + "system_chars={} declarations_chars={} tool_count={} message_chars={} "
+                        + "kind=CHARACTERS_NOT_TOKENS",
+                context.callId(), properties.getModel(),
+                properties.isCompactToolDescriptionsEnabled(),
+                properties.isContextWindowCompressionEnabled(),
+                sizes.getInt("systemInstructionChars"),
+                sizes.getInt("toolDeclarationsChars"),
+                sizes.getInt("toolCount"),
+                sizes.getInt("messageChars"));
+        return message;
+    }
+
+    static JSONObject setupSizes(JSONObject message) {
+        JSONObject setup = message.getJSONObject("setup");
+        JSONArray declarations = setup.getJSONArray("tools").getJSONObject(0)
+                .getJSONArray("functionDeclarations");
+        String instructions = setup.getJSONObject("systemInstruction").getJSONArray("parts")
+                .getJSONObject(0).getString("text");
+        return new JSONObject()
+                .put("systemInstructionChars", instructions.length())
+                .put("toolDeclarationsChars", declarations.toString().length())
+                .put("toolCount", declarations.length())
+                .put("messageChars", message.toString().length());
     }
 
     private JSONArray geminiFunctionDeclarations() {
@@ -904,11 +949,15 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         for (int i = 0; i < source.length(); i++) {
             JSONObject tool = source.getJSONObject(i);
             if (context.voiceBakeOff() && !"end_call".equals(tool.optString("name"))) continue;
-            out.put(new JSONObject()
+            JSONObject declaration = new JSONObject()
                     .put("name", tool.getString("name"))
                     .put("description", tool.optString("description", ""))
                     .put("behavior", "BLOCKING")
-                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters"))));
+                    .put("parameters", sanitizeGeminiSchema(tool.getJSONObject("parameters")));
+            if (properties.isCompactToolDescriptionsEnabled()) {
+                GeminiLiveCompactToolDescriptions.compact(declaration);
+            }
+            out.put(declaration);
         }
         return out;
     }
@@ -960,6 +1009,9 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
         String voicePersona = masculineVoice
                 ? "PERSONA VOCAL: habla como un recepcionista chileno de Santiago, adulto, cordial, despierto y profesional. La impresión debe ser de confianza, cercanía y agilidad, sin sonar infantil, exageradamente sensual ni como locutor de call center."
                 : "PERSONA VOCAL: habla como una recepcionista chilena joven-adulta de Santiago, alegre, despierta, cercana y con presencia premium. La impresión debe ser \"qué agradable hablar con ella\", no \"estoy hablando con una operadora\". Usa calidez natural, energía moderada y curiosidad genuina por ayudar, sin exagerar la sonrisa ni teatralizar la entonación. La voz debe sonar femenina y joven-adulta, con resonancia clara, nunca infantil, susurrada, empalagosa ni forzadamente sensual.";
+        if (!context.voiceBakeOff() && properties.isLeanSystemInstructionsEnabled()) {
+            return GeminiLiveLeanSystemInstructions.build(bakeOffPrelude, voiceIdentity, voicePersona);
+        }
         return bakeOffPrelude + "\n" + """
                 REGLAS DE VOZ DE RECEPVOZ:
                 Tu nombre de producto es RecepVoz. Nunca te presentes como Helvoca.
@@ -977,7 +1029,8 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
                 NO REPETIR: está prohibido repetir el saludo de bienvenida durante la misma llamada. Una vez saludaste, responde a la solicitud actual; no reinicies la conversación ni repitas "Hola, gracias por llamar", ni siquiera por silencios, interrupciones o resultados de herramientas; también está prohibido hacer dos veces la misma pregunta o volver a pedir un dato ya entregado. Mantén memoria de servicio, fecha, hora, nombre, teléfono y decisión del cliente durante toda la llamada. Si el cliente ya dio un dato, avanza al siguiente faltante. Si ya eligió una opción, no vuelvas a enumerarla ni preguntes otra vez si la quiere. Si no entendió una pregunta, REFORMÚLALA una sola vez de manera más corta, no la repitas textual. Cada turno debe aportar información nueva o ejecutar el siguiente paso.
                 CONFIRMACIÓN: pide UNA sola confirmación compacta cuando sea realmente necesaria. Después de que el cliente responda "sí", "ya", "dale", "claro", "ok", "bueno" o equivalente, NO vuelvas a pedir confirmación ni repitas la solicitud: ejecuta inmediatamente la acción correspondiente. En reservas, la fase 1 de create_booking puede requerir una única confirmación de las condiciones y la fase 2 debe ejecutarse inmediatamente después de esa aceptación.
                 HORARIOS Y DATOS: pronuncia horas como una persona, por ejemplo "a las nueve y media" en vez de leer "09:30 horas". Si hay varias alternativas, ofrece primero las dos o tres más útiles en una frase natural en vez de leer una lista mecánica.
-                FECHA HABLADA = FECHA REAL: después de create_booking o reschedule_booking con success=true y bookingId, la fecha y hora que dices en voz alta DEBEN salir de localStart/localDate del resultado exitoso más reciente de esa misma reserva, no de la propuesta anterior ni de tu memoria. Si el cliente pide aclarar la fecha, repite esa fecha persistida, sin calcularla otra vez. "Miércoles de la próxima semana" no es "miércoles de esta semana". Si "próximo miércoles" resulta ambiguo, pregunta de cuál semana se trata antes de modificar la agenda; nunca inventes el número del día.
+                 NO OFRECER HORAS PASADAS: no inventes horas ni repitas una hora de hoy que ya haya pasado. Solo puedes ofrecer alternativas FUTURAS de la última respuesta de list_available_slots o check_booking_availability para esa fecha. Si no hay una hora futura confirmada por el backend, no propongas ninguna.
+                FECHA HABLADA = FECHA REAL: después de create_booking o reschedule_booking con success=true y bookingId, la fecha y hora que dices en voz alta DEBEN salir de localStart/localDate del resultado exitoso más reciente de esa misma reserva, no de la propuesta anterior ni de tu memoria. Si el cliente pide aclarar la fecha, repite esa fecha persistida, sin calcularla otra vez. "Miércoles de la próxima semana" no es "miércoles de esta semana". "Próximo miércoles" o "próximo jueves" corresponden al día indicado en la SEMANA CALENDARIO SIGUIENTE, no esta semana: envía requestedWeekScope=NEXT_WEEK con requestedWeekday al consultar y al proponer o reprogramar. "Este miércoles/jueves" corresponde a THIS_WEEK. Si menciona el día sin semana y hay ambigüedad, pregunta antes de modificar la agenda; nunca inventes el número del día.
                 CANCELACIONES: si el cliente solicita explícitamente cancelar una reserva, usa el bookingId obtenido de create_booking confirmado o list_customer_bookings e invoca cancel_booking antes de despedirte. Solo confirma cancelación si success=true. Nunca canceles por iniciativa propia ni confundas la limpieza de una prueba con una cancelación solicitada por el paciente.
                 CONVERSACIÓN: haz una sola pregunta a la vez. Escucha la idea completa del cliente; si hace una pausa breve, no asumas automáticamente que terminó. Permite interrupciones y si el cliente empieza a hablar, detente y atiende su nueva intervención.
                 HERRAMIENTAS: si una consulta de lectura ya devolvió success=true con los mismos datos y el cliente no cambió su solicitud, usa ese resultado y NO vuelvas a ejecutar la misma herramienta. Para una reserva, consulta find_caller antes de pedir nombre o teléfono; si el cliente ya existe, reutiliza sus datos y no se los vuelvas a preguntar. Después de una herramienta, responde con el resultado en lenguaje humano; nunca menciones UUID, nombres internos de herramientas ni detalles técnicos.
@@ -1110,6 +1163,7 @@ final class GeminiLiveVoiceSession implements VoiceAiSession, WebSocket.Listener
 
     private void finalizeCall() {
         if (!finalized.compareAndSet(false, true)) return;
+        usageMeter.logFinalSummary();
         try {
             summaries.generate(context.callId());
         } catch (Exception e) {

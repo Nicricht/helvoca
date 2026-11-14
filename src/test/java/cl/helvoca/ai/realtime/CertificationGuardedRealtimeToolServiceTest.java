@@ -23,11 +23,13 @@ import org.json.JSONObject;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -214,7 +216,7 @@ class CertificationGuardedRealtimeToolServiceTest {
                 .thenReturn(proposal);
 
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         JSONObject result = new JSONObject(f.service.execute(
                 f.context,
                 "create_booking",
@@ -249,7 +251,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         setField(f.service, "bookingConfirmationWorkflow", workflow);
 
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         UUID operationId = UUID.randomUUID();
         String token = UUID.randomUUID().toString();
         JSONObject proposal = new JSONObject()
@@ -305,7 +307,7 @@ class CertificationGuardedRealtimeToolServiceTest {
                 .thenReturn(proposal);
 
         Instant startAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         JSONObject result = new JSONObject(f.service.execute(
                 f.context,
                 "create_booking",
@@ -369,7 +371,7 @@ class CertificationGuardedRealtimeToolServiceTest {
         when(f.businesses.findById(f.businessId)).thenReturn(Optional.of(business));
 
         Instant newStartAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         JSONObject result = new JSONObject(f.service.execute(
                 f.context,
                 "reschedule_booking",
@@ -400,7 +402,7 @@ class CertificationGuardedRealtimeToolServiceTest {
 
         UUID bookingId = UUID.randomUUID();
         Instant newStartAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         JSONObject result = new JSONObject(f.service.execute(
                 f.context,
                 "reschedule_booking",
@@ -425,7 +427,7 @@ class CertificationGuardedRealtimeToolServiceTest {
 
         UUID bookingId = UUID.randomUUID();
         Instant newStartAt = ZonedDateTime.of(
-                LocalDate.of(2026, 11, 13), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
+                futureFriday(), LocalTime.of(10, 30), ZoneId.of("America/Santiago")).toInstant();
         JSONObject result = new JSONObject(f.service.execute(
                 f.context,
                 "reschedule_booking",
@@ -438,6 +440,12 @@ class CertificationGuardedRealtimeToolServiceTest {
         assertEquals("BOOKING_NOT_FOUND", result.getJSONObject("error").getString("code"));
         verify(f.bookings).findByIdAndBusinessIdAndCustomerId(bookingId, f.businessId, customerId);
         verifyNoInteractions(f.jdbc);
+    }
+
+    private static LocalDate futureFriday() {
+        ZoneId zone = ZoneId.of("America/Santiago");
+        return LocalDate.now(zone).plusWeeks(3)
+                .with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
     }
 
     private static void setField(Object target, String fieldName, Object value) {

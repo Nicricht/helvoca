@@ -29,6 +29,16 @@ That evidence closes voice selection and the basic controlled-call gate. It does
 
 Do not place another real call merely to satisfy CI. Tenant-specific real-carrier confirmation is allowed only inside an explicitly authorized launch window with the pilot safety cage active.
 
+### General multi-business inbound launch preparation (14 November 2026, unmerged candidate)
+
+The platform already supports multi-tenant managed Twilio numbers and subscription admission. The production startup last inspected on 14 November reported `voiceReady=false` and `selectedVoiceProvider=null`; a successful Aurora Sur DEMO is **not** production voice certification.
+
+The draft PR #872 adds a fail-closed rule at the authenticated public Twilio `POST /webhooks/v1/twilio/voice` admission: an otherwise verified number may **not** start a commercial inbound call unless its business resolves to an explicit `pilot_launch_control` enrollment and `ControlledPilotExternalEffectGuard` allows VOICE. Unmanaged `NOT_PILOT_MANAGED`, PAUSED, DRAFT and disabled global pilot effects are **NO-GO** for public inbound. The separate, previously authorized one-shot `inbound-certification/{token}` route and its controls are unchanged; no real carrier test was repeated. This narrow voice-only rule does not change WhatsApp, payment guards or how existing providers bill.
+
+**Per-business enablement sequence:** (1) tenant data, agent, services/hours and signed customer scope; (2) number owned by that tenant with matching Twilio AC/PN, voice verification, callback HTTPS and commercial entitlement; (3) enroll that specific business in `pilot_launch_control`, verify STOP/PAUSED and budget estimates, then approve RUNNING and the pilot effects switch; (4) verify the actual production voice provider is ready before any inbound routing; (5) validate one truly authorized incoming carrier call only if still needed, then record terminal state, cost source and rollback owner. Do not point Aurora's demo number at an unrelated business, enable voice for unenrolled tenants, or claim a hard spend cap from a call-admission estimate. A zero-value/absent price, unproven provider readiness or missing tenant safety control means NO-GO.
+
+This is **code prepared in an unmerged draft**, not a production GO and not an authorization for a Twilio number purchase, Gemini spend, call, merge or deployment.
+
 ## Gate B — Mercado Pago SaaS sandbox provider round-trip
 
 Status: **GENUINE TEST APPROVED INVOICE + REAL JAVA/POSTGRESQL18 RECOVERY VERIFIED; PROVIDER ROUND-TRIP PENDING (ORGANIC SIGNED SUBSCRIPTION WEBHOOK ONLY)**

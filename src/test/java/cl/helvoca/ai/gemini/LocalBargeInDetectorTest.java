@@ -38,6 +38,26 @@ class LocalBargeInDetectorTest {
         }
     }
 
+
+    @Test
+    void isolatedNoiseSpikesDoNotCausePrematureLocalInterruption() {
+        LocalBargeInDetector detector = new LocalBargeInDetector(900, 5, 25);
+        String speech = mulawFrame((short) 8_000);
+        String silence = mulawSilence();
+
+        // Two 40-ms loud artifacts separated by silence are not speech.
+        for (int burst = 0; burst < 3; burst++) {
+            assertEquals(LocalBargeInDetector.Event.NONE, detector.accept(speech));
+            assertEquals(LocalBargeInDetector.Event.NONE, detector.accept(speech));
+            assertEquals(LocalBargeInDetector.Event.NONE, detector.accept(silence));
+        }
+        // Sustained speech still allows opt-in caller interruption.
+        for (int frame = 0; frame < 4; frame++) {
+            assertEquals(LocalBargeInDetector.Event.NONE, detector.accept(speech));
+        }
+        assertEquals(LocalBargeInDetector.Event.SPEECH_STARTED, detector.accept(speech));
+    }
+
     private static String mulawFrame(short sample) {
         byte[] frame = new byte[160];
         Arrays.fill(frame, PcmuAudioCodec.encodeMulaw(sample));

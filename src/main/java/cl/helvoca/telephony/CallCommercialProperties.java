@@ -1,5 +1,7 @@
 package cl.helvoca.telephony;
 
+import cl.helvoca.call.CallDirection;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -12,11 +14,21 @@ import java.util.Map;
 @ConfigurationProperties(prefix = "app.commercial.calls")
 public class CallCommercialProperties {
     private int maxConcurrentPerBusiness = 10;
+    // Optional spending-abuse safety gate for new call starts. Zero preserves
+    // unlimited admission; no time limit is imposed on a connected call.
+    private int maxCallsPerBusinessPerUtcDay = 0;
+    // Estimated admission ceiling, independent for every tenant/day. Zero disables it.
+    // This cannot be a hard provider-spend cap while calls have unlimited duration.
+    private BigDecimal maxEstimatedCostPerBusinessPerUtcDayUsd = BigDecimal.ZERO;
+    private BigDecimal estimatedNewCallReservationUsd = BigDecimal.ZERO;
     private BigDecimal telephonyCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal aiCostPerMinuteUsd = BigDecimal.ZERO;
     private BigDecimal usdToClpRate = BigDecimal.ZERO;
     private BigDecimal twilioNumberMonthlyCostUsd = BigDecimal.ZERO;
     private Map<String, BigDecimal> telephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
+    // Optional operator estimates by call direction. An empty map preserves legacy pricing.
+    private Map<String, BigDecimal> inboundTelephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
+    private Map<String, BigDecimal> outboundTelephonyProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiProviderCostPerMinuteUsd = new LinkedHashMap<>();
     private Map<String, BigDecimal> aiModelCostPerMinuteUsd = new LinkedHashMap<>();
 
@@ -26,6 +38,27 @@ public class CallCommercialProperties {
 
     public void setMaxConcurrentPerBusiness(int maxConcurrentPerBusiness) {
         this.maxConcurrentPerBusiness = Math.max(0, maxConcurrentPerBusiness);
+    }
+
+    public int getMaxCallsPerBusinessPerUtcDay() {
+        return maxCallsPerBusinessPerUtcDay;
+    }
+
+    public void setMaxCallsPerBusinessPerUtcDay(int maxCallsPerBusinessPerUtcDay) {
+        this.maxCallsPerBusinessPerUtcDay = Math.max(0, maxCallsPerBusinessPerUtcDay);
+    }
+
+    public BigDecimal getMaxEstimatedCostPerBusinessPerUtcDayUsd() {
+        return maxEstimatedCostPerBusinessPerUtcDayUsd;
+    }
+    public void setMaxEstimatedCostPerBusinessPerUtcDayUsd(BigDecimal value) {
+        this.maxEstimatedCostPerBusinessPerUtcDayUsd = nonNegative(value);
+    }
+    public BigDecimal getEstimatedNewCallReservationUsd() {
+        return estimatedNewCallReservationUsd;
+    }
+    public void setEstimatedNewCallReservationUsd(BigDecimal value) {
+        this.estimatedNewCallReservationUsd = nonNegative(value);
     }
 
     public BigDecimal getTelephonyCostPerMinuteUsd() {
@@ -68,6 +101,22 @@ public class CallCommercialProperties {
         this.telephonyProviderCostPerMinuteUsd = normalizeRates(values);
     }
 
+    public Map<String, BigDecimal> getInboundTelephonyProviderCostPerMinuteUsd() {
+        return Map.copyOf(inboundTelephonyProviderCostPerMinuteUsd);
+    }
+
+    public void setInboundTelephonyProviderCostPerMinuteUsd(Map<String, BigDecimal> values) {
+        this.inboundTelephonyProviderCostPerMinuteUsd = normalizeRates(values);
+    }
+
+    public Map<String, BigDecimal> getOutboundTelephonyProviderCostPerMinuteUsd() {
+        return Map.copyOf(outboundTelephonyProviderCostPerMinuteUsd);
+    }
+
+    public void setOutboundTelephonyProviderCostPerMinuteUsd(Map<String, BigDecimal> values) {
+        this.outboundTelephonyProviderCostPerMinuteUsd = normalizeRates(values);
+    }
+
     public Map<String, BigDecimal> getAiProviderCostPerMinuteUsd() {
         return Map.copyOf(aiProviderCostPerMinuteUsd);
     }
@@ -84,8 +133,34 @@ public class CallCommercialProperties {
         this.aiModelCostPerMinuteUsd = normalizeRates(values);
     }
 
+    /**
+     * A budget admission cannot rely on a zero-priced voice fallback, and a
+     * configured provider/model override must not silently bypass that floor.
+     * Positive rates are operator estimates, not proof of provider billing.
+     */
+    public boolean hasCompleteAiPricingForEstimatedBudget() {
+        return aiCostPerMinuteUsd.signum() > 0
+                && aiProviderCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0)
+                && aiModelCostPerMinuteUsd.values().stream().allMatch(rate -> rate.signum() > 0);
+    }
+
     public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider) {
         return resolve(telephonyProviderCostPerMinuteUsd, provider, telephonyCostPerMinuteUsd);
+    }
+
+    /**
+     * Use a verified direction-specific operator rate when configured, or
+     * preserve the legacy provider rate. These figures remain estimates, not bills.
+     */
+    public BigDecimal resolveTelephonyCostPerMinuteUsd(String provider, CallDirection direction) {
+        if (direction == CallDirection.INBOUND) {
+            BigDecimal configured = lookup(inboundTelephonyProviderCostPerMinuteUsd, provider);
+            if (configured != null) return configured;
+        } else if (direction == CallDirection.OUTBOUND) {
+            BigDecimal configured = lookup(outboundTelephonyProviderCostPerMinuteUsd, provider);
+            if (configured != null) return configured;
+        }
+        return resolveTelephonyCostPerMinuteUsd(provider);
     }
 
     public BigDecimal resolveAiCostPerMinuteUsd(String provider, String model) {
