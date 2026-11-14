@@ -134,6 +134,22 @@ class CallCommercialPropertiesTest {
     }
 
     @Test
+    void inboundRateCannotLeakIntoOutgoingEstimateWhenOnlyIncomingConfigured() {
+        CallCommercialProperties properties = new CallCommercialProperties();
+        properties.setTelephonyProviderCostPerMinuteUsd(
+                Map.of("TWILIO", new BigDecimal("0.080")));
+        properties.setInboundTelephonyProviderCostPerMinuteUsd(
+                Map.of("Twilio", new BigDecimal("0.0151")));
+
+        assertEquals(new BigDecimal("0.0151"),
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", CallDirection.INBOUND));
+        assertEquals(new BigDecimal("0.080"),
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", CallDirection.OUTBOUND));
+        assertEquals(new BigDecimal("0.080"),
+                properties.resolveTelephonyCostPerMinuteUsd("twilio", null));
+    }
+
+    @Test
     void invalidOrAbsentDirectionalRatesDoNotInventPositiveCharges() {
         CallCommercialProperties properties = new CallCommercialProperties();
         properties.setInboundTelephonyProviderCostPerMinuteUsd(
