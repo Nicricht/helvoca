@@ -219,7 +219,7 @@ public class CallLifecycleService {
         BigDecimal usdToClp = commercial.getUsdToClpRate();
         BigDecimal untracked = commercial.getVerifiedUntrackedPlatformSpendThisMonthClp();
         if (reservation.signum() <= 0 || usdToClp.signum() <= 0
-                || untracked == null || untracked.compareTo(BigDecimal.ZERO) < 0
+                || untracked == null
                 || commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider, CallDirection.INBOUND).signum() <= 0
                 || !commercial.hasCompleteAiPricingForEstimatedBudget()) {
             metrics.counter("helvoca.calls.rejected", "reason", "platform_monthly_budget_config").increment();
