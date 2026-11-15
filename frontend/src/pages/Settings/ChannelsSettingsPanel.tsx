@@ -228,7 +228,7 @@ export function ChannelsSettingsPanel({
       && typeof step.label === "string"
       && typeof step.complete === "boolean"
       && typeof step.guidance === "string"
-      && (step.href === null || typeof step.href === "string"))
+      && (step.href == null || typeof step.href === "string"))
   );
   const voiceGuide = voiceGuideValid ? receivedVoiceGuide : null;
 
