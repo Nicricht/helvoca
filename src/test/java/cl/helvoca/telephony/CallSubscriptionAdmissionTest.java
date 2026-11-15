@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.eq;
@@ -347,6 +348,9 @@ class CallSubscriptionAdmissionTest {
         props.setUsdToClpRate(new java.math.BigDecimal("1000"));
         props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
         props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        // Invalid external-spend evidence must be treated as unknown, never as zero.
+        props.setVerifiedUntrackedPlatformSpendThisMonthClp(new java.math.BigDecimal("-1"));
+        assertNull(props.getVerifiedUntrackedPlatformSpendThisMonthClp());
         CallLifecycleService lifecycle = lifecycle(phones, calls, props);
         lifecycle.setSubscriptions(subscriptions);
         TenantDatabaseContext databaseScope = new TenantDatabaseContext();
