@@ -66,6 +66,26 @@ public interface CallSessionRepository extends JpaRepository<CallSession, UUID> 
             @Param("end") Instant end,
             @Param("reservation") BigDecimal reservation);
 
+    /**
+     * Platform-wide estimation only. Caller must be in an explicit SYSTEM
+     * database scope; tenant-scoped results would silently undercount spend.
+     * Include every status, certification calls and unfinished calls.
+     */
+    @Query("""
+        select coalesce(sum(
+            case when c.estimatedTotalCostUsd is null
+                        or c.estimatedTotalCostUsd < :reservation
+                 then :reservation else c.estimatedTotalCostUsd end
+        ), 0)
+        from CallSession c
+        where c.startedAt >= :start
+          and c.startedAt < :end
+        """)
+    BigDecimal sumReservedEstimatedCostForPlatformPeriod(
+            @Param("start") Instant start,
+            @Param("end") Instant end,
+            @Param("reservation") BigDecimal reservation);
+
     @Query("""
         select coalesce(sum(c.estimatedTotalCostUsd), 0) from CallSession c
         where c.businessId = :businessId

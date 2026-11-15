@@ -20,6 +20,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.Map;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
@@ -163,6 +165,49 @@ class CallDailyBudgetIntegrationTest extends ExplicitSystemDatabaseScopeSupport 
         } finally {
             commercial.setInboundTelephonyProviderCostPerMinuteUsd(previous);
         }
+    }
+
+    @Test
+    void platformMonthAdmitsAcrossTenantsUntilSharedCeilingAndKeepsRetriesIdempotent() {
+        // This test is entirely offline against isolated PostgreSQL; no carrier calls.
+        BigDecimal oldCeiling = commercial.getMaxEstimatedPlatformCostPerUtcMonthClp();
+        BigDecimal oldUntracked = commercial.getVerifiedUntrackedPlatformSpendThisMonthClp();
+        BigDecimal oldFx = commercial.getUsdToClpRate();
+        BigDecimal reserve = commercial.getEstimatedNewCallReservationUsd();
+        YearMonth month = YearMonth.now(ZoneOffset.UTC);
+        Instant start = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant end = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        BigDecimal previous = calls.sumReservedEstimatedCostForPlatformPeriod(start, end, reserve);
+        BigDecimal fx = new BigDecimal("1000");
+        BigDecimal outside = new BigDecimal("750");
+        try {
+            commercial.setUsdToClpRate(fx);
+            commercial.setVerifiedUntrackedPlatformSpendThisMonthClp(outside);
+            commercial.setMaxEstimatedPlatformCostPerUtcMonthClp(
+                    outside.add(previous.add(reserve.multiply(new BigDecimal("2"))).multiply(fx)));
+
+            Fixture first = tenant("Global budget first", "+14355551925");
+            Fixture second = tenant("Global budget second", "+14355551926");
+            Fixture deniedTenant = tenant("Global budget third", "+14355551927");
+            UUID firstId = admitSystem(first, "CA-platform-month-1");
+            assertEquals(firstId, admitSystem(first, "CA-platform-month-1"));
+            assertNotNull(admitSystem(second, "CA-platform-month-2"));
+            CallCapacityExceededException denied = assertThrows(
+                    CallCapacityExceededException.class,
+                    () -> admitSystem(deniedTenant, "CA-platform-month-3"));
+            assertEquals("Platform estimated monthly voice budget reached", denied.getMessage());
+            assertTrue(calls.findByProviderCallId("CA-platform-month-3").isEmpty());
+        } finally {
+            commercial.setMaxEstimatedPlatformCostPerUtcMonthClp(oldCeiling);
+            commercial.setVerifiedUntrackedPlatformSpendThisMonthClp(oldUntracked);
+            commercial.setUsdToClpRate(oldFx);
+        }
+    }
+
+    private UUID admitSystem(Fixture tenant, String providerCallSid) {
+        return databaseContext.callAsSystem(() ->
+                lifecycle.startInboundCall("twilio", providerCallSid,
+                        "+56910001911", tenant.phone()));
     }
 
     private UUID admit(Fixture tenant, String providerCallSid) {
