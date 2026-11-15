@@ -290,4 +290,36 @@ test.describe('React settings core RED contract', () => {
     expect(state.agentPayloads).toHaveLength(0);
     expect(state.forbiddenWrites).toEqual([]);
   });
+  test('displays voice readiness when Spring omits null step links from successful JSON', async ({ page }) => {
+    const state = await bootSettingsCore(page);
+    await page.route('**/api/v1/onboarding/voice-readiness', route => route.fulfill(json({
+      status: 'CONFIGURATION_INCOMPLETE',
+      configurationReady: false,
+      liveCertified: false,
+      readyForCommercialCalls: false,
+      steps: [
+        {
+          code: 'BUSINESS', label: 'Datos del negocio', complete: true,
+          guidance: 'Completo.', href: '/app/settings?section=business'
+        },
+        {
+          code: 'CARRIER', label: 'Conexión segura con Twilio', complete: false,
+          guidance: 'Falta verificar el carrier.'
+        },
+        {
+          code: 'LIVE_CALL', label: 'Prueba de llamada real autorizada', complete: false,
+          guidance: 'Pendiente de certificación de voz.'
+        }
+      ]
+    })));
+
+    await page.goto('/app/settings?section=channels');
+    const guide = page.getByRole('region', { name: 'Guía de activación de voz' });
+    await expect(guide).toContainText('Configuración incompleta');
+    await expect(guide).toContainText('Conexión segura con Twilio');
+    await expect(guide).toContainText('Prueba de llamada real autorizada');
+    await expect(guide.getByText('No pudimos comprobar la configuración. No se puede confirmar que la voz esté lista.')).toHaveCount(0);
+    expect(state.forbiddenWrites).toEqual([]);
+  });
+
 });
