@@ -375,6 +375,106 @@ class CallSubscriptionAdmissionTest {
         verify(calls, never()).saveAndFlush(any(CallSession.class));
     }
 
+
+    @Test
+    void platformMonthlyAdmissionTestsEveryConfigurationAndThresholdBoundary() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551930")).thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+
+        CallCommercialProperties props = new CallCommercialProperties();
+        props.setMaxEstimatedPlatformCostPerUtcMonthClp(new java.math.BigDecimal("20000"));
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.50"));
+        props.setUsdToClpRate(new java.math.BigDecimal("1000"));
+        props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        props.setVerifiedUntrackedPlatformSpendThisMonthClp(java.math.BigDecimal.ZERO);
+        CallLifecycleService lifecycle = lifecycle(phones, calls, props);
+        lifecycle.setSubscriptions(subscriptions);
+        TenantDatabaseContext databaseScope = new TenantDatabaseContext();
+
+        // Monthly guard must never silently proceed without a trusted DB scope.
+        assertEquals("Platform monthly voice budget requires system scope",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-no-scope",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        lifecycle.setTenantDatabaseContext(databaseScope);
+        props.setEstimatedNewCallReservationUsd(java.math.BigDecimal.ZERO);
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-zero-reservation",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.50"));
+        props.setUsdToClpRate(java.math.BigDecimal.ZERO);
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-zero-fx",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        props.setUsdToClpRate(new java.math.BigDecimal("1000"));
+        props.setVerifiedUntrackedPlatformSpendThisMonthClp(null);
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-missing-spend",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        props.setVerifiedUntrackedPlatformSpendThisMonthClp(java.math.BigDecimal.ZERO);
+        props.setTelephonyCostPerMinuteUsd(java.math.BigDecimal.ZERO);
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-unpriced-twilio",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        props.setAiCostPerMinuteUsd(java.math.BigDecimal.ZERO);
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-unpriced-ai",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        // Unavailable database aggregate must deny admission rather than count zero.
+        assertEquals("Platform estimated monthly voice budget reached",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-unknown-aggregate",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        when(calls.sumReservedEstimatedCostForPlatformPeriod(
+                any(Instant.class), any(Instant.class),
+                eq(new java.math.BigDecimal("0.50"))))
+                .thenReturn(new java.math.BigDecimal("20.00"))
+                .thenReturn(new java.math.BigDecimal("19.50"));
+        assertEquals("Platform estimated monthly voice budget reached",
+                assertThrows(CallCapacityExceededException.class,
+                        () -> databaseScope.callAsSystem(() ->
+                                lifecycle.startInboundCall("twilio", "CA-global-over-ceiling",
+                                        "+56910001930", "+14355551930"))).getMessage());
+
+        when(calls.saveAndFlush(any(CallSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        // Exactly 20.00 USD (including new call reservation) at CLP 1000/USD is allowed.
+        databaseScope.callAsSystem(() ->
+                lifecycle.startInboundCall("twilio", "CA-global-exact-ceiling",
+                        "+56910001930", "+14355551930"));
+        verify(calls, times(1)).saveAndFlush(any(CallSession.class));
+        verify(calls, times(3)).sumReservedEstimatedCostForPlatformPeriod(
+                any(Instant.class), any(Instant.class),
+                eq(new java.math.BigDecimal("0.50")));
+    }
+
     private static BusinessSubscriptionService.SubscriptionView view(UUID businessId,
                                                                      boolean allowed,
                                                                      int maxConcurrent) {
