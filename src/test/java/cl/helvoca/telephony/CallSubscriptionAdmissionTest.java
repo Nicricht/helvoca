@@ -7,6 +7,7 @@ import cl.helvoca.common.NotFoundException;
 import cl.helvoca.customer.CustomerRepository;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
+import cl.helvoca.security.TenantDatabaseContext;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -327,6 +328,47 @@ class CallSubscriptionAdmissionTest {
                 any(UUID.class), any(Instant.class), any(Instant.class));
         verify(calls, never()).saveAndFlush(any(CallSession.class));
         verifyNoInteractions(phones);
+    }
+
+    @Test
+    void platformMonthFailsClosedForMissingProviderReconciliationAndTenantOnlyScope() {
+        UUID businessId = UUID.randomUUID();
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        CallSessionRepository calls = mock(CallSessionRepository.class);
+        BusinessSubscriptionService subscriptions = mock(BusinessSubscriptionService.class);
+        PhoneNumber phone = mock(PhoneNumber.class);
+        when(phone.getBusinessId()).thenReturn(businessId);
+        when(phones.findByPhoneNumberAndActiveTrue("+14355551929")).thenReturn(Optional.of(phone));
+        when(subscriptions.view(businessId)).thenReturn(view(businessId, true, 2));
+
+        CallCommercialProperties props = new CallCommercialProperties();
+        props.setMaxEstimatedPlatformCostPerUtcMonthClp(new java.math.BigDecimal("20000"));
+        props.setEstimatedNewCallReservationUsd(new java.math.BigDecimal("0.50"));
+        props.setUsdToClpRate(new java.math.BigDecimal("1000"));
+        props.setTelephonyCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        props.setAiCostPerMinuteUsd(new java.math.BigDecimal("0.10"));
+        CallLifecycleService lifecycle = lifecycle(phones, calls, props);
+        lifecycle.setSubscriptions(subscriptions);
+        TenantDatabaseContext databaseScope = new TenantDatabaseContext();
+        lifecycle.setTenantDatabaseContext(databaseScope);
+
+        var missingSpend = assertThrows(CallCapacityExceededException.class,
+                () -> databaseScope.callAsSystem(() ->
+                        lifecycle.startInboundCall("twilio", "CA-global-spend-unknown",
+                                "+56910001929", "+14355551929")));
+        assertEquals("Platform monthly voice budget missing verified rates or spend",
+                missingSpend.getMessage());
+
+        props.setVerifiedUntrackedPlatformSpendThisMonthClp(java.math.BigDecimal.ZERO);
+        var tenantScoped = assertThrows(CallCapacityExceededException.class,
+                () -> databaseScope.callAsTenant(businessId, () ->
+                        lifecycle.startInboundCall("twilio", "CA-global-tenant-scope",
+                                "+56910001929", "+14355551929")));
+        assertEquals("Platform monthly voice budget requires system scope",
+                tenantScoped.getMessage());
+        verify(calls, never()).sumReservedEstimatedCostForPlatformPeriod(
+                any(Instant.class), any(Instant.class), any(java.math.BigDecimal.class));
+        verify(calls, never()).saveAndFlush(any(CallSession.class));
     }
 
     private static BusinessSubscriptionService.SubscriptionView view(UUID businessId,

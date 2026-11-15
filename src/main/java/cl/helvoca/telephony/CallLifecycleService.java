@@ -12,6 +12,7 @@ import cl.helvoca.omnichannel.CustomerIdentityService;
 import cl.helvoca.phone.PhoneNumber;
 import cl.helvoca.phone.PhoneNumberRepository;
 import cl.helvoca.platform.DemoSessionCorrelationService;
+import cl.helvoca.security.TenantDatabaseContext;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +23,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +45,7 @@ public class CallLifecycleService {
     private BusinessSubscriptionService subscriptions;
     private CustomerIdentityService customerIdentities;
     private DemoSessionCorrelationService demoSessions;
+    private TenantDatabaseContext tenantDatabaseContext;
 
     public CallLifecycleService(PhoneNumberRepository phoneNumbers,
                                 CustomerRepository customers,
@@ -70,6 +74,11 @@ public class CallLifecycleService {
     @Autowired(required = false)
     void setDemoSessions(DemoSessionCorrelationService demoSessions) {
         this.demoSessions = demoSessions;
+    }
+
+    @Autowired(required = false)
+    void setTenantDatabaseContext(TenantDatabaseContext tenantDatabaseContext) {
+        this.tenantDatabaseContext = tenantDatabaseContext;
     }
 
     @Transactional
@@ -135,6 +144,7 @@ public class CallLifecycleService {
         // Same transaction + business advisory lock as the concurrency guard:
         // another replica cannot race this budget admission decision.
         enforceEstimatedDailyBudget(businessId, telephonyProvider);
+        enforceEstimatedPlatformMonthlyBudget(telephonyProvider);
 
         String normalizedProvider = normalizeProvider(telephonyProvider);
         CallSession call = new CallSession();
@@ -186,6 +196,48 @@ public class CallLifecycleService {
         if (accrued == null || accrued.add(reservation).compareTo(ceiling) > 0) {
             metrics.counter("helvoca.calls.rejected", "reason", "estimated_daily_budget_limit").increment();
             throw new CallCapacityExceededException("Estimated daily call budget reached for business");
+        }
+    }
+
+    /**
+     * Optional, platform-wide monthly call-admission estimate in CLP.
+     * Serialize admissions across tenants/replicas with a shared PG lock.
+     * It does NOT terminate ongoing sessions or guarantee provider invoices:
+     * carrier rounding, taxes, vendor latency and external usage are separate.
+     */
+    private void enforceEstimatedPlatformMonthlyBudget(String telephonyProvider) {
+        BigDecimal ceiling = commercial.getMaxEstimatedPlatformCostPerUtcMonthClp();
+        if (ceiling.signum() <= 0) return;
+
+        if (tenantDatabaseContext == null
+                || tenantDatabaseContext.currentOrDenied().mode() != TenantDatabaseContext.Mode.SYSTEM) {
+            metrics.counter("helvoca.calls.rejected", "reason", "platform_monthly_budget_scope").increment();
+            throw new CallCapacityExceededException("Platform monthly voice budget requires system scope");
+        }
+
+        BigDecimal reservation = commercial.getEstimatedNewCallReservationUsd();
+        BigDecimal usdToClp = commercial.getUsdToClpRate();
+        BigDecimal untracked = commercial.getVerifiedUntrackedPlatformSpendThisMonthClp();
+        if (reservation.signum() <= 0 || usdToClp.signum() <= 0
+                || untracked == null || untracked.compareTo(BigDecimal.ZERO) < 0
+                || commercial.resolveTelephonyCostPerMinuteUsd(telephonyProvider, CallDirection.INBOUND).signum() <= 0
+                || !commercial.hasCompleteAiPricingForEstimatedBudget()) {
+            metrics.counter("helvoca.calls.rejected", "reason", "platform_monthly_budget_config").increment();
+            throw new CallCapacityExceededException("Platform monthly voice budget missing verified rates or spend");
+        }
+
+        // One global transaction-scoped lock, distinct from all per-business locks.
+        // Every replica takes it before reading cumulative spend and inserting.
+        jdbc.execute("SELECT pg_advisory_xact_lock(2036157186,-951055201)");
+
+        YearMonth month = YearMonth.now(ZoneOffset.UTC);
+        Instant start = month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        Instant end = month.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+        BigDecimal accrued = calls.sumReservedEstimatedCostForPlatformPeriod(start, end, reservation);
+        if (accrued == null
+                || untracked.add(accrued.add(reservation).multiply(usdToClp)).compareTo(ceiling) > 0) {
+            metrics.counter("helvoca.calls.rejected", "reason", "platform_monthly_budget_limit").increment();
+            throw new CallCapacityExceededException("Platform estimated monthly voice budget reached");
         }
     }
 

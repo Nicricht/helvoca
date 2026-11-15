@@ -131,6 +131,11 @@ app:
       # Advisory USD estimate per business/day, NOT a provider hard spending cap.
       max-estimated-cost-per-business-per-utc-day-usd: ${HELVOCA_MAX_ESTIMATED_COST_PER_BUSINESS_PER_UTC_DAY_USD:0}
       estimated-new-call-reservation-usd: ${HELVOCA_ESTIMATED_NEW_CALL_RESERVATION_USD:0}
+      # Optional cross-tenant monthly admission estimate; 0 keeps legacy behavior.
+      # Requires explicit verified untracked provider spend, rates and FX;
+      # neither this gate nor provider email alerts guarantees a hard billing cap.
+      max-estimated-platform-cost-per-utc-month-clp: ${HELVOCA_MAX_ESTIMATED_PLATFORM_COST_PER_UTC_MONTH_CLP:0}
+      verified-untracked-platform-spend-this-month-clp: ${HELVOCA_VERIFIED_UNTRACKED_PLATFORM_SPEND_THIS_MONTH_CLP:}
       telephony-cost-per-minute-usd: ${HELVOCA_TELEPHONY_COST_PER_MINUTE_USD:0}
       ai-cost-per-minute-usd: ${HELVOCA_AI_COST_PER_MINUTE_USD:0}
       usd-to-clp-rate: ${HELVOCA_COST_USD_TO_CLP:0}
