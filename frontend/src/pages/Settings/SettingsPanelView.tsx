@@ -35,6 +35,7 @@ import type {
   VoiceOption
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
+import { getSectorSetupGuide } from "../../features/settings/sectorSetupGuides";
 import { ChannelsSettingsPanel } from "./ChannelsSettingsPanel";
 import { IntegrationsSettingsPanel } from "./IntegrationsSettingsPanel";
 import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
@@ -183,6 +184,7 @@ interface SettingsPanelViewProps {
     value: string
   ) => void;
   updateProfile: (key: keyof BusinessProfileInput, value: string | boolean | null) => void;
+  navigateToSection: (section: SectionKey) => void;
   updateAgent: (key: keyof AiAgentInput, value: string | boolean | string[]) => void;
   updateService: (index: number, patch: Partial<ServiceItem>) => void;
   addService: () => void;
@@ -211,6 +213,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     phones,
     updateRoot,
     updateProfile,
+    navigateToSection,
     updateAgent,
     updateService,
     addService,
@@ -224,6 +227,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
   } = props;
 
   if (activeSection === "business") {
+    const guide = getSectorSetupGuide(draft.profile.presetKey);
     return (
       <section
         id="settings-panel-business"
@@ -445,6 +449,22 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span>{businessPresetSuggestions[draft.profile.presetKey]}</span>
           </div>
         )}
+        <section className={styles.sectorSetupGuide} role="region" aria-label="Preparación del negocio">
+          <h3>Antes de atender llamadas: {guide.title}</h3>
+          <p>Confirma estos datos con información real del negocio. La guía no crea servicios, precios, reservas ni activa canales.</p>
+          <ol>
+            {guide.questions.map(question => <li key={question}>{question}</li>)}
+          </ol>
+          <div className={styles.sectorSetupActions}>
+            <button type="button" onClick={() => navigateToSection("services")}>Ir a Servicios</button>
+            <button type="button" onClick={() => navigateToSection("hours")}>Ir a Horarios</button>
+            <button type="button" onClick={() => navigateToSection("knowledge")}>Ir a Conocimiento</button>
+          </div>
+          <div className={styles.sectorMissingInformation}>
+            <strong>Si falta información durante una llamada</strong>
+            <p>{guide.missingInformation}</p>
+          </div>
+        </section>
       </section>
     );
   }
