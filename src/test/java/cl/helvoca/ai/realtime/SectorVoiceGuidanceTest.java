@@ -104,6 +104,9 @@ class SectorVoiceGuidanceTest {
         assertFalse(hotel.contains("Centro Médico"));
         assertFalse(unknown.contains("SECTOR CLÍNICA"));
         assertFalse(unknown.contains("SECTOR HOTEL"));
+        // No repository binding must fail closed without adding a fabricated sector.
+        inject(service, "businessProfiles", null);
+        assertFalse(service.buildInstructions(context(clinicId)).contains("SECTOR CLÍNICA"));
     }
 
     private static Business business(String name) {
