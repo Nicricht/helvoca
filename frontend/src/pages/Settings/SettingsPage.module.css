@@ -386,6 +386,40 @@
 }
 
 
+
+/* Evidence reflects committed fields only; it is not a voice or provider readiness badge. */
+.sectorSavedEvidence {
+  margin-top: 14px;
+  display: grid;
+  gap: 9px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--rv-border-default);
+  background: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+}
+
+.sectorSavedEvidence h3 { margin: 0; font-size: 14px; }
+.sectorSavedEvidence p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--rv-text-secondary); }
+.sectorSavedEvidence ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sectorSavedEvidence li {
+  padding: 7px 10px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.sectorSavedEvidence .sectorSavedWarning { font-size: 12px; }
+
 /* Owner-validated setup checklist. No fake readiness is displayed. */
 .sectorSetupGuide {
   display: grid;
