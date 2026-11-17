@@ -5,6 +5,7 @@ import cl.helvoca.agent.AiAgentService;
 import cl.helvoca.booking.*;
 import cl.helvoca.business.Business;
 import cl.helvoca.business.BusinessRepository;
+import cl.helvoca.business.BusinessProfileRepository;
 import cl.helvoca.call.CallSession;
 import cl.helvoca.call.CallSessionRepository;
 import cl.helvoca.call.CallTraceService;
@@ -28,6 +29,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionDefinition;
 
@@ -60,6 +62,13 @@ public class RealtimeToolService {
 
     @Autowired(required = false)
     private AiAgentService aiAgents;
+
+    @Autowired(required = false)
+    private BusinessProfileRepository businessProfiles;
+
+    // Experimental compact guidance: OFF by default so current voice tenants remain unchanged.
+    @Value("${helvoca.ai.sector-guidance-enabled:false}")
+    private boolean sectorGuidanceEnabled;
 
     @Autowired(required = false)
     private CustomerIdentityService customerIdentities;
@@ -213,6 +222,12 @@ public class RealtimeToolService {
         String custom = agent == null || agent.getInstructions() == null || agent.getInstructions().isBlank()
                 ? "Sin instrucciones adicionales."
                 : agent.getInstructions().trim();
+        // Only the current business' saved preset is used. No other sector and
+        // no tenant knowledge, prices, inventory or extra tools enter this prompt.
+        String sectorRule = !sectorGuidanceEnabled || businessProfiles == null ? ""
+                : businessProfiles.findById(context.businessId())
+                    .map(profile -> SectorVoiceGuidance.forPreset(profile.getPresetKey()))
+                    .orElse("");
 
         return """
                 Eres %s, el asistente telefónico con IA de %s.
@@ -267,7 +282,7 @@ public class RealtimeToolService {
                 localNow.toLocalDate(),
                 localNow.getDayOfWeek().name(),
                 greeting,
-                custom);
+                custom) + (sectorRule.isEmpty() ? "" : "\n" + sectorRule);
     }
 
     private JSONObject businessInformation(RealtimeCallContext context) {
