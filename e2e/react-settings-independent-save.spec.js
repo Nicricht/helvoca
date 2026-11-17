@@ -261,4 +261,60 @@ test.describe('Settings independent save contract', () => {
       'PATCH /api/v1/business', 'PUT /api/v1/business/profile', 'PUT /api/v1/business/profile'
     ]);
   });
+
+  test('twelve visual sector cards are accessible, keyboard navigable and never save before approval', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    const labels = [
+      'Clínica', 'Dentista', 'Veterinaria', 'Peluquería', 'Restaurante',
+      'Ferretería', 'Tienda', 'Taller mecánico', 'Estudio jurídico',
+      'Inmobiliaria', 'Gimnasio', 'Hotel', 'Otro negocio'
+    ];
+    await expect(picker.getByRole('button')).toHaveCount(13);
+    for (const label of labels) await expect(picker.getByRole('button', { name: label, exact: true })).toBeVisible();
+
+    const restaurant = picker.getByRole('button', { name: 'Restaurante', exact: true });
+    const hardware = picker.getByRole('button', { name: 'Ferretería', exact: true });
+    await restaurant.hover();
+    await expect(restaurant).not.toHaveCSS('box-shadow', 'none');
+    expect(mutations(state)).toEqual([]);
+
+    await restaurant.focus();
+    await expect(restaurant).not.toHaveCSS('box-shadow', 'none');
+    await page.keyboard.press('ArrowRight');
+    await expect(hardware).toBeFocused();
+    await expect(hardware).toHaveAttribute('aria-pressed', 'false');
+    expect(mutations(state)).toEqual([]);
+
+    await page.keyboard.press('Enter');
+    await expect(hardware).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByLabel('Rubro')).toHaveValue('hardware_store');
+    expect(mutations(state)).toEqual([]);
+
+    const dental = picker.getByRole('button', { name: 'Dentista', exact: true });
+    await dental.click();
+    await expect(dental).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByLabel('Rubro')).toHaveValue('dental');
+    expect(mutations(state)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(item => item.method + ' ' + item.path)).toEqual(['PUT /api/v1/business/profile']);
+    expect(state.data.profile.presetKey).toBe('dental');
+
+    await page.reload();
+    await expect(page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Dentista', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('sector cards are view-only for operators and do not trigger mutations', async ({ page }) => {
+    const state = await boot(page, { roles: ['OPERATOR'] });
+    await page.goto('/app/settings');
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    await expect(picker.getByRole('button')).toHaveCount(13);
+    await expect(picker.getByRole('button', { name: 'Dentista', exact: true })).toBeDisabled();
+    expect(mutations(state)).toEqual([]);
+  });
 });
