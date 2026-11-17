@@ -169,6 +169,7 @@ function Field({
 interface SettingsPanelViewProps {
   activeSection: SectionKey;
   draft: SettingsDraft;
+  persistedDraft: SettingsDraft;
   canManage: boolean;
   canManageTeam: boolean;
   canReadScheduleExceptions: boolean;
@@ -201,6 +202,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
   const {
     activeSection,
     draft,
+    persistedDraft,
     canManage,
     canManageTeam,
     canReadScheduleExceptions,
@@ -228,6 +230,16 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
 
   if (activeSection === "business") {
     const guide = getSectorSetupGuide(draft.profile.presetKey);
+    const sectorSaved = (draft.profile.presetKey ?? "") === (persistedDraft.profile.presetKey ?? "");
+    const savedServices = persistedDraft.services.filter(
+      item => item.id && item.active !== false && Boolean(item.name?.trim())
+    ).length;
+    const savedHours = persistedDraft.hours.filter(
+      hour => String(hour.openTime).slice(0, 5) < String(hour.closeTime).slice(0, 5)
+    ).length;
+    const savedAnswers = persistedDraft.knowledge.filter(
+      item => item.id && item.active !== false && Boolean(item.title?.trim()) && Boolean(item.content?.trim())
+    ).length;
     return (
       <section
         id="settings-panel-business"
@@ -464,6 +476,17 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <strong>Si falta información durante una llamada</strong>
             <p>{guide.missingInformation}</p>
           </div>
+        </section>
+        <section className={styles.sectorSavedEvidence} role="region" aria-label="Datos guardados para la atención">
+          <h3>Datos registrados en este negocio</h3>
+          <p>Estas cantidades reflejan datos guardados, no el formulario sin guardar.</p>
+          <ul>
+            <li>{sectorSaved ? "Rubro guardado" : "Rubro sin guardar"}</li>
+            <li>{savedServices} {savedServices === 1 ? "servicio registrado" : "servicios registrados"}</li>
+            <li>{savedHours} {savedHours === 1 ? "horario registrado" : "horarios registrados"}</li>
+            <li>{savedAnswers} {savedAnswers === 1 ? "respuesta registrada" : "respuestas registradas"}</li>
+          </ul>
+          <p className={styles.sectorSavedWarning}>Estos registros no certifican llamadas reales, disponibilidad, inventario ni herramientas habilitadas. Verifica los datos y canales antes de operar.</p>
         </section>
       </section>
     );
