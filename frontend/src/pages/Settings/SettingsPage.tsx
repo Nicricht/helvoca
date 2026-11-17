@@ -548,6 +548,7 @@ export function SettingsPage() {
             <SettingsPanelView
               activeSection={activeSection}
               draft={draft}
+              persistedDraft={baselineRef.current ?? draft}
               canManage={model.canManage && savePhase !== "saving"}
               canManageTeam={model.canManageTeam}
               canReadScheduleExceptions={model.canReadScheduleExceptions}
