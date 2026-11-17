@@ -1,5 +1,17 @@
 # Auditoría de activación por rubro · RecepVoz · 2026-11-06
 
+> [!IMPORTANT]
+> ## Checkpoint actual de implementación visual · 17-nov-2026
+> **Alcance canónico:** [Issue #879](https://github.com/Nicricht/helvoca/issues/879), [PR #880](https://github.com/Nicricht/helvoca/pull/880) **DRAFT, NO DESPLEGADO**. Este bloque prevalece sobre las declaraciones de estado histórico del PR #860 más abajo. No volver a iniciar otro selector paralelo.
+>
+> - Base ya disponible antes del PR: registro multiempresa, edición persistente de perfil `presetKey`, Settings, guardado independiente, recomendaciones de diez rubros, importación CSV/TSV revisable del PR #862. La selección de sector es orientación, no activación de herramientas, reservas, precios, canales ni pagos.
+> - Delta implementado exclusivamente en la rama de #880: **12 tarjetas de negocio + Otro negocio**, íconos Lucide, brillo cian en mouse/foco, flechas Home/End, Enter/Espacio mediante botón nativo, selección `aria-pressed`, móvil y movimiento reducido; mantiene el selector nativo de respaldo con valores legacy (`services`, `professional`) para evitar borrar configuraciones. Nuevos `presetKey` conservan strings aceptados por el perfil backend: `dental`, `legal`, `real_estate`, `gym`.
+> - Seguridad: hover/foco/clic solo actualizan la copia local del formulario; solo `Guardar cambios` solicita `PUT /api/v1/business/profile`. El rol operador no puede modificar; cambiar rubro no modifica servicios, inventario, reservas, proveedores ni datos de otros negocios.
+> - **QA no certificado** en este checkpoint: las pruebas Playwright se añadieron como contrato RED y el Fast/Full CI debe acreditar el HEAD final. No afirmar ya ejecutadas las 180 pruebas del plan #879. No hay llamadas reales, cargos, migración de proveedor, cambios de Aurora Sur ni fusión a main.
+> - Siguiente incremento real después de QA: **plantillas funcionales de cada rubro**, requerimientos de datos y herramientas opt-in, reusando la arquitectura compartida y el Issue #776. La UI sola NO equivale a 12 negocios operativamente configurados.
+>
+
+
 **Estado:** mejora UI propuesta en [PR #860](https://github.com/Nicricht/helvoca/pull/860) (DRAFT, no desplegada); la meta de `≤15 min` **no está medida ni certificada**. No sustituye [la ruta única #823](https://github.com/Nicricht/helvoca/issues/823), [PR #858](https://github.com/Nicricht/helvoca/pull/858) ni [la importación #776](https://github.com/Nicricht/helvoca/issues/776).
 
 ## Qué existe hoy y NO se reimplementa
