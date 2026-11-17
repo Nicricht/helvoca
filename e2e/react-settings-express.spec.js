@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
 async function mockSetup(page, roles = ['BUSINESS_ADMIN']) {
@@ -86,10 +87,11 @@ test.describe('Settings Express user journey', () => {
             })),
             bodyExcerpt: (document.body?.innerText ?? '').slice(0, 700)
           }));
-          await test.info().attach('settings-express-navigation-state.json', {
-            body: JSON.stringify({ case: { step, tabName, section }, observed }, null, 2),
-            contentType: 'application/json'
-          });
+          // Playwright's line reporter does not necessarily materialize in-memory
+          // attachments in test-results. Persist the exact evidence path uploaded by CI.
+          const snapshot = JSON.stringify({ case: { step, tabName, section }, observed }, null, 2);
+          fs.writeFileSync(test.info().outputPath('settings-express-navigation-state.json'), snapshot, 'utf8');
+          console.warn('SETTINGS_EXPRESS_NAVIGATION_FAILURE_DIAGNOSTIC: ' + snapshot);
         } catch (diagnosticError) {
           console.warn('Settings Express diagnostic could not be captured:', String(diagnosticError));
         }
