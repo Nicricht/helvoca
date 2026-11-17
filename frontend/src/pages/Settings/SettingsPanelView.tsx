@@ -1,17 +1,30 @@
 import {
+  BedDouble,
   Bot,
   Building2,
   CalendarClock,
+  CarFront,
+  Check,
+  Dumbbell,
   Globe2,
+  Hospital,
+  House,
   MessagesSquare,
+  PawPrint,
   Phone,
   Plus,
+  Scale,
+  Scissors,
   ShieldCheck,
+  ShoppingBag,
+  Stethoscope,
+  Store,
   Trash2,
   UsersRound,
+  Utensils,
   Wrench
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type {
   AiAgentInput,
   BusinessHour,
@@ -40,17 +53,38 @@ const dayNames = [
 
 
 const businessPresetOptions = [
-  ["", "General"],
-  ["store", "Tienda / comercio"],
-  ["hardware_store", "Ferretería / materiales"],
-  ["services", "Servicios"],
-  ["restaurant", "Restaurant / alimentos"],
-  ["clinic", "Salud / clínica"],
+  ["", "Otro negocio / general"],
+  ["clinic", "Clínica / centro médico"],
+  ["dental", "Dentista"],
   ["veterinary", "Veterinaria / mascotas"],
-  ["salon", "Belleza / peluquería"],
-  ["workshop", "Taller / reparación"],
+  ["salon", "Peluquería / barbería"],
+  ["restaurant", "Restaurante / alimentos"],
+  ["hardware_store", "Ferretería / materiales"],
+  ["store", "Tienda / comercio"],
+  ["workshop", "Taller mecánico / reparación"],
+  ["legal", "Estudio jurídico"],
+  ["real_estate", "Inmobiliaria"],
+  ["gym", "Gimnasio"],
   ["hospitality", "Hotel / hospedaje"],
-  ["professional", "Profesional / oficina"]
+  ["services", "Servicios (perfil previo)"],
+  ["professional", "Profesional (perfil previo)"]
+] as const;
+
+// Visual presentation uses existing presetKey values; it never enables an AI capability.
+const businessPresetCards = [
+  { value: "clinic", label: "Clínica", icon: Hospital },
+  { value: "dental", label: "Dentista", icon: Stethoscope },
+  { value: "veterinary", label: "Veterinaria", icon: PawPrint },
+  { value: "salon", label: "Peluquería", icon: Scissors },
+  { value: "restaurant", label: "Restaurante", icon: Utensils },
+  { value: "hardware_store", label: "Ferretería", icon: Wrench },
+  { value: "store", label: "Tienda", icon: ShoppingBag },
+  { value: "workshop", label: "Taller mecánico", icon: CarFront },
+  { value: "legal", label: "Estudio jurídico", icon: Scale },
+  { value: "real_estate", label: "Inmobiliaria", icon: House },
+  { value: "gym", label: "Gimnasio", icon: Dumbbell },
+  { value: "hospitality", label: "Hotel", icon: BedDouble },
+  { value: "", label: "Otro negocio", icon: Store }
 ] as const;
 
 const businessPresetSuggestions: Record<string, string> = {
@@ -63,8 +97,27 @@ const businessPresetSuggestions: Record<string, string> = {
   salon: "Revisa servicios, duraciones, precios, profesionales y disponibilidad para reservas.",
   workshop: "Revisa tipos de reparación, presupuestos, horarios, plazos y requisitos para recibir equipos.",
   hospitality: "Revisa tipos de alojamiento, tarifas, horarios de ingreso y salida y políticas de reserva.",
-  professional: "Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva."
+  professional: "Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva.",
+  dental: "Revisa tratamientos, profesionales, duraciones, precios de evaluación, disponibilidad y protocolo de urgencias. No diagnostiques.",
+  legal: "Revisa áreas jurídicas, abogados, agenda, tarifas y derivación de urgencias. No entregues asesoría legal personalizada.",
+  real_estate: "Revisa inmuebles publicados, estados, precios, visitas, requisitos y contactos. No inventes disponibilidad.",
+  gym: "Revisa planes, horarios, clases, cupos, cuotas, cancelaciones y profesionales. No inventes beneficios ni cobros."
 };
+
+function focusAdjacentSectorCard(event: KeyboardEvent<HTMLButtonElement>) {
+  const key = event.key;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
+  const cards = Array.from(
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[data-business-preset-card]:not(:disabled)") ?? []
+  );
+  if (!cards.length) return;
+  event.preventDefault();
+  const index = cards.indexOf(event.currentTarget);
+  const next = key === "Home" ? 0
+    : key === "End" ? cards.length - 1
+    : (index + (key === "ArrowRight" || key === "ArrowDown" ? 1 : -1) + cards.length) % cards.length;
+  cards[next]?.focus();
+}
 
 const agentCapabilities = [
   ["GET_BUSINESS_INFORMATION", "Información"],
@@ -197,17 +250,45 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             />
           </Field>
 
-          <Field label="Rubro">
-            <select
-              value={String(draft.profile.presetKey ?? "")}
-              disabled={!canManage}
-              onChange={event => updateProfile("presetKey", event.target.value || null)}
-            >
-              {businessPresetOptions.map(([value, label]) => (
-                <option value={value} key={value || "general"}>{label}</option>
-              ))}
-            </select>
-          </Field>
+          <div className={`${styles.field} ${styles.fieldWide}`}>
+            <span>Rubro</span>
+            <p className={styles.businessPresetIntro}>Elige el tipo de negocio. Solo se guardará cuando confirmes los cambios.</p>
+            <div className={styles.businessPresetGrid} role="group" aria-label="Tipos de negocio">
+              {businessPresetCards.map(({ value, label, icon: Icon }) => {
+                const selected = String(draft.profile.presetKey ?? "") === value;
+                return (
+                  <button
+                    key={value || "other"}
+                    type="button"
+                    data-business-preset-card
+                    data-selected={selected ? "true" : undefined}
+                    className={styles.businessPresetCard}
+                    aria-pressed={selected}
+                    disabled={!canManage}
+                    onClick={() => updateProfile("presetKey", value || null)}
+                    onKeyDown={focusAdjacentSectorCard}
+                  >
+                    <span className={styles.businessPresetIcon}><Icon size={22} aria-hidden="true" /></span>
+                    <span>{label}</span>
+                    {selected && <Check className={styles.businessPresetCheck} size={16} aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+            <label className={styles.businessPresetFallback}>
+              <span>También puedes elegir desde la lista</span>
+              <select
+                aria-label="Rubro"
+                value={String(draft.profile.presetKey ?? "")}
+                disabled={!canManage}
+                onChange={event => updateProfile("presetKey", event.target.value || null)}
+              >
+                {businessPresetOptions.map(([value, label]) => (
+                  <option value={value} key={value || "general"}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <Field label="Moneda">
             <select
