@@ -369,4 +369,42 @@ test.describe('Settings independent save contract', () => {
     await expect(page.getByRole('tabpanel', { name: 'Horarios' })).toBeVisible();
     expect(mutations(state)).toEqual([]);
   });
+
+  test('sector evidence uses only saved data and does not certify live calls', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+
+    const evidence = page.getByRole('region', { name: 'Datos guardados para la atención' });
+    await expect(evidence).toContainText('Rubro guardado');
+    await expect(evidence).toContainText('1 servicio registrado');
+    await expect(evidence).toContainText('1 horario registrado');
+    await expect(evidence).toContainText('1 respuesta registrada');
+    await expect(evidence).toContainText('no certifican llamadas reales');
+
+    await page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Hotel', exact: true }).click();
+    await expect(evidence).toContainText('Rubro sin guardar');
+    await expect(evidence).toContainText('1 servicio registrado');
+    expect(mutations(state)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    await expect(evidence).toContainText('Rubro guardado');
+    expect(mutations(state).map(item => item.method + ' ' + item.path))
+      .toEqual(['PUT /api/v1/business/profile']);
+    await page.reload();
+    await expect(evidence).toContainText('Rubro guardado');
+  });
+
+  test('empty sector evidence never reports fabricated services, hours or answers', async ({ page }) => {
+    const state = await boot(page, { emptyCollections: true });
+    await page.goto('/app/settings');
+
+    const evidence = page.getByRole('region', { name: 'Datos guardados para la atención' });
+    await expect(evidence).toContainText('0 servicios registrados');
+    await expect(evidence).toContainText('0 horarios registrados');
+    await expect(evidence).toContainText('0 respuestas registradas');
+    await expect(evidence).toContainText('no certifican llamadas reales');
+    expect(mutations(state)).toEqual([]);
+  });
 });
