@@ -109,6 +109,68 @@ class OnboardingServiceTest {
         assertFalse(status.servicesConfigured());
         assertFalse(status.scheduleConfigured());
         assertEquals("OPTIONAL_HUMAN_TRANSFER", status.nextStep());
+        assertEquals("CATALOG_INVENTORY", status.resourceBookingReadiness().resourceKind());
+        assertEquals("NOT_APPLICABLE", status.resourceBookingReadiness().verificationState());
+    }
+
+    @Test
+    void specializedReadinessComesOnlyFromCurrentTenantAndNeverAltersGenericCallReadiness() {
+        BusinessRepository businesses = mock(BusinessRepository.class);
+        ServiceItemRepository services = mock(ServiceItemRepository.class);
+        KnowledgeItemRepository knowledge = mock(KnowledgeItemRepository.class);
+        PhoneNumberRepository phones = mock(PhoneNumberRepository.class);
+        BusinessHoursAdminService hours = mock(BusinessHoursAdminService.class);
+        BusinessProfileService profiles = mock(BusinessProfileService.class);
+        TenantProvider tenant = mock(TenantProvider.class);
+        UUID clinicId = UUID.randomUUID();
+        UUID hotelId = UUID.randomUUID();
+        java.util.concurrent.atomic.AtomicReference<UUID> currentTenant =
+                new java.util.concurrent.atomic.AtomicReference<>(clinicId);
+        when(tenant.requireBusinessId()).thenAnswer(invocation -> currentTenant.get());
+        when(profiles.current()).thenAnswer(invocation ->
+                sectorProfile(currentTenant.get(),
+                        currentTenant.get().equals(clinicId) ? "clinic" : "hospitality"));
+
+        Business clinic = new Business();
+        clinic.setName("Centro de salud");
+        clinic.setTimezone("America/Santiago");
+        clinic.setLanguage("es");
+        Business hotel = new Business();
+        hotel.setName("Alojamiento");
+        hotel.setTimezone("America/Santiago");
+        hotel.setLanguage("es");
+        when(businesses.findById(clinicId)).thenReturn(Optional.of(clinic));
+        when(businesses.findById(hotelId)).thenReturn(Optional.of(hotel));
+        when(services.findAllByBusinessIdOrderByNameAsc(clinicId)).thenReturn(List.of());
+        when(services.findAllByBusinessIdOrderByNameAsc(hotelId)).thenReturn(List.of());
+        when(hours.list()).thenReturn(List.of());
+        when(knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(clinicId)).thenReturn(List.of());
+        when(knowledge.findAllByBusinessIdAndActiveTrueOrderByTitleAsc(hotelId)).thenReturn(List.of());
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(clinicId)).thenReturn(List.of());
+        when(phones.findAllByBusinessIdOrderByCreatedAtDesc(hotelId)).thenReturn(List.of());
+
+        OnboardingService service = new OnboardingService(
+                businesses, services, knowledge, phones, hours, profiles, tenant, mock(AuditService.class));
+        OnboardingStatusResponse clinicStatus = service.status();
+        assertEquals("PROFESSIONAL", clinicStatus.resourceBookingReadiness().resourceKind());
+        assertEquals("NOT_CERTIFIED", clinicStatus.resourceBookingReadiness().verificationState());
+        assertFalse(clinicStatus.readyForCalls());
+
+        currentTenant.set(hotelId);
+        OnboardingStatusResponse hotelStatus = service.status();
+        assertEquals("ROOM_NIGHT", hotelStatus.resourceBookingReadiness().resourceKind());
+        assertEquals("NOT_CERTIFIED", hotelStatus.resourceBookingReadiness().verificationState());
+        assertFalse(hotelStatus.readyForCalls());
+        assertNotEquals(clinicStatus.resourceBookingReadiness().resourceKind(),
+                hotelStatus.resourceBookingReadiness().resourceKind());
+        verify(businesses).findById(clinicId);
+        verify(businesses).findById(hotelId);
+    }
+
+    private static BusinessProfileResponse sectorProfile(UUID businessId, String sector) {
+        return new BusinessProfileResponse(
+                businessId, sector, null, null, null, null,
+                null, null, null, null, null, "CLP", false, false, false);
     }
 
     private static BusinessProfileResponse profile(UUID businessId,
