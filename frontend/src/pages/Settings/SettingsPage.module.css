@@ -386,6 +386,91 @@
 }
 
 
+/* Owner-validated setup checklist. No fake readiness is displayed. */
+.sectorSetupGuide {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: clamp(14px, 2vw, 20px);
+  border: 1px solid var(--rv-accent-border);
+  border-radius: 14px;
+  background: var(--rv-surface-2);
+  color: var(--rv-text-primary);
+}
+
+.sectorSetupGuide h3 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.sectorSetupGuide > p,
+.sectorMissingInformation p {
+  margin: 0;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.sectorSetupGuide ol {
+  margin: 0;
+  padding-left: 22px;
+  display: grid;
+  gap: 9px;
+  color: var(--rv-text-primary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.sectorSetupActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.sectorSetupActions button {
+  min-height: 42px;
+  border: 1px solid var(--rv-accent-border);
+  border-radius: 10px;
+  background: var(--rv-accent-soft);
+  color: var(--rv-text-primary);
+  font: inherit;
+  font-weight: 750;
+  font-size: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.sectorSetupActions button:hover,
+.sectorSetupActions button:focus-visible {
+  border-color: var(--rv-accent);
+  box-shadow: var(--rv-focus-ring);
+}
+
+.sectorSetupActions button:focus-visible {
+  outline: 2px solid var(--rv-accent);
+  outline-offset: 2px;
+}
+
+.sectorMissingInformation {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 10px;
+  background: var(--rv-bg-canvas);
+}
+
+.sectorMissingInformation strong {
+  color: var(--rv-text-primary);
+  font-size: 12px;
+}
+
+@media (max-width: 680px) {
+  .sectorSetupActions button { flex: 1 1 100%; }
+}
+
 /* Issue #879: industry cards are an advisory UI; only Save persists presetKey. */
 .businessPresetIntro {
   margin: 0;
