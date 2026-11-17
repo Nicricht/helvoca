@@ -560,6 +560,7 @@ export function SettingsPage() {
               phones={model.phones.data ?? []}
               updateRoot={updateRoot}
               updateProfile={updateProfile}
+              navigateToSection={openSection}
               updateAgent={updateAgent}
               updateService={updateService}
               addService={addService}
