@@ -317,4 +317,56 @@ test.describe('Settings independent save contract', () => {
     await expect(picker.getByRole('button', { name: 'Dentista', exact: true })).toBeDisabled();
     expect(mutations(state)).toEqual([]);
   });
+
+  test('all twelve business guides ask tailored questions without creating fictitious data', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    const guide = page.getByRole('region', { name: 'Preparación del negocio' });
+    const cases = [
+      ['Clínica', 'especialidades y profesionales'],
+      ['Dentista', 'tratamientos y odontólogos'],
+      ['Veterinaria', 'especies atendidas'],
+      ['Peluquería', 'estilistas y servicios'],
+      ['Restaurante', 'menú y alérgenos'],
+      ['Ferretería', 'catálogo y existencias'],
+      ['Tienda', 'tallas, variantes'],
+      ['Taller mecánico', 'vehículos admitidos'],
+      ['Estudio jurídico', 'áreas legales'],
+      ['Inmobiliaria', 'propiedades vigentes'],
+      ['Gimnasio', 'planes y cupos'],
+      ['Hotel', 'habitaciones y ocupación']
+    ];
+    for (const [label, expected] of cases) {
+      await picker.getByRole('button', { name: label, exact: true }).click();
+      await expect(guide).toContainText(expected);
+      await expect(guide).toContainText('Si falta información');
+      await expect(guide.getByRole('button', { name: 'Ir a Servicios' })).toBeVisible();
+      await expect(guide.getByRole('button', { name: 'Ir a Horarios' })).toBeVisible();
+      await expect(guide.getByRole('button', { name: 'Ir a Conocimiento' })).toBeVisible();
+    }
+    expect(mutations(state)).toEqual([]);
+    expect(state.data.services).toHaveLength(1);
+    expect(state.data.knowledge).toHaveLength(1);
+    await picker.getByRole('button', { name: 'Otro negocio', exact: true }).click();
+    await expect(guide).toContainText('actividad principal');
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('guided setup navigation preserves unsaved industry choice and data without auto-saving', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+    await page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Restaurante', exact: true }).click();
+    const guide = page.getByRole('region', { name: 'Preparación del negocio' });
+    await guide.getByRole('button', { name: 'Ir a Conocimiento' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Conocimiento' })).toBeVisible();
+    expect(mutations(state)).toEqual([]);
+    await page.getByRole('tab', { name: 'Negocio' }).click();
+    await expect(page.getByLabel('Rubro')).toHaveValue('restaurant');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
+    await guide.getByRole('button', { name: 'Ir a Horarios' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Horarios' })).toBeVisible();
+    expect(mutations(state)).toEqual([]);
+  });
 });
