@@ -1,6 +1,18 @@
 # Auditoría de activación por rubro · RecepVoz · 2026-11-06
 
 > [!IMPORTANT]
+> ## 17-nov-2026 · Primer contrato de reservas específicas, PR #881 (DRAFT y apilado sobre #880)
+> Se implementó una respuesta **solo lectura** en `/api/v1/onboarding/status`: `resourceBookingReadiness = {resourceKind, verificationState, requiresDedicatedResource, nextStep}`. Son datos derivados exclusivamente de `business_profile.preset_key` del tenant autenticado; no se habilitan herramientas ni se introducen precios, recursos, proveedores o nuevas reservas.
+>
+> - Clínicas, dentistas, veterinarias, peluquerías y estudios jurídicos: `PROFESSIONAL / NOT_CERTIFIED`. Taller: `SERVICE_BAY`. Restaurante: `TABLE`. Inmobiliaria: `PROPERTY_VISIT`. Gimnasio: `CLASS_SLOT`. Hotel: `ROOM_NIGHT`. Todos **NOT_CERTIFIED** hasta que exista y se verifique un modelo real de disponibilidad por recurso.
+> - Tienda y ferretería: `CATALOG_INVENTORY / NOT_APPLICABLE` para reservas por recurso (esto **no certifica stock**). Rubros generales o desconocidos: `UNSPECIFIED / NOT_VERIFIED`. Sin inventar un recurso ni inferir disponibilidad.
+> - `readyForCalls` y `nextStep` genéricos siguen funcionando sin cambio y **no son prueba** de reserva de mesa, noche, profesional, visita ni clase. `SettingsExpressIntro` ahora avisa de estas reservas no certificadas con explicación por rubro, cuando el servidor entrega el nuevo campo. Si no lo entrega, el frontend permanece compatible.
+> - **Límite consciente:** esta advertencia NO implementa todavía inventario de recursos, concurrencia, asignación de profesional/mesa/habitación ni bloqueo automático de `create_booking`; dichos contratos son el siguiente incremento real y deberán incluir PostgreSQL, pruebas de aislamiento, idempotencia y simultaneidad. No modifica Aurora Sur ni activa Gemini Live, Twilio o cobros.
+> - Tests `SectorResourceReadinessTest`, `OnboardingServiceTest` y `react-settings-independent-save.spec.js` cubren 12 rubros, fallback, compatibilidad con DTO previo, dos tenants, hotel y tienda, y sin mutaciones automáticas. **QA final del PR #881 pendiente:** no declarar DONE antes del Full Gate exact HEAD.
+>
+
+
+> [!IMPORTANT]
 > ## Checkpoint actual de implementación visual · 17-nov-2026
 > **Alcance canónico:** [Issue #879](https://github.com/Nicricht/helvoca/issues/879), [PR #880](https://github.com/Nicricht/helvoca/pull/880) **DRAFT, NO DESPLEGADO**. Este bloque prevalece sobre las declaraciones de estado histórico del PR #860 más abajo. No volver a iniciar otro selector paralelo.
 >
