@@ -53,6 +53,14 @@ export function SettingsExpressIntro({
   const contentReady = status?.servicesConfigured === true
     && status?.knowledgeConfigured === true && status?.scheduleConfigured === true;
   const phoneReady = status?.phoneConfigured === true;
+  const resourceReadiness = status?.resourceBookingReadiness;
+  const needsResourceCertification = resourceReadiness?.requiresDedicatedResource === true
+    && resourceReadiness.verificationState === "NOT_CERTIFIED";
+  const resourceLabels: Record<string, string> = {
+    PROFESSIONAL: "profesionales", TABLE: "mesas", SERVICE_BAY: "bahías",
+    PROPERTY_VISIT: "propiedades", CLASS_SLOT: "clases", ROOM_NIGHT: "habitaciones"
+  };
+  const resourceLabel = resourceLabels[resourceReadiness?.resourceKind ?? ""] ?? "recursos";
   const nextStep = status?.nextStep ? guidedSteps[status.nextStep] : undefined;
   return (
     <section className={styles.express} aria-labelledby="expressTitle" data-testid="settings-express">
@@ -114,6 +122,13 @@ export function SettingsExpressIntro({
           </button>
         )}
       </section>
+      {needsResourceCertification && (
+        <section className={styles.resourceNotice} role="region" aria-label="Estado de reservas específicas">
+          <strong>Reservas específicas no certificadas</strong>
+          <p>{resourceReadiness?.nextStep}</p>
+          <span>La agenda general no comprueba {resourceLabel} ni cupos por recurso. No prometas disponibilidad sin un sistema verificado.</span>
+        </section>
+      )}
       <div className={styles.bottom}>
         <div className={styles.facts}>
           <strong>{businessName || "Tu negocio"}</strong>
