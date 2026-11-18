@@ -113,6 +113,25 @@ class SectorOfflineScenarioContractTest {
                 if ("UNRESOLVED".equals(outcome)) {
                     assertEquals("explicit_unresolved", evidence);
                 }
+                JSONObject fixture = c.getJSONObject("fixture");
+                String sector = c.getString("sector");
+                String expectedTenant = "*".equals(sector) ? "offline-shared" : "offline-" + sector;
+                assertEquals(expectedTenant, fixture.getString("businessId"),
+                        label + "fixture must identify the intended offline tenant");
+                assertEquals("DISARMED", fixture.getString("providerMode"),
+                        label + "provider must stay disabled");
+                assertEquals(source, fixture.getString("source"),
+                        label + "fixture source must match scenario sourceState");
+                assertEquals(evidence, fixture.getString("expectedPersistedEvidence"),
+                        label + "fixture evidence must match scenario requiredEvidence");
+                assertEquals("EXPECTED_ONLY_NOT_OBSERVED", fixture.getString("verification"),
+                        label + "fixture must never claim observed backend persistence");
+                if ("TRANSFERRED_VERIFIED".equals(outcome)) {
+                    assertEquals("transfer_destination_verified", evidence,
+                            label + "transfer must require verified destination evidence");
+                    assertTrue(allowed.toList().contains("transfer_to_human"),
+                            label + "transfer must declare the actual handoff tool");
+                }
                 assertFalse(c.getBoolean("realExternalEffects"), label + "fixtures must be offline");
             }));
         }
