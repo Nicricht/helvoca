@@ -32,7 +32,15 @@ export interface BusinessProfile {
   usesReservations?: boolean | null;
 }
 
+export interface SectorResourceReadiness {
+  resourceKind: string;
+  verificationState: "NOT_CERTIFIED" | "NOT_APPLICABLE" | "NOT_VERIFIED";
+  requiresDedicatedResource: boolean;
+  nextStep: string;
+}
+
 export interface OnboardingStatus {
+  resourceBookingReadiness?: SectorResourceReadiness | null;
   businessProfileConfigured?: boolean;
   servicesConfigured?: boolean;
   scheduleConfigured?: boolean;

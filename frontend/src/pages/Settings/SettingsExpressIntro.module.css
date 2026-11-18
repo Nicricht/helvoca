@@ -34,6 +34,25 @@
 .guidedAction {flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 43px; padding: 0 14px; border: 1px solid var(--rv-accent-border); border-radius: 10px; color: #061723; background: var(--rv-accent); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;}
 .guidedAction:hover {filter: brightness(1.08);}
 .guidedAction:focus-visible {outline: 2px solid var(--rv-accent); outline-offset: 3px;}
+
+.resourceNotice {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 11px;
+  border: 1px solid var(--rv-border-default);
+  background: var(--rv-surface-2);
+}
+
+.resourceNotice strong { font-size: 13px; color: var(--rv-text-primary); }
+.resourceNotice p,
+.resourceNotice span {
+  margin: 0;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
 .bottom {border-top: 1px solid var(--rv-border-subtle); padding-top: 14px;}
 .facts {min-width: 0; display: grid; gap: 4px;}
 .facts strong {color: var(--rv-text-primary); font-size: 12px;}

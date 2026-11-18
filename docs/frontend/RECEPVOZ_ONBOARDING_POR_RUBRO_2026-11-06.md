@@ -1,5 +1,25 @@
 # Auditoría de activación por rubro · RecepVoz · 2026-11-06
 
+> [!NOTE]
+> ## Control CI de ramas 17-nov-2026 · certificación por SHA, sin activar servicios
+> - **#880 DRAFT, HEAD `7c136c295a9d616cae65465fadef324d89b89746`: CI [#44211393647 attempt 2](https://github.com/Nicricht/helvoca/actions/runs/44211393647) = `completed/success`. Datos observados: **2704 tests Java aprobados**, **669 Playwright aprobados**, diferencial JaCoCo 19/19 líneas, 8/8 ramas y 5/5 métodos. El intento 1 falló únicamente por Maven Central HTTP 429 y se reintentó solo el job fallido. El CI valida el código de esa revisión, NO despliegue, reservas especializadas o ahorro CLP real.
+> - **#881 DRAFT, tras commit de sincronización `c88bb6f`:** preserva los cambios F1 y las 180 especificaciones declarativas. Su Full Gate exacto sigue **NOT_CERTIFIED** hasta resultado terminal propio, con el verificador de recibo V2 activo. La base temporal en `main` es solo para habilitar CI, no es fusión ni permiso de despliegue; debe restituirse la base `feat/issue-879-sector-picker-20261117` una vez concluida la certificación.
+> - **Verdad funcional:** `FIXTURE_ONLY_NOT_EXECUTED` sigue vigente. Ninguna prueba certificada aquí demuestra 180 conversaciones reales, persistencia de 95 solicitudes, recurso por profesional/mesa/habitación, traspaso real ni reducción de costos Gemini Live. Cero llamadas, pagos, mensajes o cambios de Aurora/producción.
+
+> [!IMPORTANT]
+> ## 17-nov-2026 · Primer contrato de reservas específicas, PR #881 (DRAFT y apilado sobre #880)
+> - **F1, catálogo transversal de escenarios: PARTIAL, NO CERTIFICADO.** El PR #881 incorpora `src/test/resources/fixtures/sector-offline-180-v1.json` con **120 casos habituales (10 × 12 rubros), 36 difíciles (3 × 12) y 24 transversales**; `SectorOfflineScenarioContractTest` valida estructura, unicidad, herramientas realmente declaradas, fuentes oficiales, resultado esperado, evidencia que el backend **deberá producir** y afirmaciones prohibidas. El fixture se declara explícitamente `FIXTURE_ONLY_NOT_EXECUTED`: **no ejecuta Gemini Live, backend ni PostgreSQL**, no hay llamadas pagadas, operaciones persistidas ni certificación de los 180 resultados. La certificación F1/F2 exige convertirlos en tests conductuales offline y registrar resultados reales por tenant sin modificar datos del piloto. Reutilizar `AdversarialHardwareStoreWeekCertificationTest` (180 casos de ferretería) como antecedente independiente, no reemplazarlo ni duplicarlo. **Full Gate exact HEAD de #881 pendiente** por su relación apilada con #880.
+
+> Se implementó una respuesta **solo lectura** en `/api/v1/onboarding/status`: `resourceBookingReadiness = {resourceKind, verificationState, requiresDedicatedResource, nextStep}`. Son datos derivados exclusivamente de `business_profile.preset_key` del tenant autenticado; no se habilitan herramientas ni se introducen precios, recursos, proveedores o nuevas reservas.
+>
+> - Clínicas, dentistas, veterinarias, peluquerías y estudios jurídicos: `PROFESSIONAL / NOT_CERTIFIED`. Taller: `SERVICE_BAY`. Restaurante: `TABLE`. Inmobiliaria: `PROPERTY_VISIT`. Gimnasio: `CLASS_SLOT`. Hotel: `ROOM_NIGHT`. Todos **NOT_CERTIFIED** hasta que exista y se verifique un modelo real de disponibilidad por recurso.
+> - Tienda y ferretería: `CATALOG_INVENTORY / NOT_APPLICABLE` para reservas por recurso (esto **no certifica stock**). Rubros generales o desconocidos: `UNSPECIFIED / NOT_VERIFIED`. Sin inventar un recurso ni inferir disponibilidad.
+> - `readyForCalls` y `nextStep` genéricos siguen funcionando sin cambio y **no son prueba** de reserva de mesa, noche, profesional, visita ni clase. `SettingsExpressIntro` ahora avisa de estas reservas no certificadas con explicación por rubro, cuando el servidor entrega el nuevo campo. Si no lo entrega, el frontend permanece compatible.
+> - **Límite consciente:** esta advertencia NO implementa todavía inventario de recursos, concurrencia, asignación de profesional/mesa/habitación ni bloqueo automático de `create_booking`; dichos contratos son el siguiente incremento real y deberán incluir PostgreSQL, pruebas de aislamiento, idempotencia y simultaneidad. No modifica Aurora Sur ni activa Gemini Live, Twilio o cobros.
+> - Tests `SectorResourceReadinessTest`, `OnboardingServiceTest` y `react-settings-independent-save.spec.js` cubren 12 rubros, fallback, compatibilidad con DTO previo, dos tenants, hotel y tienda, y sin mutaciones automáticas. **QA final del PR #881 pendiente:** no declarar DONE antes del Full Gate exact HEAD.
+>
+
+
 > [!IMPORTANT]
 > ## Checkpoint actual de implementación visual · 17-nov-2026
 > **Alcance canónico:** [Issue #879](https://github.com/Nicricht/helvoca/issues/879), [PR #880](https://github.com/Nicricht/helvoca/pull/880) **DRAFT, NO DESPLEGADO**. Este bloque prevalece sobre las declaraciones de estado histórico del PR #860 más abajo. No volver a iniciar otro selector paralelo.
@@ -110,3 +130,11 @@ Propuesta de validación con usuarios autorizados, sin llamadas pagadas ni clien
 **Objetivo de rapidez, pendiente de evidencia:** planteamos como *stretch* **≤10 minutos de intervención de configuración básica** para un cliente que ya dispone de sus datos, manteniendo el criterio de referencia **≤15 minutos**. Ningún tiempo está medido aún; aprobaciones externas, activación y certificación real de canales quedan fuera de la medición del asistente básico. Se debe medir con sesiones consentidas de pizzería, veterinaria, ferretería y clínica y registrar mediana, fallos y pasos recorridos. No usar la mejora visual como prueba de ahorro de tiempo.
 
 **Salida:** `IMPLEMENTED_IN_DRAFT`, `CI_EXACT_HEAD_PENDING` hasta comprobar el run final; no merge ni despliegue. Siguiente acción: certificación Fast/Full Gate y Playwright exactos sobre la última revisión del PR #860.
+
+
+### 18-nov-2026 · F1: hospitality-T05 PostgreSQL follow-up (incremento offline, sin voz)
+
+- Se añadió `SectorOfflineFollowUpPostgresIntegrationTest` para **un solo escenario** del catálogo F1: `hospitality-T05`, origen `RESOURCE_UNVERIFIED`, resultado esperado `FOLLOW_UP_OPENED`. El caso usa una llamada **sintética de prueba, sin carrier**, con `RealtimeToolService.create_request` ya existente y PostgreSQL 16 Testcontainers.
+- Contratos que debe probar el CI: guardar solicitud `OPEN` con `requestId`, `operationId` y `call_id` del mismo negocio; **cero bookings inventados**; RLS oculta la solicitud a otro tenant; un contexto con tenant o stream erróneos no puede crearla.
+- **No** prueba que Gemini elija `create_request`, que exista habitación por noche, la concurrencia de asignación, reintentos idempotentes, proveedor auténtico ni llamadas reales. No modifica `readyForCalls`, herramientas, migraciones, voz, precio, políticas o activaciones.
+- **Estado al commit:** `QA_EXACT_HEAD_PENDING` hasta CI real (JUnit/Testcontainers + JaCoCo/Full Gate). Los **180** escenarios siguen siendo catálogo; solo este caso podrá marcarse `BACKEND_POSTGRES_OFFLINE_PASS` si supera CI. F1/F2 y las reservas especializadas permanecen **PARTIAL/NOT_CERTIFIED**. No fusionar ni desplegar este PR DRAFT.

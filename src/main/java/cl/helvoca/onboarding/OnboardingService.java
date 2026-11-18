@@ -231,7 +231,8 @@ public class OnboardingService {
         else if (!kb) nextStep = "OPTIONAL_KNOWLEDGE";
         else nextStep = "READY";
 
-        return new OnboardingStatusResponse(profile, service, schedule, kb, transfer, phone, ready, nextStep);
+        return new OnboardingStatusResponse(profile, service, schedule, kb, transfer, phone, ready,
+                nextStep, SectorResourceReadiness.forPreset(profileConfig == null ? null : profileConfig.presetKey()));
     }
 
     private Business requireBusiness(UUID businessId) {

@@ -33,7 +33,7 @@ async function boot(page, options = {}) {
       roles: options.roles || ['BUSINESS_ADMIN'],
       permissions: options.permissions || ['BUSINESS_READ', 'BUSINESS_CONFIGURE']
     }));
-    if (path === '/api/v1/onboarding/status') return route.fulfill(json({ readyForCalls: true }));
+    if (path === '/api/v1/onboarding/status') return route.fulfill(json({ readyForCalls: true, resourceBookingReadiness: options.resourceBookingReadiness }));
     if (path === '/api/v1/phone-numbers') return route.fulfill(json([]));
     if (path === '/api/v1/ai-agent/voices') return route.fulfill(json([{ selection: 'marin', name: 'Natural' }]));
 
@@ -405,6 +405,30 @@ test.describe('Settings independent save contract', () => {
     await expect(evidence).toContainText('0 horarios registrados');
     await expect(evidence).toContainText('0 respuestas registradas');
     await expect(evidence).toContainText('no certifican llamadas reales');
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('resource-specific hotel bookings are not certified by generic readyForCalls status', async ({ page }) => {
+    const state = await boot(page, { resourceBookingReadiness: {
+      resourceKind: 'ROOM_NIGHT', verificationState: 'NOT_CERTIFIED', requiresDedicatedResource: true,
+      nextStep: 'Configura habitaciones, ocupación y disponibilidad por noche antes de ofrecer una estadía.'
+    } });
+    await page.goto('/app/settings');
+    const warning = page.getByRole('region', { name: 'Estado de reservas específicas' });
+    await expect(warning).toBeVisible();
+    await expect(warning).toContainText('Reservas específicas no certificadas');
+    await expect(warning).toContainText('habitaciones, ocupación y disponibilidad por noche');
+    await expect(warning).toContainText('La agenda general no comprueba habitaciones ni cupos por recurso');
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('retail stock guidance never claims a specialized booking', async ({ page }) => {
+    const state = await boot(page, { resourceBookingReadiness: {
+      resourceKind: 'CATALOG_INVENTORY', verificationState: 'NOT_APPLICABLE',
+      requiresDedicatedResource: false, nextStep: 'Configura catálogo y stock verificable.'
+    } });
+    await page.goto('/app/settings');
+    await expect(page.getByRole('region', { name: 'Estado de reservas específicas' })).toHaveCount(0);
     expect(mutations(state)).toEqual([]);
   });
 });
