@@ -184,10 +184,11 @@ const clinicKnowledgeTopics = [
 ] as const;
 
 function ClinicKnowledgePreparation({
-  canManage, knowledgeReady, existingKnowledge, onPrepare
+  canManage, knowledgeReady, sectorSaved, existingKnowledge, onPrepare
 }: {
   canManage: boolean;
   knowledgeReady: boolean;
+  sectorSaved: boolean;
   existingKnowledge: KnowledgeItem[];
   onPrepare: (items: KnowledgeItem[]) => void;
 }) {
@@ -213,7 +214,7 @@ function ClinicKnowledgePreparation({
                 rows={3}
                 maxLength={2000}
                 value={answers[topic.key] ?? ""}
-                disabled={!canManage || !knowledgeReady || exists}
+                disabled={!canManage || !knowledgeReady || !sectorSaved || exists}
                 onChange={event => setAnswers(previous => ({ ...previous, [topic.key]: event.target.value }))}
               />
               {exists && <small>Ya existe una respuesta. No será sobrescrita.</small>}
@@ -222,9 +223,10 @@ function ClinicKnowledgePreparation({
         })}
       </div>
       {!knowledgeReady && <p role="status">No se pudo verificar el conocimiento actual; recarga antes de preparar respuestas.</p>}
+      {!sectorSaved && <p role="status">Guarda primero el rubro Clínica en Negocio para evitar mezclar respuestas con otro tipo de negocio.</p>}
       <button
         type="button"
-        disabled={!canManage || !knowledgeReady || available.length === 0}
+        disabled={!canManage || !knowledgeReady || !sectorSaved || available.length === 0}
         onClick={() => onPrepare(available.map(topic => ({
           id: null, title: topic.title, category: "Clínica",
           content: answers[topic.key].trim(), active: true
@@ -556,6 +558,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
           <ClinicKnowledgePreparation
             canManage={canManage}
             knowledgeReady={knowledgeReady}
+            sectorSaved={sectorSaved}
             existingKnowledge={draft.knowledge}
             onPrepare={prepareClinicKnowledge}
           />

@@ -417,20 +417,25 @@ test.describe('Settings independent save contract', () => {
       .getByRole('button', { name: 'Clínica', exact: true }).click();
     const clinic = page.getByRole('region', { name: 'Preparar respuestas de Clínica' });
     await expect(clinic.getByRole('textbox')).toHaveCount(6);
+    await expect(clinic).toContainText('Guarda primero el rubro Clínica');
+    await expect(clinic.getByRole('textbox', { name: 'Especialidades y profesionales' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/business/profile']);
     await expect(clinic.getByRole('button', { name: 'Preparar 0 respuestas para revisar' })).toBeDisabled();
     await clinic.getByRole('textbox', { name: 'Especialidades y profesionales' })
       .fill('Medicina general y pediatría, servicios confirmados por la clínica.');
     await clinic.getByRole('textbox', { name: 'Reclamos y seguimiento' })
       .fill('Recepción recibe los reclamos y genera un seguimiento.');
-    expect(mutations(state)).toEqual([]);
+    expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/business/profile']);
     await clinic.getByRole('button', { name: 'Preparar 2 respuestas para revisar' }).click();
     const knowledge = page.getByRole('tabpanel', { name: 'Conocimiento' });
     await expect(knowledge.getByRole('textbox', { name: 'Título' })).toHaveCount(3);
-    expect(mutations(state)).toEqual([]);
+    expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual(['PUT /api/v1/business/profile']);
     await page.getByRole('button', { name: 'Guardar cambios' }).click();
     await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
     expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual([
-      'POST /api/v1/knowledge', 'POST /api/v1/knowledge'
+      'PUT /api/v1/business/profile', 'POST /api/v1/knowledge', 'POST /api/v1/knowledge'
     ]);
     expect(state.data.knowledge.slice(1).map(item => item.title)).toEqual([
       'Clínica: especialidades y profesionales', 'Clínica: reclamos y seguimiento'
