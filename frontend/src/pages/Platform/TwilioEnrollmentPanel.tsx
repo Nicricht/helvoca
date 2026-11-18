@@ -110,7 +110,11 @@ export function TwilioEnrollmentPanel({ email }: { email: string }) {
     }
   }
 
-  const state = enrollment.state.toUpperCase();
+  // The enrollment endpoint is optional; malformed JSON must not blank the whole admin console.
+  const receivedState = typeof enrollment?.state === "string" ? enrollment.state.toUpperCase() : "";
+  const state = ["LOADING", "UNAVAILABLE", "NOT_STARTED", "EXPIRED", "PENDING", "APPLIED"].includes(receivedState)
+    ? receivedState
+    : "UNAVAILABLE";
   const canPrepare = state === "NOT_STARTED" || state === "EXPIRED";
 
   return (
