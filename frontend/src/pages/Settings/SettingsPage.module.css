@@ -387,6 +387,70 @@
 
 
 
+
+/* Clinic owner verification uses only the editable Settings panel; frame untouched. */
+.clinicKnowledgePreparation {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: clamp(14px, 2vw, 20px);
+  border: 1px solid var(--rv-border-default);
+  border-radius: 14px;
+  background: var(--rv-surface-2);
+  color: var(--rv-text-primary);
+}
+.clinicKnowledgePreparation h4 { margin: 0; font-size: 15px; }
+.clinicKnowledgePreparation > p {
+  margin: 0;
+  color: var(--rv-text-secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.clinicKnowledgeFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.clinicKnowledgeEntry { min-width: 0; display: grid; align-content: start; gap: 6px; }
+.clinicKnowledgeEntry strong { font-size: 13px; }
+.clinicKnowledgeEntry span, .clinicKnowledgeEntry small {
+  font-size: 12px; line-height: 1.5; color: var(--rv-text-secondary);
+}
+.clinicKnowledgeEntry textarea {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--rv-border-default);
+  border-radius: 9px;
+  background: var(--rv-bg-canvas);
+  color: var(--rv-text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+.clinicKnowledgeEntry textarea:focus-visible { outline: 2px solid var(--rv-accent); outline-offset: 2px; }
+.clinicKnowledgeEntry textarea:disabled { opacity: .6; }
+.clinicKnowledgePreparation > button {
+  justify-self: start;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--rv-accent-border);
+  background: var(--rv-accent-soft);
+  color: var(--rv-text-primary);
+  font: inherit;
+  font-weight: 750;
+  font-size: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+.clinicKnowledgePreparation > button:focus-visible { outline: 2px solid var(--rv-accent); outline-offset: 2px; }
+.clinicKnowledgePreparation > button:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 680px) {
+  .clinicKnowledgeFields { grid-template-columns: minmax(0, 1fr); }
+  .clinicKnowledgePreparation > button { justify-self: stretch; }
+}
+
 /* Evidence reflects committed fields only; it is not a voice or provider readiness badge. */
 .sectorSavedEvidence {
   margin-top: 14px;
