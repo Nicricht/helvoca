@@ -116,6 +116,16 @@ class SectorOfflineFollowUpPostgresIntegrationTest {
                 "SELECT count(*) FROM booking WHERE business_id IN (?, ?)",
                 Integer.class, hotel, otherTenant));
 
+        // Both the follow-up and its linked operation must remain tenant-isolated.
+        assertEquals(1, databaseContext.callAsTenant(hotel,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT count(*) FROM business_operation WHERE id = ?",
+                        Integer.class, operationId)));
+        assertEquals(0, databaseContext.callAsTenant(otherTenant,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT count(*) FROM business_operation WHERE id = ?",
+                        Integer.class, operationId)));
+
         // The actual runtime datasource must enforce PostgreSQL tenant RLS.
         assertEquals(0, databaseContext.callAsTenant(otherTenant,
                 () -> runtimeJdbc.queryForObject(
