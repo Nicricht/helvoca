@@ -126,6 +126,12 @@ class SectorOfflineFollowUpPostgresIntegrationTest {
                         "SELECT count(*) FROM business_operation WHERE id = ?",
                         Integer.class, operationId)));
 
+        // The owning tenant must also be able to read the durable request through runtime RLS.
+        assertEquals(1, databaseContext.callAsTenant(hotel,
+                () -> runtimeJdbc.queryForObject(
+                        "SELECT count(*) FROM business_request WHERE id = ?",
+                        Integer.class, requestId)));
+
         // The actual runtime datasource must enforce PostgreSQL tenant RLS.
         assertEquals(0, databaseContext.callAsTenant(otherTenant,
                 () -> runtimeJdbc.queryForObject(
