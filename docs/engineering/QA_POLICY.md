@@ -2,6 +2,16 @@
 
 This policy is mandatory for implementation work. It complements `AGENTS.md` and the First-Pass Engineering skill.
 
+## Standing publication rule after exact-HEAD QA (owner directive 2026-11-18)
+
+**Required for every agent:** a completed, verified product change MUST be delivered promptly to `main`, not stored indefinitely in a Draft PR. The owner issued standing authorization to mark certified PRs READY, merge through protected branch checks without repeat permission requests, validate exact merge SHA in `main`, and deploy by the normal production workflow where relevant. See the **OWNER STANDING RELEASE DIRECTIVE** in `AGENTS.md`.
+
+- **GO for publication** requires all applicable Fast Gate, Full Gate, security, Golden Journey, PostgreSQL, changed-code coverage and Playwright checks on the **exact final HEAD**, with no unresolved release-blocking defects. Split a safe, complete increment from future or unverified scope instead of delaying it.
+- **Publish and verify immediately after GO:** mark READY, merge to `main`, verify the protected post-merge CI, verify Railway deploy of that exact `main` SHA, startup/health/UX when applicable, and record evidence in the existing PR + master Issue #823. `main` without successful deployment is **not** a completed production publication.
+- **NO-GO stays blocked only for a real reason:** CI red/not verified, unsafe unguarded feature, required review, production risk or missing provider approval. Report the specific blocker, keep work isolated or default-OFF and resolve it; never bypass a gate or turn a fixture into live evidence.
+- This standing **code-merge and ordinary deploy** authorization does **not** authorize real customer calls, WhatsApp, purchases, charges, subscription payments, destructive migrations, secrets, or unapproved spend. Those require their separate safe approval.
+
+
 ## QA ownership
 
 The implementing agent owns quality assurance for the change. The user must not need to remember, request, or choose the required test categories.

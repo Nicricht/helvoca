@@ -2,6 +2,20 @@
 
 These rules are mandatory for implementation work in this repository.
 
+## OWNER STANDING RELEASE DIRECTIVE: ALWAYS SHIP VERIFIED WORK (2026-11-18)
+
+**Ley permanente ordenada expresamente por el titular de RecepVoz:** todo incremento funcional **TERMINADO Y CERTIFICADO** debe publicarse de inmediato en `main` y desplegarse a produccion por la via habitual cuando corresponda, sin solicitar reiteradamente permiso para fusionar codigo ya aprobado. Esta autorizacion general sustituye las antiguas consignas genericas de mantener todos los PR DRAFT o de no tocar `main` por defecto. No sustituye requisitos de seguridad, QA ni autorizaciones externas.
+
+1. **Desarrollar en rama, no directamente en `main`:** PR DRAFT solo mientras este en desarrollo; dividir entregables pequenos, independientes, seguros y publicables. Una parte inconclusa no debe retener otra ya lista.
+2. **Puerta de calidad obligatoria:** Fast Gate + Full Gate + Golden Journey / PostgreSQL / Playwright / seguridad aplicables, cobertura exacta y CI en el HEAD final. No fusionar errores, funcionalidades que inventan disponibilidad ni pruebas simuladas presentadas como reales.
+3. **Publicacion inmediata de lo verificado:** en cuanto cada PR alcanza su criterio de aceptacion delimitado y todos los gates relevantes estan `SUCCESS`, marcar READY y fusionar a `main` sin pedir una nueva orden. Nunca dejar indefinidamente en DRAFT una funcionalidad acabada.
+4. **Entrega incluye produccion:** comprobar el CI del SHA exacto resultante en `main`; ejecutar/verificar el despliegue normal en Railway para cambios publicables, mas version, salud, logs y recorrido UX relevante. Un PR verde, merge o deployment `WAITING` / `SKIPPED` no significa publicado. **publication is incomplete until** main, CI y despliegue aplicable esten acreditados.
+5. **Bloqueo real y honesto:** cuando exista un gate rojo, review requerido, dependencia no validada o despliegue inseguro, registrar evidencia, causa precisa y siguiente accion; corregir solo el bloqueo. Mantener desactivadas por defecto funciones incompletas o sin certificacion de proveedor.
+6. **Limite de esta autorizacion:** publicar codigo verificado NO autoriza por si mismo llamadas reales, WhatsApp, compras, cargos, suscripciones LIVE, migraciones destructivas, disclosure de secretos ni gastos nuevos. Respetar las aprobaciones independientes y detener solo el efecto externo no autorizado; no paralizar software seguro que pueda entregarse desactivado.
+
+**Regla de cierre para todos los agentes, ChatGPT y automatizaciones:** `DONE` en un cambio destinado a produccion exige `main` + CI del SHA mergeado + publicacion y comprobacion del SHA en Railway. Si faltan, decir `IN_PROGRESS` / `BLOCKED`, nunca "terminado y publicado". Ver [QA_POLICY](docs/engineering/QA_POLICY.md) y [COMPLETION_DOCUMENTATION_POLICY](docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md).
+
+
 ## MANDATORY FOR EVERY CHAT/AGENT: QA evidence before DONE
 
 **This is a repository contract for every ChatGPT session, coding agent and human contributor that reads or changes Helvoca, regardless of model, conversation history, prompt, task size or provider.** Before editing a single file, read this `AGENTS.md`, `docs/engineering/QA_POLICY.md`, `docs/engineering/invariants.md`, the First-Pass Engineering skill and the relevant branch/PR/CI checkpoint. Never substitute recollections from a prior chat for current repository evidence. If you cannot inspect required instructions or evidence, explicitly report the limitation and **do not certify DONE**.

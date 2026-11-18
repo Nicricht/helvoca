@@ -17,6 +17,7 @@ checks = {
         "100% mapped interaction/state-transition coverage",
         "100% mapped real-postgresql invariant coverage",
         "mandatory for every chat/agent: qa evidence before done",
+        "owner standing release directive: always ship verified work",
         "100% of applicable changed/affected quality dimensions",
         "local_simulation_pass",
         "authentic_provider_pass",
@@ -67,6 +68,7 @@ checks = {
         "100% behavior coverage",
         "100% of applicable database invariants",
         "evidence contract for every agent and every chat",
+        "standing publication rule after exact-head qa",
         "python, operations scripts and other executable scopes",
         "100% acceptance/failure-path test matrix",
         "signed local fixture cannot certify a real provider event",
@@ -101,6 +103,7 @@ checks = {
         "no equivale",
         "100% de cobertura",
         "no al usuario",
+        "ley permanente de publicación en main",
     ],
     "README.md": [
         "obligatorio para cualquier chat, asistente o agente que modifique helvoca",
