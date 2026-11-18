@@ -130,3 +130,11 @@ Propuesta de validación con usuarios autorizados, sin llamadas pagadas ni clien
 **Objetivo de rapidez, pendiente de evidencia:** planteamos como *stretch* **≤10 minutos de intervención de configuración básica** para un cliente que ya dispone de sus datos, manteniendo el criterio de referencia **≤15 minutos**. Ningún tiempo está medido aún; aprobaciones externas, activación y certificación real de canales quedan fuera de la medición del asistente básico. Se debe medir con sesiones consentidas de pizzería, veterinaria, ferretería y clínica y registrar mediana, fallos y pasos recorridos. No usar la mejora visual como prueba de ahorro de tiempo.
 
 **Salida:** `IMPLEMENTED_IN_DRAFT`, `CI_EXACT_HEAD_PENDING` hasta comprobar el run final; no merge ni despliegue. Siguiente acción: certificación Fast/Full Gate y Playwright exactos sobre la última revisión del PR #860.
+
+
+### 18-nov-2026 · F1: hospitality-T05 PostgreSQL follow-up (incremento offline, sin voz)
+
+- Se añadió `SectorOfflineFollowUpPostgresIntegrationTest` para **un solo escenario** del catálogo F1: `hospitality-T05`, origen `RESOURCE_UNVERIFIED`, resultado esperado `FOLLOW_UP_OPENED`. El caso usa una llamada **sintética de prueba, sin carrier**, con `RealtimeToolService.create_request` ya existente y PostgreSQL 16 Testcontainers.
+- Contratos que debe probar el CI: guardar solicitud `OPEN` con `requestId`, `operationId` y `call_id` del mismo negocio; **cero bookings inventados**; RLS oculta la solicitud a otro tenant; un contexto con tenant o stream erróneos no puede crearla.
+- **No** prueba que Gemini elija `create_request`, que exista habitación por noche, la concurrencia de asignación, reintentos idempotentes, proveedor auténtico ni llamadas reales. No modifica `readyForCalls`, herramientas, migraciones, voz, precio, políticas o activaciones.
+- **Estado al commit:** `QA_EXACT_HEAD_PENDING` hasta CI real (JUnit/Testcontainers + JaCoCo/Full Gate). Los **180** escenarios siguen siendo catálogo; solo este caso podrá marcarse `BACKEND_POSTGRES_OFFLINE_PASS` si supera CI. F1/F2 y las reservas especializadas permanecen **PARTIAL/NOT_CERTIFIED**. No fusionar ni desplegar este PR DRAFT.
