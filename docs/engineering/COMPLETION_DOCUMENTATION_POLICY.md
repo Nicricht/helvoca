@@ -6,6 +6,15 @@
 
 Cada funcionalidad, corrección, prueba, integración, auditoría u operación completada debe quedar suficientemente documentada **en GitHub** para que otra sesión pueda continuar sin repetir decisiones, código, diagnósticos, pruebas ni acciones externas. **Trabajo sin documentación verificable = trabajo no cerrado.**
 
+## Ley permanente de publicación en main (orden del titular 18-11-2026)
+
+**El trabajo terminado y certificado se fusiona y publica de inmediato.** El titular dio autorización general vigente para pasar un PR aprobado de DRAFT a READY, fusionarlo en `main` y verificar su despliegue normal a producción, sin volver a preguntarle si permite publicar cada incremento. La rama de trabajo y la revisión por PR son medios de QA, nunca el destino de un cambio acabado. Un trabajo destinado al cliente no se marca `DONE` mientras solo exista en una rama o en un deploy pendiente.
+
+**Cadena obligatoria:** rama → PR DRAFT durante desarrollo → pruebas y gates exact HEAD → READY y merge inmediato a `main` → CI del merge SHA → Railway (cuando aplique) publicado con el mismo SHA, health/UX verificados → checkpoint final. Si un subalcance no está listo, separar el incremento ya certificado, publicarlo y dejar claramente acotado el resto. Fallo real = `BLOCKED` documentado, sin forzar CI.
+
+Esta autorización general habilita **fusionar y desplegar código seguro tras QA**, pero no activa por sí sola proveedores de voz, números, WhatsApp ni autoriza cobros, llamadas, compras, migraciones destructivas o nuevos gastos: requieren controles y consentimiento específicos. El estado del código publicado y el estado del servicio comercial se informan por separado.
+
+
 La documentación es una **parte del entregable**, no una tarea opcional posterior. El agente la escribe y actualiza; el usuario no debe recordar en qué archivo quedó algo ni reconstruir conversaciones previas.
 
 ## PRE-CHANGE FRESH-CONTEXT WRITE GATE: acta antes de editar
@@ -116,7 +125,7 @@ Antes de repetir un test caro, exportar datos, consumir APIs de pago, contratar 
 
 - Nunca guardar secretos, OAuth tokens, refresh tokens, contraseñas, claves privadas, dumps de clientes, datos personales, transcripciones ni informes privados en GitHub o respuestas públicas.
 - Para evidencia privada usar solo identificador seguro/redactado, ubicación restringida o atestación del responsable, aclarando qué se ha verificado y qué no.
-- Ninguna anotación, checkpoint o automatización concede permiso para hacer merge a `main`, desplegar, migrar producción, cobrar, comprar, llamar ni cambiar variables sensibles.
+- Ninguna anotación, checkpoint o automatización concede por sí sola permiso para migrar destructivamente producción, cobrar, comprar, llamar, activar proveedores o cambiar variables sensibles. **La orden permanente expresa del titular sí autoriza fusionar a `main` y el despliegue ordinario de código certificado tras los gates obligatorios**, conforme a la ley de publicación de este documento y `AGENTS.md`; nunca autoriza saltar controles o causar efectos externos reales no aprobados.
 - Los gates de C1 (restauración antes de producción) y de C2–C7 siguen intactos; documentar un trabajo offline no lo convierte en aprobación comercial.
 
 ## Comprobación final antes de responder al usuario
