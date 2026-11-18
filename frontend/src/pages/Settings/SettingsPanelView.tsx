@@ -1,17 +1,30 @@
 import {
+  BedDouble,
   Bot,
   Building2,
   CalendarClock,
+  CarFront,
+  Check,
+  Dumbbell,
   Globe2,
+  Hospital,
+  House,
   MessagesSquare,
+  PawPrint,
   Phone,
   Plus,
+  Scale,
+  Scissors,
   ShieldCheck,
+  ShoppingBag,
+  Stethoscope,
+  Store,
   Trash2,
   UsersRound,
+  Utensils,
   Wrench
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import type {
   AiAgentInput,
   BusinessHour,
@@ -22,6 +35,7 @@ import type {
   VoiceOption
 } from "../../features/settings/api";
 import type { SectionKey, SettingsDraft } from "../../features/settings/viewModel";
+import { getSectorSetupGuide } from "../../features/settings/sectorSetupGuides";
 import { ChannelsSettingsPanel } from "./ChannelsSettingsPanel";
 import { IntegrationsSettingsPanel } from "./IntegrationsSettingsPanel";
 import { ScheduleExceptionsPanel } from "./ScheduleExceptionsPanel";
@@ -40,17 +54,38 @@ const dayNames = [
 
 
 const businessPresetOptions = [
-  ["", "General"],
-  ["store", "Tienda / comercio"],
-  ["hardware_store", "Ferretería / materiales"],
-  ["services", "Servicios"],
-  ["restaurant", "Restaurant / alimentos"],
-  ["clinic", "Salud / clínica"],
+  ["", "Otro negocio / general"],
+  ["clinic", "Clínica / centro médico"],
+  ["dental", "Dentista"],
   ["veterinary", "Veterinaria / mascotas"],
-  ["salon", "Belleza / peluquería"],
-  ["workshop", "Taller / reparación"],
+  ["salon", "Peluquería / barbería"],
+  ["restaurant", "Restaurante / alimentos"],
+  ["hardware_store", "Ferretería / materiales"],
+  ["store", "Tienda / comercio"],
+  ["workshop", "Taller mecánico / reparación"],
+  ["legal", "Estudio jurídico"],
+  ["real_estate", "Inmobiliaria"],
+  ["gym", "Gimnasio"],
   ["hospitality", "Hotel / hospedaje"],
-  ["professional", "Profesional / oficina"]
+  ["services", "Servicios (perfil previo)"],
+  ["professional", "Profesional (perfil previo)"]
+] as const;
+
+// Visual presentation uses existing presetKey values; it never enables an AI capability.
+const businessPresetCards = [
+  { value: "clinic", label: "Clínica", icon: Hospital },
+  { value: "dental", label: "Dentista", icon: Stethoscope },
+  { value: "veterinary", label: "Veterinaria", icon: PawPrint },
+  { value: "salon", label: "Peluquería", icon: Scissors },
+  { value: "restaurant", label: "Restaurante", icon: Utensils },
+  { value: "hardware_store", label: "Ferretería", icon: Wrench },
+  { value: "store", label: "Tienda", icon: ShoppingBag },
+  { value: "workshop", label: "Taller mecánico", icon: CarFront },
+  { value: "legal", label: "Estudio jurídico", icon: Scale },
+  { value: "real_estate", label: "Inmobiliaria", icon: House },
+  { value: "gym", label: "Gimnasio", icon: Dumbbell },
+  { value: "hospitality", label: "Hotel", icon: BedDouble },
+  { value: "", label: "Otro negocio", icon: Store }
 ] as const;
 
 const businessPresetSuggestions: Record<string, string> = {
@@ -63,8 +98,27 @@ const businessPresetSuggestions: Record<string, string> = {
   salon: "Revisa servicios, duraciones, precios, profesionales y disponibilidad para reservas.",
   workshop: "Revisa tipos de reparación, presupuestos, horarios, plazos y requisitos para recibir equipos.",
   hospitality: "Revisa tipos de alojamiento, tarifas, horarios de ingreso y salida y políticas de reserva.",
-  professional: "Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva."
+  professional: "Revisa servicios profesionales, tarifas, horarios, canales de contacto y modalidad de reserva.",
+  dental: "Revisa tratamientos, profesionales, duraciones, precios de evaluación, disponibilidad y protocolo de urgencias. No diagnostiques.",
+  legal: "Revisa áreas jurídicas, abogados, agenda, tarifas y derivación de urgencias. No entregues asesoría legal personalizada.",
+  real_estate: "Revisa inmuebles publicados, estados, precios, visitas, requisitos y contactos. No inventes disponibilidad.",
+  gym: "Revisa planes, horarios, clases, cupos, cuotas, cancelaciones y profesionales. No inventes beneficios ni cobros."
 };
+
+function focusAdjacentSectorCard(event: KeyboardEvent<HTMLButtonElement>) {
+  const key = event.key;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
+  const cards = Array.from(
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>("[data-business-preset-card]:not(:disabled)") ?? []
+  );
+  if (!cards.length) return;
+  event.preventDefault();
+  const index = cards.indexOf(event.currentTarget);
+  const next = key === "Home" ? 0
+    : key === "End" ? cards.length - 1
+    : (index + (key === "ArrowRight" || key === "ArrowDown" ? 1 : -1) + cards.length) % cards.length;
+  cards[next]?.focus();
+}
 
 const agentCapabilities = [
   ["GET_BUSINESS_INFORMATION", "Información"],
@@ -115,6 +169,7 @@ function Field({
 interface SettingsPanelViewProps {
   activeSection: SectionKey;
   draft: SettingsDraft;
+  persistedDraft: SettingsDraft;
   canManage: boolean;
   canManageTeam: boolean;
   canReadScheduleExceptions: boolean;
@@ -130,6 +185,7 @@ interface SettingsPanelViewProps {
     value: string
   ) => void;
   updateProfile: (key: keyof BusinessProfileInput, value: string | boolean | null) => void;
+  navigateToSection: (section: SectionKey) => void;
   updateAgent: (key: keyof AiAgentInput, value: string | boolean | string[]) => void;
   updateService: (index: number, patch: Partial<ServiceItem>) => void;
   addService: () => void;
@@ -146,6 +202,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
   const {
     activeSection,
     draft,
+    persistedDraft,
     canManage,
     canManageTeam,
     canReadScheduleExceptions,
@@ -158,6 +215,7 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     phones,
     updateRoot,
     updateProfile,
+    navigateToSection,
     updateAgent,
     updateService,
     addService,
@@ -171,6 +229,17 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
   } = props;
 
   if (activeSection === "business") {
+    const guide = getSectorSetupGuide(draft.profile.presetKey);
+    const sectorSaved = (draft.profile.presetKey ?? "") === (persistedDraft.profile.presetKey ?? "");
+    const savedServices = persistedDraft.services.filter(
+      item => item.id && item.active !== false && Boolean(item.name?.trim())
+    ).length;
+    const savedHours = persistedDraft.hours.filter(
+      hour => String(hour.openTime).slice(0, 5) < String(hour.closeTime).slice(0, 5)
+    ).length;
+    const savedAnswers = persistedDraft.knowledge.filter(
+      item => item.id && item.active !== false && Boolean(item.title?.trim()) && Boolean(item.content?.trim())
+    ).length;
     return (
       <section
         id="settings-panel-business"
@@ -197,17 +266,45 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             />
           </Field>
 
-          <Field label="Rubro">
-            <select
-              value={String(draft.profile.presetKey ?? "")}
-              disabled={!canManage}
-              onChange={event => updateProfile("presetKey", event.target.value || null)}
-            >
-              {businessPresetOptions.map(([value, label]) => (
-                <option value={value} key={value || "general"}>{label}</option>
-              ))}
-            </select>
-          </Field>
+          <div className={`${styles.field} ${styles.fieldWide}`}>
+            <span>Rubro</span>
+            <p className={styles.businessPresetIntro}>Elige el tipo de negocio. Solo se guardará cuando confirmes los cambios.</p>
+            <div className={styles.businessPresetGrid} role="group" aria-label="Tipos de negocio">
+              {businessPresetCards.map(({ value, label, icon: Icon }) => {
+                const selected = String(draft.profile.presetKey ?? "") === value;
+                return (
+                  <button
+                    key={value || "other"}
+                    type="button"
+                    data-business-preset-card
+                    data-selected={selected ? "true" : undefined}
+                    className={styles.businessPresetCard}
+                    aria-pressed={selected}
+                    disabled={!canManage}
+                    onClick={() => updateProfile("presetKey", value || null)}
+                    onKeyDown={focusAdjacentSectorCard}
+                  >
+                    <span className={styles.businessPresetIcon}><Icon size={22} aria-hidden="true" /></span>
+                    <span>{label}</span>
+                    {selected && <Check className={styles.businessPresetCheck} size={16} aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+            <label className={styles.businessPresetFallback}>
+              <span>También puedes elegir desde la lista</span>
+              <select
+                aria-label="Rubro"
+                value={String(draft.profile.presetKey ?? "")}
+                disabled={!canManage}
+                onChange={event => updateProfile("presetKey", event.target.value || null)}
+              >
+                {businessPresetOptions.map(([value, label]) => (
+                  <option value={value} key={value || "general"}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
 
           <Field label="Moneda">
             <select
@@ -364,6 +461,33 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <span>{businessPresetSuggestions[draft.profile.presetKey]}</span>
           </div>
         )}
+        <section className={styles.sectorSetupGuide} role="region" aria-label="Preparación del negocio">
+          <h3>Antes de atender llamadas: {guide.title}</h3>
+          <p>Confirma estos datos con información real del negocio. La guía no crea servicios, precios, reservas ni activa canales.</p>
+          <ol>
+            {guide.questions.map(question => <li key={question}>{question}</li>)}
+          </ol>
+          <div className={styles.sectorSetupActions}>
+            <button type="button" onClick={() => navigateToSection("services")}>Ir a Servicios</button>
+            <button type="button" onClick={() => navigateToSection("hours")}>Ir a Horarios</button>
+            <button type="button" onClick={() => navigateToSection("knowledge")}>Ir a Conocimiento</button>
+          </div>
+          <div className={styles.sectorMissingInformation}>
+            <strong>Si falta información durante una llamada</strong>
+            <p>{guide.missingInformation}</p>
+          </div>
+        </section>
+        <section className={styles.sectorSavedEvidence} role="region" aria-label="Datos guardados para la atención">
+          <h3>Datos registrados en este negocio</h3>
+          <p>Estas cantidades reflejan datos guardados, no el formulario sin guardar.</p>
+          <ul>
+            <li>{sectorSaved ? "Rubro guardado" : "Rubro sin guardar"}</li>
+            <li>{savedServices} {savedServices === 1 ? "servicio registrado" : "servicios registrados"}</li>
+            <li>{savedHours} {savedHours === 1 ? "horario registrado" : "horarios registrados"}</li>
+            <li>{savedAnswers} {savedAnswers === 1 ? "respuesta registrada" : "respuestas registradas"}</li>
+          </ul>
+          <p className={styles.sectorSavedWarning}>Estos registros no certifican llamadas reales, disponibilidad, inventario ni herramientas habilitadas. Verifica los datos y canales antes de operar.</p>
+        </section>
       </section>
     );
   }

@@ -261,4 +261,150 @@ test.describe('Settings independent save contract', () => {
       'PATCH /api/v1/business', 'PUT /api/v1/business/profile', 'PUT /api/v1/business/profile'
     ]);
   });
+
+  test('twelve visual sector cards are accessible, keyboard navigable and never save before approval', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    const labels = [
+      'Clínica', 'Dentista', 'Veterinaria', 'Peluquería', 'Restaurante',
+      'Ferretería', 'Tienda', 'Taller mecánico', 'Estudio jurídico',
+      'Inmobiliaria', 'Gimnasio', 'Hotel', 'Otro negocio'
+    ];
+    await expect(picker.getByRole('button')).toHaveCount(13);
+    for (const label of labels) await expect(picker.getByRole('button', { name: label, exact: true })).toBeVisible();
+
+    const restaurant = picker.getByRole('button', { name: 'Restaurante', exact: true });
+    const hardware = picker.getByRole('button', { name: 'Ferretería', exact: true });
+    await restaurant.hover();
+    await expect(restaurant).not.toHaveCSS('box-shadow', 'none');
+    expect(mutations(state)).toEqual([]);
+
+    await restaurant.focus();
+    await expect(restaurant).not.toHaveCSS('box-shadow', 'none');
+    await page.keyboard.press('ArrowRight');
+    await expect(hardware).toBeFocused();
+    await expect(hardware).toHaveAttribute('aria-pressed', 'false');
+    expect(mutations(state)).toEqual([]);
+
+    await page.keyboard.press('Enter');
+    await expect(hardware).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByLabel('Rubro')).toHaveValue('hardware_store');
+    expect(mutations(state)).toEqual([]);
+
+    const dental = picker.getByRole('button', { name: 'Dentista', exact: true });
+    await dental.click();
+    await expect(dental).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByLabel('Rubro')).toHaveValue('dental');
+    expect(mutations(state)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(item => item.method + ' ' + item.path)).toEqual(['PUT /api/v1/business/profile']);
+    expect(state.data.profile.presetKey).toBe('dental');
+
+    await page.reload();
+    await expect(page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Dentista', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('sector cards are view-only for operators and do not trigger mutations', async ({ page }) => {
+    const state = await boot(page, { roles: ['OPERATOR'] });
+    await page.goto('/app/settings');
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    await expect(picker.getByRole('button')).toHaveCount(13);
+    await expect(picker.getByRole('button', { name: 'Dentista', exact: true })).toBeDisabled();
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('all twelve business guides ask tailored questions without creating fictitious data', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+    const picker = page.getByRole('group', { name: 'Tipos de negocio' });
+    const guide = page.getByRole('region', { name: 'Preparación del negocio' });
+    const cases = [
+      ['Clínica', 'especialidades y profesionales'],
+      ['Dentista', 'tratamientos y odontólogos'],
+      ['Veterinaria', 'especies atendidas'],
+      ['Peluquería', 'estilistas y servicios'],
+      ['Restaurante', 'menú y alérgenos'],
+      ['Ferretería', 'catálogo y existencias'],
+      ['Tienda', 'tallas, variantes'],
+      ['Taller mecánico', 'vehículos admitidos'],
+      ['Estudio jurídico', 'áreas legales'],
+      ['Inmobiliaria', 'propiedades vigentes'],
+      ['Gimnasio', 'planes y cupos'],
+      ['Hotel', 'habitaciones y ocupación']
+    ];
+    for (const [label, expected] of cases) {
+      await picker.getByRole('button', { name: label, exact: true }).click();
+      await expect(guide).toContainText(expected);
+      await expect(guide).toContainText('Si falta información');
+      await expect(guide.getByRole('button', { name: 'Ir a Servicios' })).toBeVisible();
+      await expect(guide.getByRole('button', { name: 'Ir a Horarios' })).toBeVisible();
+      await expect(guide.getByRole('button', { name: 'Ir a Conocimiento' })).toBeVisible();
+    }
+    expect(mutations(state)).toEqual([]);
+    expect(state.data.services).toHaveLength(1);
+    expect(state.data.knowledge).toHaveLength(1);
+    await picker.getByRole('button', { name: 'Otro negocio', exact: true }).click();
+    await expect(guide).toContainText('actividad principal');
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('guided setup navigation preserves unsaved industry choice and data without auto-saving', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+    await page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Restaurante', exact: true }).click();
+    const guide = page.getByRole('region', { name: 'Preparación del negocio' });
+    await guide.getByRole('button', { name: 'Ir a Conocimiento' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Conocimiento' })).toBeVisible();
+    expect(mutations(state)).toEqual([]);
+    await page.getByRole('tab', { name: 'Negocio' }).click();
+    await expect(page.getByLabel('Rubro')).toHaveValue('restaurant');
+    await expect(page.locator('footer [role="status"]')).toContainText('Cambios sin guardar');
+    await guide.getByRole('button', { name: 'Ir a Horarios' }).click();
+    await expect(page.getByRole('tabpanel', { name: 'Horarios' })).toBeVisible();
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('sector evidence uses only saved data and does not certify live calls', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+
+    const evidence = page.getByRole('region', { name: 'Datos guardados para la atención' });
+    await expect(evidence).toContainText('Rubro guardado');
+    await expect(evidence).toContainText('1 servicio registrado');
+    await expect(evidence).toContainText('1 horario registrado');
+    await expect(evidence).toContainText('1 respuesta registrada');
+    await expect(evidence).toContainText('no certifican llamadas reales');
+
+    await page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Hotel', exact: true }).click();
+    await expect(evidence).toContainText('Rubro sin guardar');
+    await expect(evidence).toContainText('1 servicio registrado');
+    expect(mutations(state)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    await expect(evidence).toContainText('Rubro guardado');
+    expect(mutations(state).map(item => item.method + ' ' + item.path))
+      .toEqual(['PUT /api/v1/business/profile']);
+    await page.reload();
+    await expect(evidence).toContainText('Rubro guardado');
+  });
+
+  test('empty sector evidence never reports fabricated services, hours or answers', async ({ page }) => {
+    const state = await boot(page, { emptyCollections: true });
+    await page.goto('/app/settings');
+
+    const evidence = page.getByRole('region', { name: 'Datos guardados para la atención' });
+    await expect(evidence).toContainText('0 servicios registrados');
+    await expect(evidence).toContainText('0 horarios registrados');
+    await expect(evidence).toContainText('0 respuestas registradas');
+    await expect(evidence).toContainText('no certifican llamadas reales');
+    expect(mutations(state)).toEqual([]);
+  });
 });
