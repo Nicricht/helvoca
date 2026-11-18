@@ -24,7 +24,7 @@ import {
   Utensils,
   Wrench
 } from "lucide-react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import type {
   AiAgentInput,
   BusinessHour,
@@ -166,6 +166,77 @@ function Field({
   );
 }
 
+
+/** Public facts entered by the clinic owner, NEVER generated patient or medical facts. */
+const clinicKnowledgeTopics = [
+  { key: "specialties", title: "Clínica: especialidades y profesionales", label: "Especialidades y profesionales",
+    prompt: "Solo especialidades y profesionales que la clínica confirme." },
+  { key: "prices", title: "Clínica: aranceles y convenios", label: "Aranceles y convenios",
+    prompt: "Solo aranceles, convenios y condiciones vigentes." },
+  { key: "exams", title: "Clínica: exámenes y preparación", label: "Exámenes y preparación",
+    prompt: "Solo indicaciones oficiales aprobadas para exámenes concretos." },
+  { key: "emergencies", title: "Clínica: urgencias y derivaciones", label: "Urgencias y derivaciones",
+    prompt: "Protocolo público de derivación autorizado; nunca diagnósticos." },
+  { key: "complaints", title: "Clínica: reclamos y seguimiento", label: "Reclamos y seguimiento",
+    prompt: "Canales y políticas de reclamo aprobados por la clínica." },
+  { key: "locations", title: "Clínica: sedes y accesibilidad", label: "Sedes y accesibilidad",
+    prompt: "Sucursales, horarios específicos y accesibilidad comprobados." }
+] as const;
+
+function ClinicKnowledgePreparation({
+  canManage, knowledgeReady, existingKnowledge, onPrepare
+}: {
+  canManage: boolean;
+  knowledgeReady: boolean;
+  existingKnowledge: KnowledgeItem[];
+  onPrepare: (items: KnowledgeItem[]) => void;
+}) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const titles = new Set(existingKnowledge.map(item => item.title.trim().toLocaleLowerCase("es")));
+  const available = clinicKnowledgeTopics.filter(topic =>
+    !titles.has(topic.title.toLocaleLowerCase("es")) && Boolean(answers[topic.key]?.trim())
+  );
+  return (
+    <section className={styles.clinicKnowledgePreparation} role="region" aria-label="Preparar respuestas de Clínica">
+      <h4>Preparar información de tu clínica</h4>
+      <p>Escribe solo datos públicos confirmados por la clínica. No ingreses nombres de pacientes,
+        fichas, diagnósticos ni resultados. Nada se guardará sin tu revisión y aprobación.</p>
+      <div className={styles.clinicKnowledgeFields}>
+        {clinicKnowledgeTopics.map(topic => {
+          const exists = titles.has(topic.title.toLocaleLowerCase("es"));
+          return (
+            <label className={styles.clinicKnowledgeEntry} key={topic.key}>
+              <strong>{topic.label}</strong>
+              <span>{topic.prompt}</span>
+              <textarea
+                aria-label={topic.label}
+                rows={3}
+                maxLength={2000}
+                value={answers[topic.key] ?? ""}
+                disabled={!canManage || !knowledgeReady || exists}
+                onChange={event => setAnswers(previous => ({ ...previous, [topic.key]: event.target.value }))}
+              />
+              {exists && <small>Ya existe una respuesta. No será sobrescrita.</small>}
+            </label>
+          );
+        })}
+      </div>
+      {!knowledgeReady && <p role="status">No se pudo verificar el conocimiento actual; recarga antes de preparar respuestas.</p>}
+      <button
+        type="button"
+        disabled={!canManage || !knowledgeReady || available.length === 0}
+        onClick={() => onPrepare(available.map(topic => ({
+          id: null, title: topic.title, category: "Clínica",
+          content: answers[topic.key].trim(), active: true
+        })))}
+      >
+        Preparar {available.length} {available.length === 1 ? "respuesta" : "respuestas"} para revisar
+      </button>
+      <p>Revisa las respuestas en Conocimiento y confirma «Guardar cambios» para publicarlas.</p>
+    </section>
+  );
+}
+
 interface SettingsPanelViewProps {
   activeSection: SectionKey;
   draft: SettingsDraft;
@@ -186,6 +257,8 @@ interface SettingsPanelViewProps {
   ) => void;
   updateProfile: (key: keyof BusinessProfileInput, value: string | boolean | null) => void;
   navigateToSection: (section: SectionKey) => void;
+  knowledgeReady: boolean;
+  prepareClinicKnowledge: (items: KnowledgeItem[]) => void;
   updateAgent: (key: keyof AiAgentInput, value: string | boolean | string[]) => void;
   updateService: (index: number, patch: Partial<ServiceItem>) => void;
   addService: () => void;
@@ -216,6 +289,8 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
     updateRoot,
     updateProfile,
     navigateToSection,
+    knowledgeReady,
+    prepareClinicKnowledge,
     updateAgent,
     updateService,
     addService,
@@ -477,6 +552,14 @@ export function SettingsPanelView(props: SettingsPanelViewProps) {
             <p>{guide.missingInformation}</p>
           </div>
         </section>
+        {draft.profile.presetKey === "clinic" && (
+          <ClinicKnowledgePreparation
+            canManage={canManage}
+            knowledgeReady={knowledgeReady}
+            existingKnowledge={draft.knowledge}
+            onPrepare={prepareClinicKnowledge}
+          />
+        )}
         <section className={styles.sectorSavedEvidence} role="region" aria-label="Datos guardados para la atención">
           <h3>Datos registrados en este negocio</h3>
           <p>Estas cantidades reflejan datos guardados, no el formulario sin guardar.</p>

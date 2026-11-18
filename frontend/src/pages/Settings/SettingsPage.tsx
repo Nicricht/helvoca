@@ -327,6 +327,31 @@ export function SettingsPage() {
     markDirty();
   }
 
+
+  function prepareClinicKnowledge(items: KnowledgeItem[]) {
+    if (!model.canManage || !model.knowledge.isSuccess || submitLock.current || !items.length) return;
+    setDraft(current => {
+      if (!current || current.profile.presetKey !== "clinic") return current;
+      const titles = new Set(
+        current.knowledge.map(item => item.title.trim().toLocaleLowerCase("es"))
+      );
+      const additions = items.filter(item => {
+        const title = item.title.trim().toLocaleLowerCase("es");
+        if (!title.startsWith("clínica:") || !item.content.trim() || titles.has(title)) return false;
+        titles.add(title);
+        return true;
+      });
+      return additions.length ? {
+        ...current,
+        knowledge: [...current.knowledge, ...additions.map(item => ({
+          ...item, content: item.content.trim()
+        }))]
+      } : current;
+    });
+    markDirty();
+    openSection("knowledge");
+  }
+
   function removeKnowledge(index: number) {
     setDraft(current => current
       ? { ...current, knowledge: current.knowledge.filter((_, currentIndex) => currentIndex !== index) }
@@ -562,6 +587,8 @@ export function SettingsPage() {
               updateRoot={updateRoot}
               updateProfile={updateProfile}
               navigateToSection={openSection}
+              knowledgeReady={model.knowledge.isSuccess}
+              prepareClinicKnowledge={prepareClinicKnowledge}
               updateAgent={updateAgent}
               updateService={updateService}
               addService={addService}

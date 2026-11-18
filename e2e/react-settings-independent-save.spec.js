@@ -9,7 +9,7 @@ async function boot(page, options = {}) {
   const data = {
     business: { name: 'Mi negocio', timezone: 'America/Santiago', language: 'es', humanTransferPhone: '+56999999999' },
     profile: {
-      presetKey: 'services', publicDescription: 'Descripción inicial', publicPhone: null,
+      presetKey: options.presetKey ?? 'services', publicDescription: 'Descripción inicial', publicPhone: null,
       publicEmail: null, websiteUrl: null, addressLine: null, commune: null, city: null,
       region: null, countryCode: 'CL', defaultCurrency: 'CLP',
       sellsProducts: null, sellsServices: true, usesReservations: true
@@ -73,7 +73,7 @@ async function boot(page, options = {}) {
       if (method === 'PUT') data.hours = payload.hours;
       return route.fulfill(json(data.hours));
     }
-    if (path === '/api/v1/knowledge' && method === 'GET') return route.fulfill(json(data.knowledge));
+    if (path === '/api/v1/knowledge' && method === 'GET') return route.fulfill(json(options.failKnowledgeLoad ? { message: 'No disponible' } : data.knowledge, options.failKnowledgeLoad ? 503 : 200));
     if (path === '/api/v1/knowledge' && method === 'POST') {
       const item = { id: 'k' + (data.knowledge.length + 1), ...payload };
       data.knowledge.push(item);
@@ -405,6 +405,85 @@ test.describe('Settings independent save contract', () => {
     await expect(evidence).toContainText('0 horarios registrados');
     await expect(evidence).toContainText('0 respuestas registradas');
     await expect(evidence).toContainText('no certifican llamadas reales');
+    expect(mutations(state)).toEqual([]);
+  });
+
+
+  test('clinic owner prepares confirmed answers without writes until explicit save', async ({ page }) => {
+    const state = await boot(page);
+    await page.goto('/app/settings');
+    await expect(page.getByRole('region', { name: 'Preparar respuestas de Clínica' })).toHaveCount(0);
+    await page.getByRole('group', { name: 'Tipos de negocio' })
+      .getByRole('button', { name: 'Clínica', exact: true }).click();
+    const clinic = page.getByRole('region', { name: 'Preparar respuestas de Clínica' });
+    await expect(clinic.getByRole('textbox')).toHaveCount(6);
+    await expect(clinic.getByRole('button', { name: 'Preparar 0 respuestas para revisar' })).toBeDisabled();
+    await clinic.getByRole('textbox', { name: 'Especialidades y profesionales' })
+      .fill('Medicina general y pediatría, servicios confirmados por la clínica.');
+    await clinic.getByRole('textbox', { name: 'Reclamos y seguimiento' })
+      .fill('Recepción recibe los reclamos y genera un seguimiento.');
+    expect(mutations(state)).toEqual([]);
+    await clinic.getByRole('button', { name: 'Preparar 2 respuestas para revisar' }).click();
+    const knowledge = page.getByRole('tabpanel', { name: 'Conocimiento' });
+    await expect(knowledge.getByRole('textbox', { name: 'Título' })).toHaveCount(3);
+    expect(mutations(state)).toEqual([]);
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(x => x.method + ' ' + x.path)).toEqual([
+      'POST /api/v1/knowledge', 'POST /api/v1/knowledge'
+    ]);
+    expect(state.data.knowledge.slice(1).map(item => item.title)).toEqual([
+      'Clínica: especialidades y profesionales', 'Clínica: reclamos y seguimiento'
+    ]);
+    expect(state.data.knowledge.slice(1).map(item => item.content)).toEqual([
+      'Medicina general y pediatría, servicios confirmados por la clínica.',
+      'Recepción recibe los reclamos y genera un seguimiento.'
+    ]);
+    await page.reload();
+    await expect(page.getByRole('tabpanel', { name: 'Conocimiento' })
+      .getByRole('textbox', { name: 'Título' })).toHaveCount(3);
+  });
+
+  test('clinic preparer preserves existing verified answers and ignores empty fields', async ({ page }) => {
+    const state = await boot(page, { presetKey: 'clinic' });
+    state.data.knowledge.push({
+      id: 'k2', title: 'Clínica: especialidades y profesionales',
+      category: 'Clínica', content: 'Contenido anterior verificado', active: true
+    });
+    await page.goto('/app/settings');
+    const clinic = page.getByRole('region', { name: 'Preparar respuestas de Clínica' });
+    await expect(clinic.getByRole('textbox', { name: 'Especialidades y profesionales' })).toBeDisabled();
+    await expect(clinic).toContainText('No será sobrescrita');
+    await expect(clinic.getByRole('button', { name: 'Preparar 0 respuestas para revisar' })).toBeDisabled();
+    await clinic.getByRole('textbox', { name: 'Urgencias y derivaciones' })
+      .fill('Derivaciones según el protocolo autorizado del centro.');
+    await clinic.getByRole('button', { name: 'Preparar 1 respuesta para revisar' }).click();
+    expect(mutations(state)).toEqual([]);
+    await page.getByRole('button', { name: 'Guardar cambios' }).click();
+    await expect(page.locator('footer [role="status"]')).toContainText('Guardado');
+    expect(mutations(state).map(x => x.method + ' ' + x.path))
+      .toEqual(['POST /api/v1/knowledge']);
+    expect(state.data.knowledge.find(x => x.id === 'k2').content).toBe('Contenido anterior verificado');
+    await page.getByRole('tab', { name: 'Negocio' }).click();
+    await expect(clinic.getByRole('textbox', { name: 'Urgencias y derivaciones' })).toBeDisabled();
+  });
+
+  test('clinic knowledge preparation is read-only for an operator', async ({ page }) => {
+    const state = await boot(page, { roles: ['OPERATOR'], presetKey: 'clinic' });
+    await page.goto('/app/settings');
+    const clinic = page.getByRole('region', { name: 'Preparar respuestas de Clínica' });
+    await expect(clinic.getByRole('button', { name: 'Preparar 0 respuestas para revisar' })).toBeDisabled();
+    await expect(clinic.getByRole('textbox', { name: 'Reclamos y seguimiento' })).toBeDisabled();
+    expect(mutations(state)).toEqual([]);
+  });
+
+  test('clinic knowledge preparation fails closed if knowledge cannot load', async ({ page }) => {
+    const state = await boot(page, { presetKey: 'clinic', failKnowledgeLoad: true });
+    await page.goto('/app/settings');
+    const clinic = page.getByRole('region', { name: 'Preparar respuestas de Clínica' });
+    await expect(clinic).toContainText('No se pudo verificar el conocimiento actual');
+    await expect(clinic.getByRole('textbox', { name: 'Reclamos y seguimiento' })).toBeDisabled();
+    await expect(clinic.getByRole('button', { name: 'Preparar 0 respuestas para revisar' })).toBeDisabled();
     expect(mutations(state)).toEqual([]);
   });
 });
