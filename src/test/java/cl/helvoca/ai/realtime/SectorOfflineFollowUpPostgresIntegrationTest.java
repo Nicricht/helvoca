@@ -55,6 +55,8 @@ class SectorOfflineFollowUpPostgresIntegrationTest {
         assertEquals("FOLLOW_UP_OPENED", scenario.getString("expectedOutcome"));
         assertEquals("request_id_persisted", scenario.getString("requiredEvidence"));
         assertFalse(scenario.getBoolean("realExternalEffects"));
+        assertEquals("DISARMED", scenario.getJSONObject("fixture").getString("providerMode"));
+        assertEquals("EXPECTED_ONLY_NOT_OBSERVED", scenario.getJSONObject("fixture").getString("verification"));
         assertEquals("NOT_CERTIFIED",
                 SectorResourceReadiness.forPreset("hospitality").verificationState());
 
