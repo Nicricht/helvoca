@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('node:fs');
 const json = body => ({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
 
 async function mockSetup(page, roles = ['BUSINESS_ADMIN']) {
@@ -63,8 +64,39 @@ test.describe('Settings Express user journey', () => {
       const continueButton = next.getByRole('button', { name: buttonName });
       await expect(continueButton).toBeVisible();
       await continueButton.click();
-      await expect(page.getByRole('tab', { name: tabName, exact: true }))
-        .toHaveAttribute('aria-selected', 'true');
+      try {
+        await expect(page.getByRole('tab', { name: tabName, exact: true }))
+          .toHaveAttribute('aria-selected', 'true');
+      } catch (originalError) {
+        // Read-only on-failure evidence; never weaken the verified navigation contract.
+        try {
+          const observed = await page.evaluate(() => ({
+            url: window.location.href,
+            documentReadyState: document.readyState,
+            pageHeading: document.querySelector('h1')?.textContent?.trim() ?? null,
+            nextStepExcerpt: document.querySelector('[data-testid="settings-next-step"]')
+              ?.textContent?.trim().slice(0, 400) ?? null,
+            tablists: Array.from(document.querySelectorAll('[role="tablist"]')).map(node => ({
+              label: node.getAttribute('aria-label'),
+              excerpt: (node.textContent ?? '').trim().slice(0, 240)
+            })),
+            tabs: Array.from(document.querySelectorAll('[role="tab"]')).map(node => ({
+              label: (node.textContent ?? '').trim(),
+              selected: node.getAttribute('aria-selected'),
+              disabled: node.hasAttribute('disabled')
+            })),
+            bodyExcerpt: (document.body?.innerText ?? '').slice(0, 700)
+          }));
+          // Playwright's line reporter does not necessarily materialize in-memory
+          // attachments in test-results. Persist the exact evidence path uploaded by CI.
+          const snapshot = JSON.stringify({ case: { step, tabName, section }, observed }, null, 2);
+          fs.writeFileSync(test.info().outputPath('settings-express-navigation-state.json'), snapshot, 'utf8');
+          console.warn('SETTINGS_EXPRESS_NAVIGATION_FAILURE_DIAGNOSTIC: ' + snapshot);
+        } catch (diagnosticError) {
+          console.warn('Settings Express diagnostic could not be captured:', String(diagnosticError));
+        }
+        throw originalError;
+      }
       await expect(page).toHaveURL(new RegExp('section=' + section));
       expect(writes).toEqual([]);
     }
