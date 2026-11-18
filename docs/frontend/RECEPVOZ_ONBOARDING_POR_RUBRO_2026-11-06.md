@@ -111,3 +111,8 @@ Propuesta de validación con usuarios autorizados, sin llamadas pagadas ni clien
 **Objetivo de rapidez, pendiente de evidencia:** planteamos como *stretch* **≤10 minutos de intervención de configuración básica** para un cliente que ya dispone de sus datos, manteniendo el criterio de referencia **≤15 minutos**. Ningún tiempo está medido aún; aprobaciones externas, activación y certificación real de canales quedan fuera de la medición del asistente básico. Se debe medir con sesiones consentidas de pizzería, veterinaria, ferretería y clínica y registrar mediana, fallos y pasos recorridos. No usar la mejora visual como prueba de ahorro de tiempo.
 
 **Salida:** `IMPLEMENTED_IN_DRAFT`, `CI_EXACT_HEAD_PENDING` hasta comprobar el run final; no merge ni despliegue. Siguiente acción: certificación Fast/Full Gate y Playwright exactos sobre la última revisión del PR #860.
+
+
+## Incremento Clínica P0 · preparación de conocimiento aprobado (18-nov-2026)
+
+Objetivo limitado del Issue #879: que el propietario de una clínica pueda completar respuestas públicas verificadas en seis temas clínicos y preparar borradores de Conocimiento sin escribir seis formularios separados. Los títulos y preguntas son sugerencias, no hechos. Los campos vacíos no se guardan, lo ya existente no se sobrescribe y toda publicación de respuestas exige confirmar Guardar cambios en Conocimiento. No crea citas, agenda médica, recetas, resultados, pagos ni canales; no altera Aurora Sur. Aceptación requerida: Playwright con propietario, operador, información vacía, duplicados, persistencia y recarga; QA exact HEAD + release en main/Railway antes de declarar disponible.
