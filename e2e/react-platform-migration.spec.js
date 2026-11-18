@@ -111,8 +111,13 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
             pageExcerpt: (document.body?.innerText ?? '').slice(0, 650)
           };
         });
+        // Persist failure-only evidence under test-results/** so CI artifacts
+        // retain it even if the reporter omits in-memory attachments.
+        const snapshot = JSON.stringify(observed, null, 2);
+        fs.writeFileSync(test.info().outputPath('platform-header-dom-state.json'), snapshot, 'utf8');
+        console.warn('PLATFORM_HEADER_FAILURE_DIAGNOSTIC: ' + snapshot);
         await test.info().attach('platform-header-dom-state.json', {
-          body: JSON.stringify(observed, null, 2), contentType: 'application/json'
+          body: snapshot, contentType: 'application/json'
         });
       } catch (diagnosticError) {
         console.warn('Platform header diagnostic could not be captured:', String(diagnosticError));
