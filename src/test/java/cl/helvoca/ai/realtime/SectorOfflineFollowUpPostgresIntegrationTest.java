@@ -138,6 +138,14 @@ class SectorOfflineFollowUpPostgresIntegrationTest {
                         "SELECT count(*) FROM business_request WHERE id = ?",
                         Integer.class, requestId)));
 
+        // A foreign tenant must not be able to mutate the owner's durable follow-up.
+        assertEquals(0, databaseContext.callAsTenant(otherTenant,
+                () -> runtimeJdbc.update(
+                        "UPDATE business_request SET status = 'CLOSED' WHERE id = ?", requestId)));
+        assertEquals("OPEN", owner.queryForObject(
+                "SELECT status FROM business_request WHERE id = ? AND business_id = ?",
+                String.class, requestId, hotel));
+
         RealtimeCallContext foreignTenant = new RealtimeCallContext(
                 callId, otherTenant, null, caller, destination, streamSid);
         JSONObject foreignResult = new JSONObject(tools.execute(
