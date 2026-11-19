@@ -79,6 +79,15 @@ async function boot(page, roles = ['PLATFORM_ADMIN']) {
 test.describe('React PLATFORM_ADMIN console migration', () => {
   test('canonical platform route renders a dedicated non-tenant console without writes on visit', async ({ page }) => {
     const state = await boot(page);
+    const browserEvents = [];
+    page.on('pageerror', error => browserEvents.push({ type: 'pageerror', detail: error.message }));
+    page.on('console', message => {
+      if (message.type() === 'error') browserEvents.push({ type: 'console-error', detail: message.text() });
+    });
+    page.on('framenavigated', frame => {
+      if (frame === page.mainFrame()) browserEvents.push({ type: 'navigation', detail: frame.url() });
+    });
+    page.on('requestfailed', request => browserEvents.push({ type: 'requestfailed', detail: request.url() }));
 
     await page.goto('/app/platform');
 
@@ -108,12 +117,13 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
             })),
             platformAdminTextMatches: Array.from(document.querySelectorAll('small'))
               .filter(node => node.textContent?.trim() === 'PLATFORM ADMIN').length,
-            pageExcerpt: (document.body?.innerText ?? '').slice(0, 650)
+            pageExcerpt: (document.body?.innerText ?? '').slice(0, 650),
+            rootHtml: (document.querySelector('#root')?.innerHTML ?? '').slice(0, 650)
           };
         });
         // Persist failure-only evidence under test-results/** so CI artifacts
         // retain it even if the reporter omits in-memory attachments.
-        const snapshot = JSON.stringify(observed, null, 2);
+        const snapshot = JSON.stringify({ ...observed, browserEvents }, null, 2);
         fs.writeFileSync(test.info().outputPath('platform-header-dom-state.json'), snapshot, 'utf8');
         console.warn('PLATFORM_HEADER_FAILURE_DIAGNOSTIC: ' + snapshot);
         await test.info().attach('platform-header-dom-state.json', {
