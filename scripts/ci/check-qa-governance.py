@@ -18,6 +18,12 @@ checks = {
         "100% mapped real-postgresql invariant coverage",
         "mandatory for every chat/agent: qa evidence before done",
         "owner standing release directive: always ship verified work",
+        # Railway deploy safety is a standing owner rule, not a temporary workaround.
+        "regla permanente: railway",
+        "wait for ci",
+        "config.source.checksuites === true",
+        "no reconectar github para reintentar un deploy normal",
+        "connect_service_source",
         "100% of applicable changed/affected quality dimensions",
         "local_simulation_pass",
         "authentic_provider_pass",
