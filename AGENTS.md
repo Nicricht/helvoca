@@ -16,6 +16,17 @@ These rules are mandatory for implementation work in this repository.
 **Regla de cierre para todos los agentes, ChatGPT y automatizaciones:** `DONE` en un cambio destinado a produccion exige `main` + CI del SHA mergeado + publicacion y comprobacion del SHA en Railway. Si faltan, decir `IN_PROGRESS` / `BLOCKED`, nunca "terminado y publicado". Ver [QA_POLICY](docs/engineering/QA_POLICY.md) y [COMPLETION_DOCUMENTATION_POLICY](docs/engineering/COMPLETION_DOCUMENTATION_POLICY.md).
 
 
+## REGLA PERMANENTE: RAILWAY `WAIT FOR CI` SIEMPRE ACTIVADO (2026-11-19)
+
+**Ley expresa del titular de RecepVoz:** en Railway produccion, el servicio existente `Helvoca / production / helvoca-api` debe mantener `Settings > Source > Wait for CI` habilitado. Verificar su configuracion de origen: `config.source.checkSuites === true`. Este control **no puede desactivarse, debilitarse ni omitirse** para apresurar merges, despliegues o solucionar un CI rojo. Es independiente de la regla de publicar rapido: la seguridad de CI tiene precedencia.
+
+1. **Antes y despues de cualquier cambio en Railway que afecte la fuente GitHub:** leer `checkSuites` (o equivalente) y confirmar nuevamente `true`; registrar evidencia del readback y SHA exacto desplegado. No declarar `DONE` si el control estaba activado y la operacion lo apago. No cambiar esta configuracion como efecto lateral accidental.
+2. **No reconectar GitHub para reintentar un deploy normal:** `connect_service_source` restablecio `checkSuites=false` durante el incidente de PR #884. Preferir la ruta ordinaria que preserve la fuente y Wait for CI. Una reconexion excepcional exige restaurar y verificar la proteccion inmediatamente.
+3. **Ante Railway `WAITING` o `SKIPPED`:** revisar el workflow de GitHub y el check exacto del SHA (`helvoca/full-verification`), corregir el defecto real o reejecutar exclusivamente jobs fallidos cuando sea seguro y adecuado. No usar `checkSuites=false`, cambios de rama, pushes vacios ni bypass de pruebas para forzar verde.
+4. **Cierre trazable:** SHA final en `main`, gates postmerge `SUCCESS`, Railway `SUCCESS` del mismo SHA y salud/UX realmente comprobados; documentar por separado UI autenticada no verificada. Si las herramientas no permiten restaurar `checkSuites`, informar `BLOCKED` y solicitar solo la accion especifica en Railway, nunca asumir que se reactivo.
+
+**Incidente de referencia:** PR #884, postmerge CI [#44402459195](https://github.com/Nicricht/helvoca/actions/runs/44402459195), Railway production deployment `e6b017ec-5d12-4c28-b20f-49de5ebf4d5a`, y [registro canonico en Issue #823](https://github.com/Nicricht/helvoca/issues/823#issuecomment-7000573356). La configuracion fue leida posteriormente con `checkSuites=true` sin un despliegue nuevo. **No repetir el incidente.**
+
 ## MANDATORY FOR EVERY CHAT/AGENT: QA evidence before DONE
 
 **This is a repository contract for every ChatGPT session, coding agent and human contributor that reads or changes Helvoca, regardless of model, conversation history, prompt, task size or provider.** Before editing a single file, read this `AGENTS.md`, `docs/engineering/QA_POLICY.md`, `docs/engineering/invariants.md`, the First-Pass Engineering skill and the relevant branch/PR/CI checkpoint. Never substitute recollections from a prior chat for current repository evidence. If you cannot inspect required instructions or evidence, explicitly report the limitation and **do not certify DONE**.
