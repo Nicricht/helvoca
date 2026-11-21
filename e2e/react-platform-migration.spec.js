@@ -70,6 +70,11 @@ async function boot(page, roles = ['PLATFORM_ADMIN']) {
       }));
     }
 
+    if (pathname === '/api/v1/platform/twilio-single-operator-demo/current') {
+      // Incomplete optional provider response must not unmount the console.
+      return route.fulfill(json({}));
+    }
+
     return route.fulfill(json({}));
   });
 
@@ -79,8 +84,12 @@ async function boot(page, roles = ['PLATFORM_ADMIN']) {
 test.describe('React PLATFORM_ADMIN console migration', () => {
   test('canonical platform route renders a dedicated non-tenant console without writes on visit', async ({ page }) => {
     const state = await boot(page);
+    const pageErrors = [];
     const browserEvents = [];
-    page.on('pageerror', error => browserEvents.push({ type: 'pageerror', detail: error.message }));
+    page.on('pageerror', error => {
+      pageErrors.push(error.message);
+      browserEvents.push({ type: 'pageerror', detail: error.message });
+    });
     page.on('console', message => {
       if (message.type() === 'error') browserEvents.push({ type: 'console-error', detail: message.text() });
     });
@@ -134,9 +143,22 @@ test.describe('React PLATFORM_ADMIN console migration', () => {
       }
       throw originalError;
     }
+    await expect(page.getByText('El endpoint de enrolamiento no está disponible en este entorno. No se modificó el número.')).toBeVisible();
+    expect(pageErrors).toEqual([]);
     await expect(page.getByText('RecepVoz activo', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: 'Navegación principal' })).toHaveCount(0);
     expect(state.writes).toEqual([]);
+  });
+
+  test('valid Twilio enrollment response retains the dedicated platform console', async ({ page }) => {
+    await boot(page);
+    await page.route('**/api/v1/platform/twilio-single-operator-demo/current', route =>
+      route.fulfill(json({ changeId: null, state: 'NOT_STARTED' }))
+    );
+
+    await page.goto('/app/platform');
+    await expect(page.getByText('Todavía no existe una solicitud de vinculación.')).toBeVisible();
+    await expect(page.locator('[data-react-platform-console="true"] > header').getByText('PLATFORM ADMIN', { exact: true })).toBeVisible();
   });
 
   test('legacy platform URL redirects to React and never loads platform.js', async ({ page }) => {
